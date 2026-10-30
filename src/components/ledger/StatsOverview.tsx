@@ -229,82 +229,88 @@ export const StatsOverview: React.FC = () => {
   // Stock Management Tab
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-4">
-      {/* Total Inventory Value */}
+      {/* Total Net Balance */}
       <div className="p-3 sm:px-3.5 sm:py-2.5 rounded-xl bg-card shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5 flex flex-col justify-between">
         <div className="flex items-center justify-between gap-1">
           <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
-            Inventory Value
+            Net Balance
           </span>
           <div className="p-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 flex items-center justify-center">
             <ion-icon name="wallet-outline" class="text-sm"></ion-icon>
           </div>
         </div>
         <div className="mt-1">
-          <div className="text-base sm:text-lg font-bold text-foreground tracking-tight">
+          <div
+            className={`text-base sm:text-lg font-bold tracking-tight ${
+              grandTotal >= 0
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-rose-600 dark:text-rose-400'
+            }`}
+          >
             {formatCurrency(grandTotal)}
           </div>
           <p className="text-[10px] text-muted-foreground truncate">
-            Current warehouse valuation
+            Remaining warehouse balance
           </p>
         </div>
       </div>
 
-      {/* Units in Stock */}
+      {/* Goods In (Stock Delivered) */}
+      <div className="p-3 sm:px-3.5 sm:py-2.5 rounded-xl bg-card shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5 flex flex-col justify-between">
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+            Goods In
+          </span>
+          <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
+            <ion-icon name="arrow-up-circle-outline" class="text-sm"></ion-icon>
+          </div>
+        </div>
+        <div className="mt-1">
+          <div className="text-base sm:text-lg font-bold text-foreground tracking-tight">
+            {formatCurrency(positiveSubtotal)}
+          </div>
+          <p className="text-[10px] text-muted-foreground truncate">
+            Total delivered goods value
+          </p>
+        </div>
+      </div>
+
+      {/* Payments Out (Bank & Cash Settlements) */}
+      <div className="p-3 sm:px-3.5 sm:py-2.5 rounded-xl bg-card shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5 flex flex-col justify-between">
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+            Payments Out
+          </span>
+          <div className="p-1 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 shrink-0 flex items-center justify-center">
+            <ion-icon name="business-outline" class="text-sm"></ion-icon>
+          </div>
+        </div>
+        <div className="mt-1">
+          <div className="text-base sm:text-lg font-bold text-foreground tracking-tight">
+            {formatCurrency(negativeSubtotal)}
+          </div>
+          <p className="text-[10px] text-muted-foreground truncate">
+            Bank transfers & cash paid
+          </p>
+        </div>
+      </div>
+
+      {/* Total Units in Stock */}
       <div className="p-3 sm:px-3.5 sm:py-2.5 rounded-xl bg-card shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5 flex flex-col justify-between">
         <div className="flex items-center justify-between gap-1">
           <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
             Total Units
           </span>
-          <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
+          <div className="p-1 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 shrink-0 flex items-center justify-center">
             <ion-icon name="cube-outline" class="text-sm"></ion-icon>
           </div>
         </div>
         <div className="mt-1">
           <div className="text-base sm:text-lg font-bold text-foreground tracking-tight">
-            {totalUnitsQuantity.toLocaleString()}
+            {totalUnitsQuantity.toLocaleString()} pcs
           </div>
           <p className="text-[10px] text-muted-foreground truncate">
-            Tracked product items
-          </p>
-        </div>
-      </div>
-
-      {/* Stock Batches / Records */}
-      <div className="p-3 sm:px-3.5 sm:py-2.5 rounded-xl bg-card shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5 flex flex-col justify-between">
-        <div className="flex items-center justify-between gap-1">
-          <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
-            Stock Lots
-          </span>
-          <div className="p-1 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 shrink-0 flex items-center justify-center">
-            <ion-icon name="layers-outline" class="text-sm"></ion-icon>
-          </div>
-        </div>
-        <div className="mt-1">
-          <div className="text-base sm:text-lg font-bold text-foreground tracking-tight">
-            {currentTabRecords.length}
-          </div>
-          <p className="text-[10px] text-muted-foreground truncate">
-            Warehouses & depots
-          </p>
-        </div>
-      </div>
-
-      {/* Distinct Line Items */}
-      <div className="p-3 sm:px-3.5 sm:py-2.5 rounded-xl bg-card shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5 flex flex-col justify-between">
-        <div className="flex items-center justify-between gap-1">
-          <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
-            Line Items
-          </span>
-          <div className="p-1 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 shrink-0 flex items-center justify-center">
-            <ion-icon name="pricetags-outline" class="text-sm"></ion-icon>
-          </div>
-        </div>
-        <div className="mt-1">
-          <div className="text-base sm:text-lg font-bold text-foreground tracking-tight">
-            {totalItemsCount}
-          </div>
-          <p className="text-[10px] text-muted-foreground truncate">
-            Individual SKU entries
+            Across {currentTabRecords.length} lots ({totalItemsCount} rows)
           </p>
         </div>
       </div>

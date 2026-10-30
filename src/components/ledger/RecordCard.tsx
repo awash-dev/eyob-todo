@@ -106,6 +106,33 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
 
           <div>
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  record.type === 'customer'
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                    : record.type === 'supplier'
+                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                      : 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                }`}
+              >
+                <ion-icon
+                  name={
+                    record.type === 'customer'
+                      ? 'people-outline'
+                      : record.type === 'supplier'
+                        ? 'business-outline'
+                        : 'layers-outline'
+                  }
+                  class="text-xs"
+                ></ion-icon>
+                <span>
+                  {record.type === 'customer'
+                    ? 'Customer'
+                    : record.type === 'supplier'
+                      ? 'Supplier'
+                      : 'Stock Lot'}
+                </span>
+              </span>
               <h3 className="font-bold text-sm sm:text-base text-foreground tracking-tight">
                 {record.title}
               </h3>
@@ -225,7 +252,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
       {isExpanded && (
         <div className="border-t border-zinc-100 dark:border-zinc-800/80 bg-muted/15 px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-xs">
+            <table className="w-full min-w-[680px] text-xs">
               <thead>
                 <tr className="border-b border-zinc-100 dark:border-zinc-800 text-muted-foreground text-[10px] uppercase tracking-wider">
                   <th className="text-left font-semibold py-1.5 w-24 sm:w-28">
@@ -234,17 +261,18 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                   <th className="text-left font-semibold py-1.5">
                     {columnLabels.item}
                   </th>
-                  <th className="text-left font-semibold py-1.5 w-20">Bank</th>
+                  <th className="text-left font-semibold py-1.5 w-24">Bank / Channel</th>
                   {isStock && (
-                    <th className="text-left font-semibold py-1.5 w-20">
-                      {columnLabels.custom}
-                    </th>
+                    <>
+                      <th className="text-right font-semibold py-1.5 w-14">Ctns</th>
+                      <th className="text-right font-semibold py-1.5 w-16">Pcs/Ctn</th>
+                    </>
                   )}
+                  <th className="text-right font-semibold py-1.5 w-16">
+                    {columnLabels.qty}
+                  </th>
                   <th className="text-right font-semibold py-1.5 w-24">
                     {columnLabels.unitPrice}
-                  </th>
-                  <th className="text-right font-semibold py-1.5 w-14">
-                    {columnLabels.qty}
                   </th>
                   {hasCustoms && (
                     <th className="text-right font-semibold py-1.5 w-24">
@@ -311,7 +339,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                         {item.name}
                       </td>
 
-                      {/* Bank */}
+                      {/* Bank / Type */}
                       <td className="py-2 whitespace-nowrap">
                         {bank ? (
                           <span
@@ -324,42 +352,42 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                             ></ion-icon>
                             <span>{bank}</span>
                           </span>
+                        ) : customType ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border bg-zinc-100/70 dark:bg-zinc-800/70 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                            title={`Stock Type: ${customType}`}
+                          >
+                            <ion-icon
+                              name="cube-outline"
+                              class="text-xs shrink-0"
+                            ></ion-icon>
+                            <span>{customType}</span>
+                          </span>
                         ) : (
-                          <span className="text-muted-foreground/50">—</span>
+                          <span className="text-muted-foreground/40">—</span>
                         )}
                       </td>
 
-                      {/* Stock Type (stock tab only) */}
+                      {/* Ctns & Pcs/Ctn (stock tab only) */}
                       {isStock && (
-                        <td className="py-2 whitespace-nowrap">
-                          {customType ? (
-                            <span
-                              className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${isAdd
-                                  ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-800'
-                                  : 'bg-muted/60 text-muted-foreground border-zinc-200 dark:border-zinc-700'
-                                }`}
-                              title={`Stock type: ${customType}`}
-                            >
-                              <ion-icon
-                                name="pricetag-outline"
-                                class="text-xs shrink-0"
-                              ></ion-icon>
-                              <span>{customType}</span>
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground/50">—</span>
-                          )}
-                        </td>
+                        <>
+                          <td className="py-2 text-right text-muted-foreground font-mono">
+                            {item.cartons ? `${item.cartons} ctn` : '—'}
+                          </td>
+                          <td className="py-2 text-right text-muted-foreground font-mono">
+                            {item.pcsPerCarton ? `${item.pcsPerCarton} pcs` : '—'}
+                          </td>
+                        </>
                       )}
+
+                      {/* Quantity */}
+                      <td className="py-2 text-right text-muted-foreground font-mono font-semibold">
+                        {item.quantity}
+                      </td>
 
                       {/* Unit Price */}
                       <td className="py-2 text-right text-muted-foreground font-mono">
                         {formatCurrency(item.unitPrice)}
-                      </td>
-
-                      {/* Quantity */}
-                      <td className="py-2 text-right text-muted-foreground font-mono">
-                        {item.quantity}
                       </td>
 
                       {/* Customs (only if record has customs duties) */}
@@ -388,12 +416,43 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
           </div>
 
           {/* Subtotal summary footer within expanded card */}
-          <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 text-xs">
-            <span className="text-[11px] text-muted-foreground">
-              Total of {record.items.length} items
-            </span>
-            <div className="font-mono font-bold text-sm text-foreground">
-              {formatCurrency(total)}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 mt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 text-xs">
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-4 text-[11px] text-muted-foreground">
+              <span>Total of {record.items.length} items</span>
+              {isStock && (
+                <>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                    Goods In:{' '}
+                    {formatCurrency(
+                      record.items
+                        .filter((i) => i.sign === '+')
+                        .reduce((acc, i) => acc + calculateItemTotal(i), 0),
+                    )}
+                  </span>
+                  <span className="text-rose-600 dark:text-rose-400 font-semibold">
+                    Payments Out:{' '}
+                    {formatCurrency(
+                      record.items
+                        .filter((i) => i.sign === '-')
+                        .reduce((acc, i) => acc + Math.abs(calculateItemTotal(i)), 0),
+                    )}
+                  </span>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground uppercase font-semibold">
+                {isStock ? 'Net Warehouse Balance:' : 'Net Balance:'}
+              </span>
+              <div
+                className={`font-mono font-bold text-sm ${
+                  total >= 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                {formatCurrency(total)}
+              </div>
             </div>
           </div>
         </div>

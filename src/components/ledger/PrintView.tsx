@@ -136,7 +136,14 @@ export const PrintView: React.FC = () => {
                         <td className="py-1 font-bold whitespace-nowrap">
                           {isAdd ? columnLabels.add : columnLabels.deduct}
                         </td>
-                        <td className="py-1">{item.name}</td>
+                        <td className="py-1">
+                          {item.name}
+                          {isStock && item.cartons && item.pcsPerCarton ? (
+                            <span className="text-zinc-500 font-mono text-[11px] ml-1.5">
+                              ({item.cartons} ctns × {item.pcsPerCarton} pcs)
+                            </span>
+                          ) : null}
+                        </td>
                         <td className="py-1 whitespace-nowrap">
                           {bank || '—'}
                         </td>

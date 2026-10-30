@@ -17,6 +17,8 @@ export interface LineItem {
   bank?: string
   customType?: string
   customs?: number
+  cartons?: number
+  pcsPerCarton?: number
 }
 
 export interface LedgerRecord {

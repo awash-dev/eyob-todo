@@ -193,40 +193,30 @@ export const RecordModal: React.FC = () => {
     handleItemChange(index, 'unitPrice', etbPrice)
   }
 
-  // Quick Carton tool: Cartons × Pcs/Ctn = Total Quantity
-  const handleCartonCalculation = (index: number) => {
-    const currentItem = items[index]
-    const cartonsInput = window.prompt(
-      `Carton Tool for "${currentItem.name || 'Item'}":\nEnter number of Cartons / Boxes (e.g. 10):`,
-      '10',
-    )
-    if (!cartonsInput) return
-    const cartons = parseFloat(cartonsInput)
-    if (isNaN(cartons) || cartons <= 0) return
-
-    const pcsInput = window.prompt(`Enter Pieces per Carton (e.g. 100):`, '100')
-    if (!pcsInput) return
-    const pcs = parseFloat(pcsInput)
-    if (isNaN(pcs) || pcs <= 0) return
-
-    const totalQty = cartons * pcs
-    let newName = currentItem.name
-    if (!newName) {
-      newName = `(${cartons} ctns × ${pcs} pcs)`
-    } else if (!newName.includes('ctn')) {
-      newName = `${newName} (${cartons} ctns × ${pcs} pcs)`
-    }
-
+  // Quick Carton tool & direct cartons / pcs per carton calculation
+  const handleCartonOrPcsChange = (
+    index: number,
+    field: 'cartons' | 'pcsPerCarton',
+    val: number,
+  ) => {
     setItems((prev) =>
-      prev.map((it, i) => {
+      prev.map((item, i) => {
         if (i === index) {
+          const cartons = field === 'cartons' ? val : item.cartons || 0
+          const pcs = field === 'pcsPerCarton' ? val : item.pcsPerCarton || 0
+          const computedQty =
+            cartons > 0 && pcs > 0
+              ? cartons * pcs
+              : cartons > 0
+                ? cartons
+                : item.quantity
           return {
-            ...it,
-            name: newName,
-            quantity: totalQty,
+            ...item,
+            [field]: val > 0 ? val : undefined,
+            quantity: computedQty > 0 ? computedQty : item.quantity,
           }
         }
-        return it
+        return item
       }),
     )
   }
@@ -240,7 +230,7 @@ export const RecordModal: React.FC = () => {
     return acc + (item.sign === '-' ? -base : base + customs)
   }, 0)
 
-  // Title label based on activeTab
+  // Title label and badge based on activeTab
   const getTabLabel = () => {
     switch (activeTab) {
       case 'customer':
@@ -249,7 +239,11 @@ export const RecordModal: React.FC = () => {
             modalMode === 'create'
               ? 'New Customer Entry'
               : 'Edit Customer Entry',
-          placeholder: 'Customer / Store name (e.g. Alex Johnson)',
+          placeholder: 'Customer / Store name (e.g. Alex Johnson, Kelil Aginbi)',
+          badge: 'Customer Credit',
+          badgeColor:
+            'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+          icon: 'people-outline',
         }
       case 'supplier':
         return {
@@ -257,27 +251,35 @@ export const RecordModal: React.FC = () => {
             modalMode === 'create'
               ? 'New Supplier Entry'
               : 'Edit Supplier Entry',
-          placeholder: 'Supplier / Vendor name (e.g. Global Tech)',
+          placeholder: 'Supplier / Vendor name (e.g. Global Tech, Metro Packaging)',
+          badge: 'Supplier Credit',
+          badgeColor:
+            'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+          icon: 'business-outline',
         }
       case 'stock':
         return {
           header:
             modalMode === 'create' ? 'New Stock Entry' : 'Edit Stock Entry',
-          placeholder: 'Depot or Item batch (e.g. Warehouse A)',
+          placeholder: 'Stock Lot / Account (e.g. KELIL AGINBI - Electrical & LED Lighting)',
+          badge: 'Stock & Inventory',
+          badgeColor:
+            'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+          icon: 'layers-outline',
         }
     }
   }
 
-  const { header, placeholder } = getTabLabel()
+  const { header, placeholder, badge, badgeColor, icon } = getTabLabel()
 
   const isStockTab = activeTab === 'stock'
   const lineLabels = isStockTab
     ? {
         type: 'Bank / Stock Type',
-        item: 'Item / Product',
+        item: 'Item / Description',
         unitPrice: 'Unit Cost',
-        quantity: 'Qty',
-        amount: 'Value',
+        quantity: 'Total Qty',
+        amount: 'Total Value',
       }
     : {
         type: 'Bank / Type',
@@ -310,7 +312,11 @@ export const RecordModal: React.FC = () => {
         unitPrice: Math.max(0, Number(it.unitPrice) || 0),
         quantity: Math.max(0, Number(it.quantity) || 0),
         sign: it.sign,
-        customs: Math.max(0, Number(it.customs) || 0),
+        cartons: it.cartons ? Math.max(0, Number(it.cartons)) : undefined,
+        pcsPerCarton: it.pcsPerCarton
+          ? Math.max(0, Number(it.pcsPerCarton))
+          : undefined,
+        customs: it.customs ? Math.max(0, Number(it.customs)) : undefined,
         bank: bank || undefined,
         customType: customType || undefined,
       }
@@ -337,11 +343,19 @@ export const RecordModal: React.FC = () => {
   return (
     <Dialog open={isModalOpen} onOpenChange={(open) => !open && closeModal()}>
       <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto overflow-x-hidden sm:rounded-2xl p-4 sm:p-6 border-0 shadow-2xl bg-card">
-        <DialogHeader className="pb-2 text-left pr-10">
-          <div className="flex items-center justify-between gap-3">
-            <DialogTitle className="text-base sm:text-lg font-bold text-foreground">
-              {header}
-            </DialogTitle>
+        <DialogHeader className="pb-2 text-left pr-12 sm:pr-14">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${badgeColor}`}
+              >
+                <ion-icon name={icon} class="text-xs"></ion-icon>
+                <span>{badge}</span>
+              </span>
+              <DialogTitle className="text-base sm:text-lg font-bold text-foreground truncate">
+                {header}
+              </DialogTitle>
+            </div>
             <div className="flex items-center gap-3 shrink-0">
               {isStockTab && (
                 <button
@@ -440,21 +454,40 @@ export const RecordModal: React.FC = () => {
           {/* Line Items - Clean, spacious layout with Bank and Custom Type support */}
           <div className="pt-1 w-full min-w-0 max-w-full">
             <div className="w-full min-w-0 max-w-full overflow-x-auto pb-1.5 scrollbar-thin rounded-xl border border-zinc-100 dark:border-zinc-800/80 p-2 sm:p-3 bg-muted/10">
-              <div className={isStockTab && showCustoms ? 'min-w-[760px]' : 'min-w-[660px]'}>
+              <div className={isStockTab ? (showCustoms ? 'min-w-[890px]' : 'min-w-[820px]') : 'min-w-[660px]'}>
                 <div className="flex items-center gap-2 text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-1 border-b border-zinc-100 dark:border-zinc-800/80 pb-1.5">
                   <span className="w-8 text-center shrink-0">+/-</span>
                   <span className="w-32 sm:w-36 text-left shrink-0">
                     {lineLabels.type}
                   </span>
-                  <span className="flex-1 min-w-[140px] text-left">
+                  <span className="flex-1 min-w-[130px] text-left">
                     {lineLabels.item}
                   </span>
-                  <span className="w-20 sm:w-24 text-right shrink-0">
-                    {lineLabels.unitPrice}
-                  </span>
-                  <span className="w-24 sm:w-26 text-center shrink-0">
-                    {lineLabels.quantity}
-                  </span>
+                  {isStockTab ? (
+                    <>
+                      <span className="w-14 sm:w-16 text-right shrink-0" title="Cartons / Boxes">
+                        Ctns
+                      </span>
+                      <span className="w-14 sm:w-16 text-right shrink-0" title="Pieces per Carton">
+                        Pcs/Ctn
+                      </span>
+                      <span className="w-16 sm:w-20 text-right shrink-0" title="Total Quantity (Ctns × Pcs/Ctn)">
+                        Total Qty
+                      </span>
+                      <span className="w-20 sm:w-24 text-right shrink-0">
+                        {lineLabels.unitPrice}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-20 sm:w-24 text-right shrink-0">
+                        {lineLabels.unitPrice}
+                      </span>
+                      <span className="w-20 sm:w-24 text-center shrink-0">
+                        {lineLabels.quantity}
+                      </span>
+                    </>
+                  )}
                   {isStockTab && showCustoms && (
                     <span className="w-20 sm:w-24 text-right shrink-0">Customs</span>
                   )}
@@ -539,73 +572,150 @@ export const RecordModal: React.FC = () => {
                           onChange={(e) =>
                             handleItemChange(index, 'name', e.target.value)
                           }
-                          className="flex-1 min-w-[140px] h-8 px-2 text-xs bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors"
+                          className="flex-1 min-w-[130px] h-8 px-2 text-xs bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors"
                           required
                         />
 
-                        {/* Price in ETB */}
-                        <input
-                          type="number"
-                          placeholder="Price"
-                          step="any"
-                          min="0"
-                          value={item.unitPrice === 0 ? '' : item.unitPrice}
-                          onChange={(e) =>
-                            handleItemChange(
-                              index,
-                              'unitPrice',
-                              parseFloat(e.target.value) || 0,
-                            )
-                          }
-                          className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
+                        {/* Inputs: Stock tab (Cartons, Pcs, Qty, Price) vs Customer/Supplier tabs */}
+                        {isStockTab ? (
+                          isAdd ? (
+                            <>
+                              {/* Ctns */}
+                              <input
+                                type="number"
+                                placeholder="Ctns"
+                                step="any"
+                                min="0"
+                                value={item.cartons || ''}
+                                onChange={(e) =>
+                                  handleCartonOrPcsChange(
+                                    index,
+                                    'cartons',
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="w-14 sm:w-16 h-8 px-1 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                title="Number of Cartons (e.g. 10)"
+                              />
 
-                        {/* Optional USDT helper button for row */}
-                        {showUsdtHelper && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const val = window.prompt(
-                                'Enter price in USDT (e.g. 50):',
-                                '50',
-                              )
-                              if (val && !isNaN(Number(val))) {
-                                handleConvertUsdtToEtbRow(index, Number(val))
+                              {/* Pcs/Ctn */}
+                              <input
+                                type="number"
+                                placeholder="Pcs"
+                                step="any"
+                                min="0"
+                                value={item.pcsPerCarton || ''}
+                                onChange={(e) =>
+                                  handleCartonOrPcsChange(
+                                    index,
+                                    'pcsPerCarton',
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="w-14 sm:w-16 h-8 px-1 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                title="Pieces per Carton (e.g. 100)"
+                              />
+
+                              {/* Total Qty (auto-calculated: Ctns × Pcs/Ctn) */}
+                              <input
+                                type="number"
+                                placeholder="Qty"
+                                step="any"
+                                min="0"
+                                value={item.quantity === 0 ? '' : item.quantity}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    'quantity',
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="w-16 sm:w-20 h-8 px-1 text-xs text-right font-mono font-semibold bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                title="Total Quantity = Ctns × Pcs/Ctn"
+                              />
+
+                              {/* Unit Price in ETB */}
+                              <input
+                                type="number"
+                                placeholder="Price"
+                                step="any"
+                                min="0"
+                                value={item.unitPrice === 0 ? '' : item.unitPrice}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    'unitPrice',
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              {/* Deduction / Bank payment placeholders and amount */}
+                              <div className="w-14 sm:w-16 h-8 flex items-center justify-center text-muted-foreground/30 font-mono text-xs shrink-0">
+                                —
+                              </div>
+                              <div className="w-14 sm:w-16 h-8 flex items-center justify-center text-muted-foreground/30 font-mono text-xs shrink-0">
+                                —
+                              </div>
+                              <div className="w-16 sm:w-20 h-8 flex items-center justify-center text-muted-foreground/50 font-mono text-xs shrink-0 font-semibold">
+                                1
+                              </div>
+                              <input
+                                type="number"
+                                placeholder="Amount"
+                                step="any"
+                                min="0"
+                                value={item.unitPrice === 0 ? '' : item.unitPrice}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    'unitPrice',
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono font-bold bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                title="Payment Amount in ETB"
+                              />
+                            </>
+                          )
+                        ) : (
+                          <>
+                            {/* Customer / Supplier tabs standard Price and Qty */}
+                            <input
+                              type="number"
+                              placeholder="Price"
+                              step="any"
+                              min="0"
+                              value={item.unitPrice === 0 ? '' : item.unitPrice}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  'unitPrice',
+                                  parseFloat(e.target.value) || 0,
+                                )
                               }
-                            }}
-                            className="text-[10px] font-mono text-emerald-600 bg-emerald-100/60 dark:bg-emerald-950 px-1.5 py-1 rounded cursor-pointer shrink-0"
-                            title="Convert from USDT"
-                          >
-                            USDT
-                          </button>
+                              className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <input
+                              type="number"
+                              placeholder="Qty"
+                              step="any"
+                              min="0"
+                              value={item.quantity === 0 ? '' : item.quantity}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  'quantity',
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
+                              className="w-20 sm:w-24 h-8 px-1 text-xs text-center font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          </>
                         )}
-
-                        {/* Qty & Carton tool group */}
-                        <div className="flex items-center gap-1 w-24 sm:w-26 shrink-0">
-                          <input
-                            type="number"
-                            placeholder="Qty"
-                            step="any"
-                            min="0"
-                            value={item.quantity === 0 ? '' : item.quantity}
-                            onChange={(e) =>
-                              handleItemChange(
-                                index,
-                                'quantity',
-                                parseFloat(e.target.value) || 0,
-                              )
-                            }
-                            className="flex-1 min-w-0 h-8 px-1 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleCartonCalculation(index)}
-                            className="text-[10px] font-mono font-medium text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/80 px-1.5 h-8 rounded flex items-center justify-center cursor-pointer shrink-0 border border-dashed border-zinc-300 dark:border-zinc-700 transition-colors"
-                            title="Carton Tool: Cartons × Pcs/Ctn = Qty (e.g. 10 ctns × 100 pcs = 1000)"
-                          >
-                            ctn
-                          </button>
-                        </div>
 
                         {/* Customs duty (optional toggle, stock additions only) */}
                         {isStockTab && showCustoms && (

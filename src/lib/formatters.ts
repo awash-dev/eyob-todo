@@ -83,6 +83,9 @@ export function generateRecordShareText(
     text += `  ${index + 1}. ${item.name}\n`
     if (bank) text += `     🏦 Bank: ${bank}\n`
     if (customType) text += `     🏷️ Custom Type: ${customType}\n`
+    if (item.cartons && item.pcsPerCarton) {
+      text += `     📦 Packing: ${item.cartons} ctns × ${item.pcsPerCarton} pcs/ctn (${item.quantity} units)\n`
+    }
     if (item.customs) {
       text += `     🛃 Customs: ${formatCurrency(item.customs, currency)}\n`
     }

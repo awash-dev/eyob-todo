@@ -40,6 +40,20 @@ export const MobileBottomNav: React.FC = () => {
           const isActive = activeTab === tab.id
           const count = tabRecordCounts[tab.id]
 
+          const activeColorClass =
+            tab.id === 'customer'
+              ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+              : tab.id === 'supplier'
+                ? 'text-blue-600 dark:text-blue-400 font-semibold'
+                : 'text-purple-600 dark:text-purple-400 font-semibold'
+
+          const activeBadgeClass =
+            tab.id === 'customer'
+              ? 'bg-emerald-600 text-white'
+              : tab.id === 'supplier'
+                ? 'bg-blue-600 text-white'
+                : 'bg-purple-600 text-white'
+
           return (
             <button
               key={tab.id}
@@ -47,7 +61,7 @@ export const MobileBottomNav: React.FC = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 transition-all relative ${
                 isActive
-                  ? 'text-primary font-semibold'
+                  ? activeColorClass
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -59,7 +73,13 @@ export const MobileBottomNav: React.FC = () => {
                   }`}
                 ></ion-icon>
                 {count > 0 && (
-                  <span className="absolute -top-1 -right-2 bg-primary text-primary-foreground text-[9px] font-mono px-1 min-w-[15px] h-[15px] flex items-center justify-center rounded-full leading-none">
+                  <span
+                    className={`absolute -top-1 -right-2 text-[9px] font-mono px-1 min-w-[15px] h-[15px] flex items-center justify-center rounded-full leading-none ${
+                      isActive
+                        ? activeBadgeClass
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
                     {count}
                   </span>
                 )}
