@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react'
 import { useLedger } from '../../context/LedgerContext'
-import { generateTabSummaryText } from '../../lib/formatters'
 import {
   Dialog,
   DialogContent,
@@ -9,17 +8,7 @@ import {
   DialogDescription,
 } from '../ui/dialog'
 import { Button } from '../ui/button'
-import {
-  Copy,
-  Download,
-  Upload,
-  Printer,
-  Check,
-  FileText,
-  Cloud,
-  Loader2,
-} from 'lucide-react'
-import { uploadBackupToS3 } from '../../lib/s3Client'
+import { exportRecordsToExcel, importRecordsFromExcel } from '../../lib/excelUtils'
 
 interface ExportDialogProps {
   isOpen: boolean
@@ -30,71 +19,83 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   isOpen,
   onClose,
 }) => {
-  const {
-    records,
-    activeTab,
-    currentTabRecords,
-    importRecords,
-    showToast,
-    currency,
-  } = useLedger()
-  const [copiedText, setCopiedText] = useState(false)
-  const [copiedJson, setCopiedJson] = useState(false)
-  const [isUploadingS3, setIsUploadingS3] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { records, activeTab, importRecords, showToast } = useLedger()
 
-  const handleUploadToS3 = async () => {
+  const [isProcessingExcel, setIsProcessingExcel] = useState(false)
+  const excelFileInputRef = useRef<HTMLInputElement>(null)
+  const jsonFileInputRef = useRef<HTMLInputElement>(null)
+
+  // 1. Export to Excel (.xlsx)
+  const handleExportExcel = () => {
     try {
-      setIsUploadingS3(true)
-      const filename = await uploadBackupToS3(records)
-      showToast(
-        `Cloud backup saved to Neon S3: ${filename.split('/').pop()}`,
-        'success',
-      )
+      if (records.length === 0) {
+        showToast('No records available to export', 'info')
+        return
+      }
+      exportRecordsToExcel(records, `eyoba-ledger-${activeTab}`)
+      showToast('Excel workbook exported successfully (.xlsx)', 'success')
+      onClose()
     } catch (err: any) {
-      console.error('S3 upload error:', err)
-      showToast(
-        `Cloud backup failed: ${err.message || 'Unknown error'}`,
-        'error',
-      )
-    } finally {
-      setIsUploadingS3(false)
+      console.error('Excel export error:', err)
+      showToast(`Excel export failed: ${err.message || 'Unknown error'}`, 'error')
     }
   }
 
-  const handleCopySummary = () => {
-    const text = generateTabSummaryText(activeTab, currentTabRecords, currency)
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedText(true)
-      showToast('Formatted text summary copied to clipboard!', 'success')
-      setTimeout(() => setCopiedText(false), 2000)
-    })
+  // 2. Export to JSON (.json)
+  const handleExportJson = () => {
+    try {
+      if (records.length === 0) {
+        showToast('No records available to export', 'info')
+        return
+      }
+      const jsonString = JSON.stringify(records, null, 2)
+      const blob = new Blob([jsonString], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `eyoba-ledger-backup-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      showToast('JSON backup file downloaded successfully', 'success')
+      onClose()
+    } catch (err: any) {
+      console.error('JSON export error:', err)
+      showToast(`JSON export failed: ${err.message || 'Unknown error'}`, 'error')
+    }
   }
 
-  const handleCopyJson = () => {
-    const jsonString = JSON.stringify(records, null, 2)
-    navigator.clipboard.writeText(jsonString).then(() => {
-      setCopiedJson(true)
-      showToast('All records JSON copied to clipboard!', 'success')
-      setTimeout(() => setCopiedJson(false), 2000)
-    })
+  // 3. Import from Excel (.xlsx, .xls, .csv)
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setIsProcessingExcel(true)
+      const imported = await importRecordsFromExcel(file, activeTab)
+      if (imported.length === 0) {
+        showToast('No valid records found in the selected Excel file', 'error')
+        return
+      }
+      const success = importRecords(imported)
+      if (success) {
+        onClose()
+      }
+    } catch (err: any) {
+      console.error('Excel import error:', err)
+      showToast(
+        `Failed to import Excel: ${err.message || 'Check file format'}`,
+        'error',
+      )
+    } finally {
+      setIsProcessingExcel(false)
+      e.target.value = ''
+    }
   }
 
-  const handleDownloadBackup = () => {
-    const jsonString = JSON.stringify(records, null, 2)
-    const blob = new Blob([jsonString], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `eyoba-ledger-backup-${new Date().toISOString().split('T')[0]}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    showToast('Backup file downloaded successfully', 'success')
-  }
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 4. Import from JSON (.json)
+  const handleJsonUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -118,219 +119,197 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     e.target.value = ''
   }
 
-  const handlePrint = () => {
-    onClose()
-    setTimeout(() => {
-      window.print()
-    }, 200)
-  }
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md sm:rounded-2xl p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">
-            Export, Share & Backup
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <ion-icon
+              name="swap-vertical-outline"
+              class="text-primary text-xl"
+            ></ion-icon>
+            <span>Export & Import Data</span>
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
-            Easily copy, print, or download your ledger accounts data for
-            offline records and sharing.
+            Export your ledger records to Excel or JSON, and import data files
+            seamlessly.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 pt-3">
-          {/* Action 1: Copy Tab Summary */}
-          <div className="p-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-colors flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
-                <FileText className="w-4 h-4" />
+        {/* Hidden File Inputs */}
+        <input
+          ref={excelFileInputRef}
+          type="file"
+          accept=".xlsx, .xls, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+          className="hidden"
+          onChange={handleExcelUpload}
+        />
+        <input
+          ref={jsonFileInputRef}
+          type="file"
+          accept=".json, application/json"
+          className="hidden"
+          onChange={handleJsonUpload}
+        />
+
+        <div className="space-y-4 pt-2">
+          {/* Section: EXPORT */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Export Options
+              </span>
+              <div className="h-px bg-border flex-1"></div>
+            </div>
+
+            <div className="space-y-2">
+              {/* Option 1: Export to Excel */}
+              <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 shrink-0 flex items-center justify-center">
+                    <ion-icon
+                      name="document-text-outline"
+                      class="text-xl"
+                    ></ion-icon>
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-semibold text-foreground truncate">
+                      Export to Excel (.xlsx)
+                    </h4>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      Multi-sheet spreadsheet with item details ({records.length}{' '}
+                      records)
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportExcel}
+                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-emerald-500 hover:text-emerald-600"
+                >
+                  <ion-icon name="download-outline" class="text-sm"></ion-icon>
+                  <span>Export</span>
+                </Button>
               </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground">
-                  Copy Active Tab Summary
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  Text summary of {currentTabRecords.length} {activeTab} records
-                  for WhatsApp or notes
-                </p>
+
+              {/* Option 2: Export to JSON */}
+              <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 shrink-0 flex items-center justify-center">
+                    <ion-icon
+                      name="code-slash-outline"
+                      class="text-xl"
+                    ></ion-icon>
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-semibold text-foreground truncate">
+                      Export to JSON (.json)
+                    </h4>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      Complete structured data backup for device storage
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportJson}
+                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-indigo-500 hover:text-indigo-600"
+                >
+                  <ion-icon name="download-outline" class="text-sm"></ion-icon>
+                  <span>Export</span>
+                </Button>
               </div>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleCopySummary}
-              className="shrink-0 text-xs"
-            >
-              {copiedText ? (
-                <>
-                  <Check className="w-3.5 h-3.5 mr-1 text-emerald-500" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 mr-1" />
-                  Copy
-                </>
-              )}
-            </Button>
           </div>
 
-          {/* Action 2: Print / PDF */}
-          <div className="p-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-colors flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
-                <Printer className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground">
-                  Print / PDF Report
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  Generates clean printable statement via browser print dialog
-                </p>
-              </div>
+          {/* Section: IMPORT */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Import Options
+              </span>
+              <div className="h-px bg-border flex-1"></div>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handlePrint}
-              className="shrink-0 text-xs"
-            >
-              <Printer className="w-3.5 h-3.5 mr-1" />
-              Print
-            </Button>
-          </div>
 
-          {/* Action 3: Copy JSON */}
-          <div className="p-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-colors flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
-                <Copy className="w-4 h-4" />
+            <div className="space-y-2">
+              {/* Option 3: Import from Excel */}
+              <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2.5 rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-950/60 dark:text-teal-400 shrink-0 flex items-center justify-center">
+                    <ion-icon
+                      name="cloud-upload-outline"
+                      class="text-xl"
+                    ></ion-icon>
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-semibold text-foreground truncate">
+                      Import from Excel
+                    </h4>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      Upload .xlsx, .xls, or .csv workbook
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isProcessingExcel}
+                  onClick={() => excelFileInputRef.current?.click()}
+                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-teal-500 hover:text-teal-600"
+                >
+                  {isProcessingExcel ? (
+                    <>
+                      <ion-icon
+                        name="sync-outline"
+                        class="text-sm animate-spin"
+                      ></ion-icon>
+                      <span>Loading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ion-icon
+                        name="cloud-upload-outline"
+                        class="text-sm"
+                      ></ion-icon>
+                      <span>Import</span>
+                    </>
+                  )}
+                </Button>
               </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground">
-                  Copy All JSON Data
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  Raw JSON text payload for clipboard transfer
-                </p>
-              </div>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleCopyJson}
-              className="shrink-0 text-xs"
-            >
-              {copiedJson ? (
-                <>
-                  <Check className="w-3.5 h-3.5 mr-1 text-emerald-500" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 mr-1" />
-                  Copy
-                </>
-              )}
-            </Button>
-          </div>
 
-          {/* Action 4: Download Backup file */}
-          <div className="p-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-colors flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-                <Download className="w-4 h-4" />
+              {/* Option 4: Import from JSON */}
+              <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2.5 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 shrink-0 flex items-center justify-center">
+                    <ion-icon
+                      name="file-tray-full-outline"
+                      class="text-xl"
+                    ></ion-icon>
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-semibold text-foreground truncate">
+                      Import from JSON
+                    </h4>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      Restore accounts from a previously saved .json file
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => jsonFileInputRef.current?.click()}
+                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-amber-500 hover:text-amber-600"
+                >
+                  <ion-icon
+                    name="cloud-upload-outline"
+                    class="text-sm"
+                  ></ion-icon>
+                  <span>Import</span>
+                </Button>
               </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground">
-                  Download Backup (.json)
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  Save all {records.length} records safely to your device
-                </p>
-              </div>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleDownloadBackup}
-              className="shrink-0 text-xs"
-            >
-              <Download className="w-3.5 h-3.5 mr-1" />
-              Download
-            </Button>
-          </div>
-
-          {/* Action 5: Cloud Backup to Neon S3 */}
-          <div className="p-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-colors flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400">
-                <Cloud className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground">
-                  Backup to Neon Cloud S3
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  Save snapshot to your Neon S3 bucket ({records.length}{' '}
-                  records)
-                </p>
-              </div>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={isUploadingS3}
-              onClick={handleUploadToS3}
-              className="shrink-0 text-xs"
-            >
-              {isUploadingS3 ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Cloud className="w-3.5 h-3.5 mr-1" />
-                  Save to S3
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Action 5: Restore / Import */}
-          <div className="p-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-colors flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400">
-                <Upload className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground">
-                  Restore from Backup
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  Import records from previously saved JSON file
-                </p>
-              </div>
-            </div>
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,application/json"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                className="shrink-0 text-xs"
-              >
-                <Upload className="w-3.5 h-3.5 mr-1" />
-                Import
-              </Button>
             </div>
           </div>
         </div>

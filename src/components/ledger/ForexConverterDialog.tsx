@@ -10,7 +10,6 @@ import {
 } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
-import { ArrowRightLeft, Check, TrendingUp, Landmark } from 'lucide-react'
 
 interface ForexConverterDialogProps {
   isOpen: boolean
@@ -64,8 +63,11 @@ export const ForexConverterDialog: React.FC<ForexConverterDialogProps> = ({
       <DialogContent className="max-w-md sm:rounded-2xl p-5 border-0 shadow-xl bg-card">
         <DialogHeader className="pb-1 text-left">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-              <ArrowRightLeft className="w-4 h-4" />
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 flex items-center justify-center">
+              <ion-icon
+                name="swap-horizontal-outline"
+                class="text-lg"
+              ></ion-icon>
             </div>
             <div>
               <DialogTitle className="text-base sm:text-lg font-bold text-foreground">
@@ -99,11 +101,17 @@ export const ForexConverterDialog: React.FC<ForexConverterDialogProps> = ({
                   }`}
                 >
                   {selectedMode === 'black_market' && (
-                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    <ion-icon
+                      name="checkmark-outline"
+                      class="text-xs"
+                    ></ion-icon>
                   )}
                 </div>
                 <span className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  <ion-icon
+                    name="trending-up-outline"
+                    class="text-base text-emerald-600"
+                  ></ion-icon>
                   <span>Black Market Rate</span>
                 </span>
               </div>
@@ -161,11 +169,17 @@ export const ForexConverterDialog: React.FC<ForexConverterDialogProps> = ({
                   }`}
                 >
                   {selectedMode === 'bank' && (
-                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    <ion-icon
+                      name="checkmark-outline"
+                      class="text-xs"
+                    ></ion-icon>
                   )}
                 </div>
                 <span className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                  <Landmark className="w-4 h-4 text-blue-600" />
+                  <ion-icon
+                    name="business-outline"
+                    class="text-base text-blue-600"
+                  ></ion-icon>
                   <span>Official Bank Rate</span>
                 </span>
               </div>

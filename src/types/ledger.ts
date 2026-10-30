@@ -14,6 +14,9 @@ export interface LineItem {
   unitPrice: number
   quantity: number
   sign: SignType
+  bank?: string
+  customType?: string
+  customs?: number
 }
 
 export interface LedgerRecord {

@@ -1,6 +1,6 @@
 import React from 'react'
 import { useLedger } from '../../context/LedgerContext'
-import { calculateRecordTotal } from '../../lib/formatters'
+import { calculateRecordTotal, calculateItemTotal } from '../../lib/formatters'
 
 export const StatsOverview: React.FC = () => {
   const { activeTab, currentTabRecords, formatCurrency } = useLedger()
@@ -32,7 +32,7 @@ export const StatsOverview: React.FC = () => {
       acc +
       rec.items
         .filter((i) => i.sign === '+')
-        .reduce((itemAcc, i) => itemAcc + i.unitPrice * i.quantity, 0)
+        .reduce((itemAcc, i) => itemAcc + calculateItemTotal(i), 0)
     )
   }, 0)
 
@@ -41,7 +41,7 @@ export const StatsOverview: React.FC = () => {
       acc +
       rec.items
         .filter((i) => i.sign === '-')
-        .reduce((itemAcc, i) => itemAcc + i.unitPrice * i.quantity, 0)
+        .reduce((itemAcc, i) => itemAcc + Math.abs(calculateItemTotal(i)), 0)
     )
   }, 0)
 
@@ -75,7 +75,10 @@ export const StatsOverview: React.FC = () => {
               Credit Given
             </span>
             <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
-              <ion-icon name="arrow-up-circle-outline" class="text-sm"></ion-icon>
+              <ion-icon
+                name="arrow-up-circle-outline"
+                class="text-sm"
+              ></ion-icon>
             </div>
           </div>
           <div className="mt-1">
@@ -95,7 +98,10 @@ export const StatsOverview: React.FC = () => {
               Payments In
             </span>
             <div className="p-1 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 shrink-0 flex items-center justify-center">
-              <ion-icon name="arrow-down-circle-outline" class="text-sm"></ion-icon>
+              <ion-icon
+                name="arrow-down-circle-outline"
+                class="text-sm"
+              ></ion-icon>
             </div>
           </div>
           <div className="mt-1">
@@ -181,7 +187,10 @@ export const StatsOverview: React.FC = () => {
               Payments Disbursed
             </span>
             <div className="p-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 flex items-center justify-center">
-              <ion-icon name="checkmark-done-circle-outline" class="text-sm"></ion-icon>
+              <ion-icon
+                name="checkmark-done-circle-outline"
+                class="text-sm"
+              ></ion-icon>
             </div>
           </div>
           <div className="mt-1">

@@ -4,6 +4,7 @@ import type {
   LineItem,
   TabType,
 } from '../types/ledger'
+import { getItemBank, getItemCustomType } from './bankUtils'
 
 export function formatCurrency(
   amount: number,
@@ -37,8 +38,11 @@ export function formatDate(dateString: string): string {
 }
 
 export function calculateItemTotal(item: LineItem): number {
-  const multiplier = item.sign === '-' ? -1 : 1
-  return multiplier * (item.unitPrice || 0) * (item.quantity || 0)
+  const base = (item.unitPrice || 0) * (item.quantity || 0)
+  if (item.sign === '-') {
+    return -base
+  }
+  return base + (item.customs || 0)
 }
 
 export function calculateRecordTotal(record: LedgerRecord): number {
@@ -74,7 +78,14 @@ export function generateRecordShareText(
   record.items.forEach((item, index) => {
     const sign = item.sign === '+' ? '(+ Added)' : '(- Deducted)'
     const itemTotal = calculateItemTotal(item)
+    const bank = getItemBank(item, record.type)
+    const customType = getItemCustomType(item)
     text += `  ${index + 1}. ${item.name}\n`
+    if (bank) text += `     🏦 Bank: ${bank}\n`
+    if (customType) text += `     🏷️ Custom Type: ${customType}\n`
+    if (item.customs) {
+      text += `     🛃 Customs: ${formatCurrency(item.customs, currency)}\n`
+    }
     text += `     ${item.quantity} × ${formatCurrency(item.unitPrice, currency)} = ${formatCurrency(itemTotal, currency)} ${sign}\n`
   })
 

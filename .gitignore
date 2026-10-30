@@ -11,3 +11,10 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# Android / Capacitor build artifacts
+android/.gradle
+android/build
+android/app/build
+*.apk
+*.aab

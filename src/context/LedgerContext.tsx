@@ -20,6 +20,7 @@ import {
   deleteRecordFromNeon,
   fetchSettingsFromNeon,
   saveSettingToNeon,
+  getSql,
 } from '../lib/neonClient'
 
 const STORAGE_KEY = 'eyoba_ledger_records_v1'
@@ -90,6 +91,14 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       if (saved) {
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasKelil = parsed.some((r) => r.id === 'stock-kelil-aginbi')
+          if (!hasKelil) {
+            const stockSamples = INITIAL_LEDGER_DATA.filter(
+              (r) => r.type === 'stock',
+            )
+            const nonStock = parsed.filter((r) => r.type !== 'stock')
+            return [...stockSamples, ...nonStock]
+          }
           return parsed
         }
       }
@@ -177,9 +186,10 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       const dbRecords = await fetchRecordsFromNeon()
       if (dbRecords.length > 0) {
         setRecords(dbRecords)
-      } else if (records.length > 0) {
-        // First-time sync: seed Neon with local records
-        for (const r of records) {
+      } else {
+        // First-time sync: seed Neon with initial records
+        setRecords(INITIAL_LEDGER_DATA)
+        for (const r of INITIAL_LEDGER_DATA) {
           await saveRecordToNeon(r)
         }
       }
@@ -198,7 +208,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       console.warn('Neon real-time sync notice (offline mode active):', err)
       setSyncStatus('offline')
     }
-  }, [records])
+  }, [])
 
   // Initial load from Neon and background live sync
   useEffect(() => {
@@ -407,11 +417,28 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
   const resetToDemo = () => {
     setRecords(INITIAL_LEDGER_DATA)
     showToast('Reset to demo sample data', 'info')
+    Promise.all(INITIAL_LEDGER_DATA.map((r) => saveRecordToNeon(r)))
+      .then(() => {
+        setSyncStatus('synced')
+        setLastSyncedAt(new Date())
+      })
+      .catch((e) => console.warn('Neon sync reset error:', e))
   }
 
   const clearAll = () => {
     setRecords([])
     showToast('All records cleared', 'info')
+    try {
+      const sql = getSql()
+      sql`DELETE FROM ledger_records`
+        .then(() => {
+          setSyncStatus('synced')
+          setLastSyncedAt(new Date())
+        })
+        .catch((e) => console.warn('Neon clear error:', e))
+    } catch (e) {
+      console.warn('Neon clear failed:', e)
+    }
   }
 
   const importRecords = (imported: LedgerRecord[]): boolean => {
@@ -421,6 +448,10 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     setRecords(imported)
     showToast(`Successfully imported ${imported.length} records`, 'success')
+    // Background sync to Neon PostgreSQL
+    Promise.all(imported.map((r) => saveRecordToNeon(r))).catch((e) =>
+      console.warn('Neon sync during import error:', e),
+    )
     return true
   }
 

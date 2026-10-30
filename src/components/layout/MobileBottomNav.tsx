@@ -4,7 +4,8 @@ import type { TabType } from '../../types/ledger'
 import { Badge } from '../ui/badge'
 
 export const MobileBottomNav: React.FC = () => {
-  const { activeTab, setActiveTab, tabRecordCounts, openCreateModal } = useLedger()
+  const { activeTab, setActiveTab, tabRecordCounts, openCreateModal } =
+    useLedger()
 
   const tabs: {
     id: TabType

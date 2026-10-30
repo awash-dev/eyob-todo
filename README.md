@@ -1,20 +1,51 @@
-Welcome to your new TanStack Start app!
+# Eyoba Ledger - React Ionic Mobile & Web App
 
-# Getting Started
+A modern, responsive multi-tab credit and inventory ledger built with **React**, **Vite**, **Tailwind CSS v4**, **Ionicons**, and **Capacitor Android**.
 
-To run this application:
+---
 
+## Android APK Setup & Build Workflow
+
+The native Android platform has been fully initialized with `@capacitor/core`, `@capacitor/cli`, and `@capacitor/android`.
+
+### 1. Build and Sync Web Assets to Android
+Whenever you modify your React web code, run:
 ```bash
-bun install
-bun --bun run dev
+npm run cap:build
+# Or bun run cap:build
+```
+This builds the production bundle in `dist/` and syncs it into `android/app/src/main/assets/public`.
+
+### 2. Open in Android Studio
+To inspect, debug on an emulator, or run on a connected USB device:
+```bash
+npm run cap:open
+# Or bun run cap:open
+```
+In Android Studio:
+- Select **Build** > **Build Bundle(s) / APK(s)** > **Build APK(s)**.
+- The output APK will be generated at:
+  `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+### 3. Build APK Directly via Command Line (Gradle)
+If Android SDK is configured in your system environment (`ANDROID_HOME`):
+```bash
+# Debug APK
+npm run build:apk
+
+# Release APK
+npm run build:apk:release
 ```
 
-# Building For Production
+---
 
-To build this application for production:
+## Web Development
+
+To run the application locally in your browser:
 
 ```bash
-bun --bun run build
+npm run dev
+# Or bun run dev
 ```
 
 ## Styling

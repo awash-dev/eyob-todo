@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { LedgerProvider, useLedger } from '../context/LedgerContext'
 import { Navbar } from '../components/layout/Navbar'
+import { MobileBottomNav } from '../components/layout/MobileBottomNav'
 import { StatsOverview } from '../components/ledger/StatsOverview'
 import { RecordCard } from '../components/ledger/RecordCard'
 import { RecordModal } from '../components/ledger/RecordModal'
@@ -9,17 +10,8 @@ import { ExportDialog } from '../components/ledger/ExportDialog'
 import { ForexConverterDialog } from '../components/ledger/ForexConverterDialog'
 import { PrintView } from '../components/ledger/PrintView'
 import { ToastContainer } from '../components/ledger/ToastContainer'
-import {
-  Plus,
-  Search,
-  X,
-  Printer,
-  Share2,
-  SlidersHorizontal,
-  ArrowRightLeft,
-  FolderOpen,
-} from 'lucide-react'
 import { Button } from '../components/ui/button'
+import { calculateItemTotal } from '../lib/formatters'
 
 export const Route = createFileRoute('/')({
   component: AppContentWrapper,
@@ -61,13 +53,11 @@ function MainAppView() {
       return new Date(a.date).getTime() - new Date(b.date).getTime()
     }
     const totalA = a.items.reduce(
-      (sum, item) =>
-        sum + (item.sign === '-' ? -1 : 1) * item.unitPrice * item.quantity,
+      (sum, item) => sum + calculateItemTotal(item),
       0,
     )
     const totalB = b.items.reduce(
-      (sum, item) =>
-        sum + (item.sign === '-' ? -1 : 1) * item.unitPrice * item.quantity,
+      (sum, item) => sum + calculateItemTotal(item),
       0,
     )
     if (sortBy === 'amount-desc') {
@@ -88,11 +78,11 @@ function MainAppView() {
 
   return (
     <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 text-foreground flex flex-col font-sans">
-      {/* Top Centered Navbar: 3 Tabs Only */}
+      {/* Top Sticky Navbar (Desktop tabs + unified header) */}
       <Navbar />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-5 pb-12 no-print">
+      {/* Main Container - Padded for mobile bottom nav bar */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-5 pb-24 md:pb-12 no-print">
         {/* Compact Dynamic Metric Cards */}
         <StatsOverview />
 
@@ -100,7 +90,9 @@ function MainAppView() {
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 mb-4 p-1.5 sm:p-2 bg-card rounded-2xl shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5">
           {/* Left: Clean Integrated Search */}
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none text-muted-foreground">
+              <ion-icon name="search-outline" class="text-base"></ion-icon>
+            </span>
             <input
               type="text"
               placeholder={`Search ${tabLabels} by name, notes, or items...`}
@@ -111,10 +103,13 @@ function MainAppView() {
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md flex items-center justify-center cursor-pointer"
                 title="Clear search"
               >
-                <X className="w-3.5 h-3.5" />
+                <ion-icon
+                  name="close-circle-outline"
+                  class="text-base"
+                ></ion-icon>
               </button>
             )}
           </div>
@@ -134,15 +129,22 @@ function MainAppView() {
                     : 'Offline (local storage cache active - click to retry)'
               }
             >
-              <span
-                className={`w-2 h-2 rounded-full shrink-0 ${
+              <ion-icon
+                name={
                   syncStatus === 'synced'
-                    ? 'bg-emerald-500 shadow-xs'
+                    ? 'cloud-done-outline'
                     : syncStatus === 'syncing'
-                      ? 'bg-amber-500 animate-pulse'
-                      : 'bg-zinc-400'
+                      ? 'sync-outline'
+                      : 'cloud-offline-outline'
+                }
+                class={`text-sm ${
+                  syncStatus === 'synced'
+                    ? 'text-emerald-500'
+                    : syncStatus === 'syncing'
+                      ? 'text-amber-500 animate-spin'
+                      : 'text-zinc-400'
                 }`}
-              />
+              ></ion-icon>
               <span className="hidden sm:inline text-[11px] font-medium">
                 {syncStatus === 'synced'
                   ? 'Live Sync'
@@ -156,10 +158,13 @@ function MainAppView() {
             <button
               type="button"
               onClick={() => setIsForexDialogOpen(true)}
-              className="h-8 px-2.5 text-xs gap-1.5 inline-flex items-center rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold transition-colors"
+              className="h-8 px-2.5 text-xs gap-1.5 inline-flex items-center rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-semibold transition-colors cursor-pointer"
               title="Click to switch between Black Market and Bank rate"
             >
-              <ArrowRightLeft className="w-3.5 h-3.5" />
+              <ion-icon
+                name="swap-horizontal-outline"
+                class="text-sm"
+              ></ion-icon>
               <span>
                 {rateMode === 'black_market' ? 'Black' : 'Bank'}: 1 USDT ={' '}
                 {usdtRate} ETB
@@ -167,8 +172,11 @@ function MainAppView() {
             </button>
 
             {/* Sort Selector */}
-            <div className="flex items-center gap-1 bg-muted/60 px-2.5 py-1 rounded-xl text-xs h-8">
-              <SlidersHorizontal className="w-3 h-3 text-muted-foreground" />
+            <div className="flex items-center gap-1.5 bg-muted/60 px-2.5 py-1 rounded-xl text-xs h-8">
+              <ion-icon
+                name="options-outline"
+                class="text-sm text-muted-foreground"
+              ></ion-icon>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
@@ -186,23 +194,23 @@ function MainAppView() {
               variant="ghost"
               size="sm"
               onClick={handlePrint}
-              className="h-8 px-2.5 text-xs gap-1.5 text-muted-foreground hover:text-foreground rounded-xl"
+              className="h-8 px-2.5 text-xs gap-1.5 text-muted-foreground hover:text-foreground rounded-xl flex items-center"
               title="Print Statement (PDF)"
             >
-              <Printer className="w-3.5 h-3.5" />
+              <ion-icon name="print-outline" class="text-sm"></ion-icon>
               <span className="hidden sm:inline">Print</span>
             </Button>
 
-            {/* Export & Backup Button */}
+            {/* Export & Import Button */}
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsExportDialogOpen(true)}
-              className="h-8 px-2.5 text-xs gap-1.5 text-muted-foreground hover:text-foreground rounded-xl"
-              title="Export Data & Backup"
+              className="h-8 px-2.5 text-xs gap-1.5 text-muted-foreground hover:text-foreground rounded-xl flex items-center"
+              title="Export & Import Data (Excel, JSON)"
             >
-              <Share2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Export</span>
+              <ion-icon name="swap-vertical-outline" class="text-sm"></ion-icon>
+              <span className="hidden sm:inline">Export / Import</span>
             </Button>
 
             {/* Primary New Entry Button */}
@@ -211,7 +219,7 @@ function MainAppView() {
               size="sm"
               className="text-xs font-semibold shadow-xs flex items-center gap-1.5 h-8 px-3.5 rounded-xl shrink-0"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <ion-icon name="add-outline" class="text-base"></ion-icon>
               <span>Add Entry</span>
             </Button>
           </div>
@@ -231,7 +239,7 @@ function MainAppView() {
             </span>
             <button
               onClick={() => setSearchQuery('')}
-              className="text-primary hover:underline font-semibold"
+              className="text-primary hover:underline font-semibold cursor-pointer"
             >
               Clear filter
             </button>
@@ -250,9 +258,12 @@ function MainAppView() {
           <div className="p-8 sm:p-10 text-center rounded-2xl bg-card shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5 my-4">
             <div className="w-12 h-12 rounded-2xl bg-muted/70 text-muted-foreground flex items-center justify-center mx-auto mb-3 shadow-inner">
               {searchQuery ? (
-                <Search className="w-6 h-6" />
+                <ion-icon name="search-outline" class="text-2xl"></ion-icon>
               ) : (
-                <FolderOpen className="w-6 h-6" />
+                <ion-icon
+                  name="folder-open-outline"
+                  class="text-2xl"
+                ></ion-icon>
               )}
             </div>
 
@@ -282,9 +293,9 @@ function MainAppView() {
                 <Button
                   size="sm"
                   onClick={() => openCreateModal(activeTab)}
-                  className="font-semibold shadow-xs text-xs h-8 rounded-xl"
+                  className="font-semibold shadow-xs text-xs h-8 rounded-xl flex items-center gap-1.5"
                 >
-                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  <ion-icon name="add-outline" class="text-base"></ion-icon>
                   <span>Create First Record</span>
                 </Button>
               )}
@@ -292,6 +303,9 @@ function MainAppView() {
           </div>
         )}
       </main>
+
+      {/* Mobile Sticky Bottom Navigation (PWA / Capacitor thumb-friendly) */}
+      <MobileBottomNav />
 
       {/* Modals & Portals */}
       <RecordModal />

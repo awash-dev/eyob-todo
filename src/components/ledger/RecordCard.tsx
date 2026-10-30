@@ -7,6 +7,11 @@ import {
   calculateItemTotal,
   generateRecordShareText,
 } from '../../lib/formatters'
+import {
+  getItemBank,
+  getItemCustomType,
+  getItemTypeInfo,
+} from '../../lib/bankUtils'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import {
@@ -34,6 +39,26 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
 
   const total = calculateRecordTotal(record)
   const isPositive = total >= 0
+  const isStock = record.type === 'stock'
+  const hasCustoms = isStock && record.items.some((it) => (it.customs || 0) > 0)
+
+  const columnLabels = isStock
+    ? {
+      type: 'Type (+ In / - Out)',
+      item: 'Item / Product',
+      custom: 'Stock Type',
+      unitPrice: 'Unit Cost',
+      qty: 'Qty',
+      amount: 'Value',
+    }
+    : {
+      type: 'Type (+ Add / - Deduct)',
+      item: 'Item / Description',
+      custom: '',
+      unitPrice: 'Unit Price',
+      qty: 'Qty',
+      amount: 'Amount',
+    }
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -118,11 +143,10 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
               {record.type === 'stock' ? 'Total Value' : 'Net Balance'}
             </span>
             <div
-              className={`text-base sm:text-lg font-bold tracking-tight ${
-                isPositive
+              className={`text-base sm:text-lg font-bold tracking-tight ${isPositive
                   ? 'text-emerald-600 dark:text-emerald-400'
                   : 'text-rose-600 dark:text-rose-400'
-              }`}
+                }`}
             >
               {formatCurrency(total)}
             </div>
@@ -201,19 +225,34 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
       {isExpanded && (
         <div className="border-t border-zinc-100 dark:border-zinc-800/80 bg-muted/15 px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[640px] text-xs">
               <thead>
                 <tr className="border-b border-zinc-100 dark:border-zinc-800 text-muted-foreground text-[10px] uppercase tracking-wider">
-                  <th className="text-left font-semibold py-1.5 w-16">Type</th>
+                  <th className="text-left font-semibold py-1.5 w-24 sm:w-28">
+                    {columnLabels.type}
+                  </th>
                   <th className="text-left font-semibold py-1.5">
-                    Item / Description
+                    {columnLabels.item}
                   </th>
+                  <th className="text-left font-semibold py-1.5 w-20">Bank</th>
+                  {isStock && (
+                    <th className="text-left font-semibold py-1.5 w-20">
+                      {columnLabels.custom}
+                    </th>
+                  )}
                   <th className="text-right font-semibold py-1.5 w-24">
-                    Unit Price
+                    {columnLabels.unitPrice}
                   </th>
-                  <th className="text-right font-semibold py-1.5 w-14">Qty</th>
+                  <th className="text-right font-semibold py-1.5 w-14">
+                    {columnLabels.qty}
+                  </th>
+                  {hasCustoms && (
+                    <th className="text-right font-semibold py-1.5 w-24">
+                      Customs
+                    </th>
+                  )}
                   <th className="text-right font-semibold py-1.5 w-24">
-                    Amount
+                    {columnLabels.amount}
                   </th>
                 </tr>
               </thead>
@@ -221,37 +260,97 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                 {record.items.map((item, idx) => {
                   const isAdd = item.sign === '+'
                   const itemTotal = calculateItemTotal(item)
+                  const info = getItemTypeInfo(item, record.type)
+                  const bank = getItemBank(item, record.type)
+                  const customType = getItemCustomType(item)
 
                   return (
                     <tr
                       key={item.id || idx}
                       className="hover:bg-muted/30 transition-colors"
                     >
-                      {/* Sign indicator */}
-                      <td className="py-2">
-                        {isAdd ? (
-                          <span className="inline-flex items-center gap-1 font-semibold text-[10px] text-emerald-700 bg-emerald-100/70 dark:bg-emerald-950/70 dark:text-emerald-300 px-1.5 py-0.5 rounded-md">
-                            <ion-icon
-                              name="add-circle-outline"
-                              class="text-xs"
-                            ></ion-icon>
-                            <span>Add</span>
+                      {/* Type (+ Add / - Deduct) */}
+                      <td className="py-2 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 font-semibold text-[10px] px-2 py-0.5 rounded-md border ${isAdd
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                              : 'bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                            }`}
+                          title={
+                            isStock
+                              ? isAdd
+                                ? 'Stock In'
+                                : 'Stock Out / Payment'
+                              : isAdd
+                                ? '+ Add Addition'
+                                : '- Deduct Payment'
+                          }
+                        >
+                          <ion-icon
+                            name={
+                              isAdd
+                                ? 'add-circle-outline'
+                                : 'remove-circle-outline'
+                            }
+                            class="text-xs shrink-0"
+                          ></ion-icon>
+                          <span>
+                            {isStock
+                              ? isAdd
+                                ? '+ In'
+                                : '− Out'
+                              : isAdd
+                                ? '+ Add'
+                                : '− Deduct'}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 font-semibold text-[10px] text-rose-700 bg-rose-100/70 dark:bg-rose-950/70 dark:text-rose-300 px-1.5 py-0.5 rounded-md">
-                            <ion-icon
-                              name="remove-circle-outline"
-                              class="text-xs"
-                            ></ion-icon>
-                            <span>Deduct</span>
-                          </span>
-                        )}
+                        </span>
                       </td>
 
                       {/* Name */}
                       <td className="py-2 font-medium text-foreground pr-2">
                         {item.name}
                       </td>
+
+                      {/* Bank */}
+                      <td className="py-2 whitespace-nowrap">
+                        {bank ? (
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${info.borderClass} ${info.bgClass} ${info.textClass}`}
+                            title={`Bank / Payment channel: ${bank}`}
+                          >
+                            <ion-icon
+                              name="business-outline"
+                              class="text-xs shrink-0"
+                            ></ion-icon>
+                            <span>{bank}</span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+
+                      {/* Stock Type (stock tab only) */}
+                      {isStock && (
+                        <td className="py-2 whitespace-nowrap">
+                          {customType ? (
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${isAdd
+                                  ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-800'
+                                  : 'bg-muted/60 text-muted-foreground border-zinc-200 dark:border-zinc-700'
+                                }`}
+                              title={`Stock type: ${customType}`}
+                            >
+                              <ion-icon
+                                name="pricetag-outline"
+                                class="text-xs shrink-0"
+                              ></ion-icon>
+                              <span>{customType}</span>
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/50">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Unit Price */}
                       <td className="py-2 text-right text-muted-foreground font-mono">
@@ -263,13 +362,21 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                         {item.quantity}
                       </td>
 
+                      {/* Customs (only if record has customs duties) */}
+                      {hasCustoms && (
+                        <td className="py-2 text-right font-mono text-muted-foreground whitespace-nowrap">
+                          {isAdd && item.customs
+                            ? formatCurrency(item.customs)
+                            : '—'}
+                        </td>
+                      )}
+
                       {/* Total */}
                       <td
-                        className={`py-2 text-right font-mono font-semibold ${
-                          isAdd
+                        className={`py-2 text-right font-mono font-semibold ${isAdd
                             ? 'text-emerald-600 dark:text-emerald-400'
                             : 'text-rose-600 dark:text-rose-400'
-                        }`}
+                          }`}
                       >
                         {formatCurrency(itemTotal)}
                       </td>
