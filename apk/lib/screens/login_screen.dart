@@ -102,15 +102,35 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Demo Accounts'),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Admin: 0911111111 / Admin@123', style: TextStyle(fontSize: 13)),
-            SizedBox(height: 6),
-            Text('Shop 1 (Merkato): 0922222222 / Shop@123', style: TextStyle(fontSize: 13)),
-            SizedBox(height: 6),
-            Text('Shop 2 (Bole): 0933333333 / Shop@123', style: TextStyle(fontSize: 13)),
+            const Text('Admin: 0911111111 / Admin@123', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: () {
+                _fillCredentials('0922222222', 'Shop@123');
+                Navigator.pop(ctx);
+              },
+              child: const Text('Shop 1 (Merkato)', style: TextStyle(fontSize: 11)),
+            ),
+            const SizedBox(height: 6),
+            OutlinedButton(
+              onPressed: () {
+                _fillCredentials('0933333333', 'Shop@123');
+                Navigator.pop(ctx);
+              },
+              child: const Text('Shop 2 (Bole)', style: TextStyle(fontSize: 11)),
+            ),
+            const SizedBox(height: 6),
+            OutlinedButton(
+              onPressed: () {
+                _fillCredentials('0911111111', 'Admin@123');
+                Navigator.pop(ctx);
+              },
+              child: const Text('Admin', style: TextStyle(fontSize: 11)),
+            ),
           ],
         ),
         actions: [

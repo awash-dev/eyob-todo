@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+
 import '../models/user.dart';
 import '../models/shop.dart';
 import '../models/ledger_record.dart';
@@ -22,8 +23,7 @@ class _MainScreenState extends State<MainScreen> {
   final _currencyFormat = NumberFormat('#,##0.00', 'en_US');
 
   // Tabs: 0: Stocks, 1: Customer, 2: Supplier, 3: Delala
-  int _currentTabIndex = 1; 
-  bool _isTableView = true; // Excel / Table view matching Google Stitch
+  int _currentTabIndex = 1;
   List<Shop> _shops = [];
   String? _selectedShopId;
   List<LedgerRecord> _records = [];
@@ -84,9 +84,7 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _isLoading = true);
     try {
       final shops = await ApiService.getShops();
-      final records = await ApiService.getRecords(
-        shopId: _selectedShopId,
-      );
+      final records = await ApiService.getRecords(shopId: _selectedShopId);
       if (mounted) {
         setState(() {
           _shops = shops;
@@ -101,9 +99,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _reloadRecordsOnly() async {
     try {
-      final records = await ApiService.getRecords(
-        shopId: _selectedShopId,
-      );
+      final records = await ApiService.getRecords(shopId: _selectedShopId);
       if (mounted) {
         setState(() {
           _records = records;
@@ -399,13 +395,19 @@ class _MainScreenState extends State<MainScreen> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                'Statement Summary',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13.5,
-                  color: theme.colorScheme.onSurface,
-                ),
+              Row(
+                children: [
+                  const Icon(Icons.table_view_outlined, size: 16, color: Color(0xFF006948)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Statement Summary',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.5,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -493,21 +495,24 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// Authentic Excel Spreadsheet Table View matching the User's Excel Ledger
   Widget _buildRecordTable(LedgerRecord rec, ThemeData theme, bool isDark) {
     double runningBalance = 0;
     final isCustomerOrDelala = rec.type == 'customer' || rec.type == 'delala';
 
+    // Yellow highlight color for Credit/Payment column matching Column G in reference Excel
+    final paymentBgColor = isDark ? const Color(0xFF382D05) : const Color(0xFFFEF9C3);
+    final gridBorderColor = isDark ? const Color(0xFF2E384D) : const Color(0xFFCBD5E1);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1B2234) : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
-        ),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: gridBorderColor, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 4,
             offset: const Offset(0, 1),
           ),
@@ -516,17 +521,13 @@ class _MainScreenState extends State<MainScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Account Header Row
+          // Account Name Bar with Balance & Quick Actions
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF242C40) : const Color(0xFFF2F3FF),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
-                ),
-              ),
+              color: isDark ? const Color(0xFF242C40) : const Color(0xFFF1F5F9),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+              border: Border(bottom: BorderSide(color: gridBorderColor, width: 1.2)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -540,8 +541,8 @@ class _MainScreenState extends State<MainScreen> {
                           child: Text(
                             rec.title,
                             style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13.5,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
                               color: theme.colorScheme.onSurface,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -564,14 +565,15 @@ class _MainScreenState extends State<MainScreen> {
                       'Balance: ',
                       style: TextStyle(
                         fontSize: 11,
+                        fontWeight: FontWeight.w600,
                         color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6D7A72),
                       ),
                     ),
                     Text(
                       'ETB ${_currencyFormat.format(rec.balance)}',
                       style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
                         color: rec.balance >= 0
                             ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
                             : (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A)),
@@ -591,63 +593,101 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
 
-          // Scrollable Excel-Style Table
+          // Horizontal Scrolling Excel Spreadsheet Table
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
-              columnSpacing: 14,
-              headingRowHeight: 32,
+              columnSpacing: 12,
+              headingRowHeight: 34,
               dataRowMinHeight: 32,
               dataRowMaxHeight: 52,
+              border: TableBorder(
+                horizontalInside: BorderSide(color: gridBorderColor, width: 0.8),
+                verticalInside: BorderSide(color: gridBorderColor, width: 0.8),
+              ),
               headingRowColor: MaterialStateProperty.all(
-                isDark ? const Color(0xFF242C40) : const Color(0xFFEAEDFF),
+                isDark ? const Color(0xFF1E2638) : const Color(0xFFE2E8F0),
               ),
               columns: const [
-                DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                DataColumn(label: Text('Item / Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                DataColumn(numeric: true, label: Text('Debit (+)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                DataColumn(numeric: true, label: Text('Credit (-)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                DataColumn(numeric: true, label: Text('Balance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
+                DataColumn(label: Text('Item / Description', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
+                DataColumn(numeric: true, label: Text('Ctns', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
+                DataColumn(numeric: true, label: Text('Pcs/Ctn', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
+                DataColumn(numeric: true, label: Text('Unit Price', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
+                DataColumn(numeric: true, label: Text('Debit (+)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFF006948)))),
+                DataColumn(numeric: true, label: Text('Credit (-)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFFB45309)))),
+                DataColumn(numeric: true, label: Text('Balance', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
               ],
               rows: rec.items.map((item) {
                 final isDebit = item.sign == '+';
                 final subtotal = item.subtotal;
                 if (isCustomerOrDelala) {
-                  if (isDebit) runningBalance += subtotal;
-                  else runningBalance -= subtotal;
+                  if (isDebit) {
+                    runningBalance += subtotal;
+                  } else {
+                    runningBalance -= subtotal;
+                  }
                 } else {
-                  if (isDebit) runningBalance -= subtotal;
-                  else runningBalance += subtotal;
+                  if (isDebit) {
+                    runningBalance -= subtotal;
+                  } else {
+                    runningBalance += subtotal;
+                  }
                 }
 
                 return DataRow(
                   cells: [
-                    DataCell(Text(rec.date, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'))),
+                    // Date
+                    DataCell(Text(rec.date, style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace'))),
+
+                    // Item / Description
                     DataCell(
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11.5)),
-                          if (item.cartons != null && item.cartons! > 0)
+                          Text(
+                            item.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+                          ),
+                          if (item.paymentMethod != null && item.paymentMethod!.isNotEmpty)
                             Text(
-                              '${item.cartons!.toInt()} ctns × ${item.pcsPerCarton?.toInt() ?? 100} pcs @ ${_currencyFormat.format(item.unitPrice)}',
+                              'via ${item.paymentMethod}${item.reference != null ? " (${item.reference})" : ""}',
                               style: TextStyle(
                                 fontSize: 9.5,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              ),
-                            )
-                          else if (item.quantity > 1 || item.unitPrice > 0)
-                            Text(
-                              '${item.quantity.toInt()} pcs @ ${_currencyFormat.format(item.unitPrice)}',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                         ],
                       ),
                     ),
+
+                    // Cartons
+                    DataCell(
+                      Text(
+                        item.cartons != null && item.cartons! > 0 ? item.cartons!.toInt().toString() : '-',
+                        style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace'),
+                      ),
+                    ),
+
+                    // Pcs / Carton
+                    DataCell(
+                      Text(
+                        item.pcsPerCarton != null && item.pcsPerCarton! > 0 ? item.pcsPerCarton!.toInt().toString() : '-',
+                        style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace'),
+                      ),
+                    ),
+
+                    // Unit Price
+                    DataCell(
+                      Text(
+                        item.unitPrice > 0 ? _currencyFormat.format(item.unitPrice) : '-',
+                        style: const TextStyle(fontSize: 10.5, fontFamily: 'monospace'),
+                      ),
+                    ),
+
+                    // Debit (+) [Goods Invoiced / Consignment]
                     DataCell(
                       Text(
                         isDebit ? _currencyFormat.format(subtotal) : '-',
@@ -659,24 +699,35 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                       ),
                     ),
+
+                    // Credit (-) [Payment via CBE/Awash/Telebirr highlighted in yellow like Excel Column G]
                     DataCell(
-                      Text(
-                        !isDebit ? _currencyFormat.format(subtotal) : '-',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontFamily: 'monospace',
-                          color: !isDebit ? const Color(0xFFBA1A1A) : Colors.grey,
-                          fontWeight: !isDebit ? FontWeight.bold : FontWeight.normal,
+                      Container(
+                        color: !isDebit ? paymentBgColor : Colors.transparent,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          !isDebit ? _currencyFormat.format(subtotal) : '-',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                            color: !isDebit
+                                ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                                : Colors.grey,
+                            fontWeight: !isDebit ? FontWeight.bold : FontWeight.normal,
+                          ),
                         ),
                       ),
                     ),
+
+                    // Running Balance
                     DataCell(
                       Text(
                         _currencyFormat.format(runningBalance),
                         style: TextStyle(
                           fontSize: 11.5,
                           fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w900,
                           color: runningBalance >= 0 ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
                         ),
                       ),
@@ -687,39 +738,36 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
 
-          // Subtotal Footer Row
+          // Excel Subtotal Footer Summary
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF242C40) : const Color(0xFFEAEDFF),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
-              border: Border(
-                top: BorderSide(
-                  color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
-                ),
-              ),
+              color: isDark ? const Color(0xFF242C40) : const Color(0xFFE2E8F0),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(7)),
+              border: Border(top: BorderSide(color: gridBorderColor, width: 1.2)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${rec.title.split(' ').first} Balance Due',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, letterSpacing: 0.3),
+                  '${rec.title} Total',
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11.5),
                 ),
                 Row(
                   children: [
                     Text(
-                      'Debit: ${_currencyFormat.format(rec.totalDebit)} | Credit: ${_currencyFormat.format(rec.totalCredit)} | Due: ',
+                      'Goods: ${_currencyFormat.format(rec.totalDebit)}  |  Paid: ${_currencyFormat.format(rec.totalCredit)}  |  Due: ',
                       style: TextStyle(
-                        fontSize: 10,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF334155),
                       ),
                     ),
                     Text(
                       'ETB ${_currencyFormat.format(rec.balance)}',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
                         color: rec.balance >= 0 ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
                       ),
                     ),
@@ -729,82 +777,6 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRecordCard(LedgerRecord rec, ThemeData theme, bool isDark) {
-    return InkWell(
-      onTap: () => _openStatement(rec),
-      onLongPress: () => _showRecordActions(rec),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    rec.title,
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                      height: 1.25,
-                      letterSpacing: -0.2,
-                    ),
-                    softWrap: true,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${rec.date} • ${rec.items.length} items • ${rec.shopName ?? 'Shop 1'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'ETB ${_currencyFormat.format(rec.balance)}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: rec.balance >= 0
-                            ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
-                            : (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A)),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                IconButton(
-                  icon: const Icon(
-                    Icons.unfold_more,
-                    color: Color(0xFF4059AA),
-                    size: 22,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Entry actions',
-                  onPressed: () => _showRecordActions(rec),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -840,25 +812,48 @@ class _MainScreenState extends State<MainScreen> {
                 color: const Color(0xFF006948),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(Icons.menu_book, color: Colors.white, size: 16),
+              child: const Icon(Icons.table_chart, color: Colors.white, size: 16),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _currentTabLabel,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                      letterSpacing: -0.2,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        _currentTabLabel,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2E384D) : const Color(0xFFEAEDFF),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: isDark ? const Color(0xFF3F4E6E) : const Color(0xFFDAE2FD)),
+                        ),
+                        child: const Text(
+                          'Excel View',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF006948),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   Text(
                     widget.currentUser.isAdmin
-                        ? (_selectedShopId == 'all' ? 'All Shops (Central)' : (_shops.firstWhere((s) => s.id == _selectedShopId, orElse: () => Shop(id: '', name: 'Shop')).name))
+                        ? (_selectedShopId == 'all'
+                            ? 'All Shops (Central)'
+                            : (_shops.firstWhere((s) => s.id == _selectedShopId, orElse: () => Shop(id: '', name: 'Shop', code: '')).name))
                         : (widget.currentUser.shopName ?? 'Shop 1 - Merkato'),
                     style: TextStyle(
                       fontSize: 10,
@@ -871,48 +866,6 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         actions: [
-          // Excel / Table View Toggle Pill
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _isTableView = !_isTableView;
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _isTableView
-                    ? (isDark ? const Color(0xFF2E384D) : const Color(0xFFEAEDFF))
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF3F4E6E) : const Color(0xFFDAE2FD),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isTableView ? Icons.table_chart : Icons.view_agenda,
-                    size: 13,
-                    color: isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _isTableView ? 'Excel View' : 'Card View',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-
           // Sign out
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Color(0xFFBA1A1A), size: 19),
@@ -1111,17 +1064,17 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
 
-                  // Stitch-Aligned Statement Summary Card
+                  // Stitch Statement Summary Card
                   _buildStatementSummary(theme, isDark),
 
-                  // Records Display (Table View vs Card View)
+                  // Pure Excel Table View List
                   Expanded(
                     child: records.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.receipt_long_outlined, size: 38, color: Colors.grey.shade400),
+                                Icon(Icons.table_chart_outlined, size: 38, color: Colors.grey.shade400),
                                 const SizedBox(height: 8),
                                 Text(
                                   'No $_currentTabLabel entries found',
@@ -1140,13 +1093,10 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                           )
                         : ListView.builder(
-                            padding: const EdgeInsets.only(bottom: 70),
+                            padding: const EdgeInsets.only(bottom: 75),
                             itemCount: records.length,
                             itemBuilder: (ctx, index) {
-                              final rec = records[index];
-                              return _isTableView
-                                  ? _buildRecordTable(rec, theme, isDark)
-                                  : _buildRecordCard(rec, theme, isDark);
+                              return _buildRecordTable(records[index], theme, isDark);
                             },
                           ),
                   ),

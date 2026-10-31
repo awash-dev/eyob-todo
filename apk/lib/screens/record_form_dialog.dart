@@ -4,7 +4,7 @@ import '../models/ledger_record.dart';
 import '../models/line_item.dart';
 
 class RecordFormDialog extends StatefulWidget {
-  final String activeTab; // 'customer' | 'supplier' | 'stock'
+  final String activeTab; // 'customer' | 'supplier' | 'stock' | 'delala'
   final LedgerRecord? editingRecord;
   final String? shopId;
 
@@ -28,8 +28,19 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   late DateTime _selectedDate;
   late List<LineItemFormItem> _formItems;
 
-  bool _isExcelGridView = false;
+  String _stockPackagingUnit = 'Carton';
   bool _showCustoms = false;
+
+  static const List<String> _stockSuggestions = [
+    '12W Safari',
+    '3W Effishent',
+    '6W Effishent',
+    '9W Effishent',
+    '5W Candel3000K',
+    '5W Candel8000K',
+    '12W Safari300K',
+    'Portland Cement Bags (50kg)',
+  ];
 
   static const List<String> _stockTypeOptions = [
     'Stock',
@@ -84,6 +95,12 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
           typeOrBank: 'Stock',
         ),
       ];
+    }
+
+    if (widget.activeTab == 'stock' && _formItems.isNotEmpty) {
+      if (_titleController.text.isNotEmpty && _formItems.first.nameController.text.isEmpty) {
+        _formItems.first.nameController.text = _titleController.text;
+      }
     }
   }
 
@@ -171,6 +188,25 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
+    // In Stock tab, ensure title and item name are synchronized
+    if (widget.activeTab == 'stock' && _formItems.isNotEmpty) {
+      final item = _formItems.first;
+      if (item.nameController.text.trim().isNotEmpty && _titleController.text.trim().isEmpty) {
+        _titleController.text = item.nameController.text.trim();
+      } else if (_titleController.text.trim().isNotEmpty && item.nameController.text.trim().isEmpty) {
+        item.nameController.text = _titleController.text.trim();
+      }
+
+      // Auto compute total units if packaging is carton
+      if (_stockPackagingUnit == 'Carton') {
+        final c = double.tryParse(item.cartonsController.text) ?? 0.0;
+        final p = double.tryParse(item.pcsController.text) ?? 0.0;
+        if (c > 0 && p > 0) {
+          item.qtyController.text = (c * p).toStringAsFixed(0);
+        }
+      }
+    }
+
     final lineItems = _formItems.map((f) {
       final q = double.tryParse(f.qtyController.text) ?? f.quantity;
       final p = double.tryParse(f.priceController.text) ?? f.unitPrice;
@@ -214,441 +250,664 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     final isStock = widget.activeTab == 'stock';
     final isDelala = widget.activeTab == 'delala';
 
-    final badgeLabel = isCustomer
-        ? 'Customer Credit'
-        : isStock
-            ? 'Stock & Inventory'
-            : isDelala
-                ? 'Delala (Broker) Credit'
-                : 'Supplier Credit';
-
-    final headerTitle = widget.editingRecord == null
-        ? (isCustomer
-            ? 'New Customer Entry'
-            : isStock
-                ? 'Stock In (Storekeeper)'
-                : isDelala
-                    ? 'New Delala Entry'
-                    : 'New Supplier Entry')
-        : (isCustomer
-            ? 'Edit Customer Entry'
-            : isStock
-                ? 'Edit Stock Entry'
-                : isDelala
-                    ? 'Edit Delala Entry'
-                    : 'Edit Supplier Entry');
-
-    final nameLabel = isCustomer
-        ? 'Customer Name (የደንበኛ ስም)'
-        : isStock
-            ? 'Item / Batch Name (የዕቃ ስም)'
-            : isDelala
-                ? 'Delala / Broker Name (የደላላ ስም)'
-                : 'Supplier Name (የአቅራቢ ስም)';
-
-    final nameHint = isCustomer
-        ? 'e.g. Apex Construction Ltd., Kelil Aginbi, Sarah Connor'
-        : isStock
-            ? 'e.g. 12W SAFARI LED Bulbs Batch #4'
-            : isDelala
-                ? 'e.g. Abebe Delala, Merkato Broker Agent'
-                : 'e.g. Summit Raw Materials, Global Tech';
-
-    final grandTotal = _calculateGrandTotal();
-
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final badgeBg = isCustomer
-        ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
-        : isStock
-            ? (isDark ? const Color(0xFF3B0764) : const Color(0xFFFAF5FF))
-            : isDelala
-                ? (isDark ? const Color(0xFF451A03) : const Color(0xFFFFFBEB))
-                : (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF));
+    // When Stock In, render dedicated Google Stitch Stock In form layout
+    if (isStock) {
+      return _buildStockInDialog(theme, isDark);
+    }
 
-    final badgeBorder = isCustomer
-        ? (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
-        : isStock
-            ? (isDark ? const Color(0xFF9333EA) : const Color(0xFFE9D5FF))
-            : isDelala
-                ? (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A))
-                : (isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE));
+    // Otherwise render Excel Table Ledger Entry Form (Customer, Supplier, Delala)
+    return _buildLedgerTableDialog(theme, isDark, isCustomer, isDelala);
+  }
 
-    final badgeColor = isCustomer
-        ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669))
-        : isStock
-            ? (isDark ? const Color(0xFFD8B4FE) : const Color(0xFF7C3AED))
-            : isDelala
-                ? (isDark ? const Color(0xFFFCD34D) : const Color(0xFFD97706))
-                : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8));
+  /// Google Stitch Stock In Form (Pixel-Matched to Reference Screenshot)
+  Widget _buildStockInDialog(ThemeData theme, bool isDark) {
+    final item = _formItems.first;
+    final cartons = double.tryParse(item.cartonsController.text) ?? 0.0;
+    final pcs = double.tryParse(item.pcsController.text) ?? 0.0;
+    final price = double.tryParse(item.priceController.text) ?? 0.0;
 
-    final badgeIcon = isCustomer
-        ? Icons.people_outline
-        : isStock
-            ? Icons.layers_outlined
-            : isDelala
-                ? Icons.handshake_outlined
-                : Icons.business_outlined;
+    double calculatedTotal = 0.0;
+    if (_stockPackagingUnit == 'Carton' && cartons > 0 && pcs > 0 && price > 0) {
+      calculatedTotal = cartons * pcs * price;
+    } else {
+      final q = double.tryParse(item.qtyController.text) ?? cartons;
+      calculatedTotal = q * price;
+    }
+
+    final inputFill = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
+    final inputBorder = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
 
     return Dialog(
       backgroundColor: theme.colorScheme.surface,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header: Back Arrow & Title
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, size: 22),
+                        onPressed: () => Navigator.of(context).pop(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        tooltip: 'Back',
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.editingRecord == null
+                              ? 'Stock In (Storekeeper)'
+                              : 'Edit Stock Entry',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // 1. Item Field
+                  _buildFieldLabel('Item', isDark),
+                  const SizedBox(height: 6),
+                  Autocomplete<String>(
+                    initialValue: TextEditingValue(
+                      text: item.nameController.text.isNotEmpty
+                          ? item.nameController.text
+                          : _titleController.text,
+                    ),
+                    optionsBuilder: (textEditingValue) {
+                      if (textEditingValue.text.isEmpty) {
+                        return _stockSuggestions;
+                      }
+                      return _stockSuggestions.where((s) => s
+                          .toLowerCase()
+                          .contains(textEditingValue.text.toLowerCase()));
+                    },
+                    onSelected: (selection) {
+                      item.nameController.text = selection;
+                      _titleController.text = selection;
+                      setState(() {});
+                    },
+                    fieldViewBuilder: (ctx, textEditingController, focusNode, onFieldSubmitted) {
+                      return TextFormField(
+                        controller: textEditingController,
+                        focusNode: focusNode,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '12W Safari',
+                          hintStyle: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                          ),
+                          suffixIcon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          filled: true,
+                          fillColor: inputFill,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: inputBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: inputBorder),
+                          ),
+                        ),
+                        onChanged: (val) {
+                          item.nameController.text = val;
+                          _titleController.text = val;
+                        },
+                        validator: (v) =>
+                            v == null || v.trim().isEmpty ? 'Please enter item name' : null,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 2. Quantity (Cartons / Units) + Unit Dropdown
+                  _buildFieldLabel('Quantity', isDark),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 6,
+                        child: TextFormField(
+                          controller: item.cartonsController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '10',
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            filled: true,
+                            fillColor: inputFill,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: inputBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: inputBorder),
+                            ),
+                          ),
+                          onChanged: (val) {
+                            final c = double.tryParse(val) ?? 0.0;
+                            final p = double.tryParse(item.pcsController.text) ?? 0.0;
+                            if (c > 0 && p > 0) {
+                              item.qtyController.text = (c * p).toStringAsFixed(0);
+                            } else {
+                              item.qtyController.text = val;
+                            }
+                            setState(() {});
+                          },
+                          validator: (v) =>
+                              v == null || v.trim().isEmpty ? 'Enter qty' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 4,
+                        child: Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: inputFill,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: inputBorder),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _stockPackagingUnit,
+                              isExpanded: true,
+                              icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                              items: const [
+                                DropdownMenuItem(value: 'Carton', child: Text('Carton')),
+                                DropdownMenuItem(value: 'Pcs', child: Text('Pcs')),
+                                DropdownMenuItem(value: 'Dozen', child: Text('Dozen')),
+                                DropdownMenuItem(value: 'Box', child: Text('Box')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) setState(() => _stockPackagingUnit = val);
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 3. Pieces per Carton
+                  if (_stockPackagingUnit == 'Carton') ...[
+                    _buildFieldLabel('Pieces per Carton', isDark),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: item.pcsController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '100',
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        filled: true,
+                        fillColor: inputFill,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: inputBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: inputBorder),
+                        ),
+                      ),
+                      onChanged: (val) {
+                        final p = double.tryParse(val) ?? 0.0;
+                        final c = double.tryParse(item.cartonsController.text) ?? 0.0;
+                        if (c > 0 && p > 0) {
+                          item.qtyController.text = (c * p).toStringAsFixed(0);
+                        }
+                        setState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // 4. Unit Price (ETB)
+                  _buildFieldLabel('Unit Price (ETB)', isDark),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: item.priceController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '65',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      filled: true,
+                      fillColor: inputFill,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: inputBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: inputBorder),
+                      ),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'Enter unit price' : null,
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 5. Total (ETB) Auto-Computed Field
+                  _buildFieldLabel('Total (ETB)', isDark),
+                  const SizedBox(height: 6),
+                  Container(
+                    height: 46,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    alignment: Alignment.centerLeft,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                      ),
+                    ),
+                    child: Text(
+                      calculatedTotal > 0
+                          ? _currencyFormat.format(calculatedTotal)
+                          : '65,000',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w900,
+                        color: calculatedTotal > 0
+                            ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 6. Date Field with Calendar Picker
+                  _buildFieldLabel('Date', isDark),
+                  const SizedBox(height: 6),
+                  InkWell(
+                    onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      height: 46,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: inputFill,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: inputBorder),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            DateFormat('dd/MM/yyyy').format(_selectedDate),
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 18,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 7. Note (optional)
+                  _buildFieldLabel('Note (optional)', isDark),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _notesController,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'From supplier',
+                      hintStyle: TextStyle(
+                        fontSize: 12.5,
+                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      filled: true,
+                      fillColor: inputFill,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: inputBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: inputBorder),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+
+                  // 8. Save Full-Width Action Button
+                  SizedBox(
+                    height: 48,
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _handleSubmit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB), // Stitch Primary Blue
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Save',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFieldLabel(String label, bool isDark) {
+    return Text(
+      label,
+      style: TextStyle(
+        fontSize: 12.5,
+        fontWeight: FontWeight.bold,
+        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
+      ),
+    );
+  }
+
+  /// Authentic Horizontal Excel Spreadsheet Table Dialog for Ledger Accounts (Customer, Supplier, Delala)
+  Widget _buildLedgerTableDialog(
+    ThemeData theme,
+    bool isDark,
+    bool isCustomer,
+    bool isDelala,
+  ) {
+    final badgeLabel = isCustomer
+        ? 'Customer Credit Ledger'
+        : isDelala
+            ? 'Delala (Broker) Ledger'
+            : 'Supplier Credit Ledger';
+
+    final headerTitle = widget.editingRecord == null
+        ? (isCustomer
+            ? 'New Customer Ledger'
+            : isDelala
+                ? 'New Delala Entry'
+                : 'New Supplier Ledger')
+        : (isCustomer
+            ? 'Edit Customer Ledger'
+            : isDelala
+                ? 'Edit Delala Entry'
+                : 'Edit Supplier Ledger');
+
+    final nameLabel = isCustomer
+        ? 'Customer / Party Name'
+        : isDelala
+            ? 'Delala / Broker Name'
+            : 'Supplier / Vendor Name';
+
+    final nameHint = isCustomer
+        ? 'e.g. Apex Construction Ltd. or Kelil Aginbi'
+        : isDelala
+            ? 'e.g. Abebe Delala, Merkato Agent'
+            : 'e.g. Summit Raw Materials Ltd.';
+
+    final grandTotal = _calculateGrandTotal();
+
+    return Dialog(
+      backgroundColor: theme.colorScheme.surface,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: _isExcelGridView ? 620 : 500,
-          maxHeight: MediaQuery.of(context).size.height * 0.9,
+          maxWidth: 640,
+          maxHeight: MediaQuery.of(context).size.height * 0.92,
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 1. Header with Web-Aligned Badge, Title, Customs Toggle & Close
+                // Header with Badge & Title
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: badgeBg,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: badgeBorder),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(badgeIcon, size: 12, color: badgeColor),
-                                const SizedBox(width: 4),
-                                Text(
-                                  badgeLabel,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: badgeColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              headerTitle,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
                     Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (isStock)
-                          TextButton.icon(
-                            onPressed: () => setState(() => _showCustoms = !_showCustoms),
-                            icon: Icon(
-                              _showCustoms ? Icons.check_circle : Icons.shield_outlined,
-                              size: 13,
-                              color: _showCustoms ? const Color(0xFFD97706) : const Color(0xFF64748B),
-                            ),
-                            label: Text(
-                              _showCustoms ? 'Customs On' : '+ Customs',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: _showCustoms ? const Color(0xFFD97706) : const Color(0xFF64748B),
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              visualDensity: VisualDensity.compact,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isCustomer
+                                ? const Color(0xFF006948).withOpacity(0.12)
+                                : isDelala
+                                    ? const Color(0xFFD97706).withOpacity(0.12)
+                                    : const Color(0xFF2563EB).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            badgeLabel,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: isCustomer
+                                  ? const Color(0xFF006948)
+                                  : isDelala
+                                      ? const Color(0xFFD97706)
+                                      : const Color(0xFF2563EB),
                             ),
                           ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          onPressed: () => Navigator.of(context).pop(),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          tooltip: 'Close',
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          headerTitle,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
                       ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(context).pop(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Divider(height: 1, thickness: 1, color: theme.dividerColor),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
 
-                // 2. Scrollable Form Body
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Account / Item Name Field
-                        Text(
-                          nameLabel,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        TextFormField(
-                          controller: _titleController,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: theme.colorScheme.onSurface,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: nameHint,
-                            hintStyle: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            filled: true,
-                            fillColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(
-                                color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(
-                                color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300,
-                              ),
-                            ),
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Please enter name' : null,
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Date & Notes Row
-                        Row(
-                          children: [
-                            // Date
-                            Expanded(
-                              flex: 5,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Date',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  InkWell(
-                                    onTap: _pickDate,
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
-                                        border: Border.all(
-                                          color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300,
-                                        ),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            DateFormat('yyyy-MM-dd').format(_selectedDate),
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                              color: theme.colorScheme.onSurface,
-                                            ),
-                                          ),
-                                          Icon(
-                                            Icons.calendar_today_outlined,
-                                            size: 15,
-                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-
-                            // Invoice / Notes
-                            Expanded(
-                              flex: 6,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Invoice / Notes',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  TextFormField(
-                                    controller: _notesController,
-                                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
-                                    decoration: InputDecoration(
-                                      hintText: 'Optional ref or phone',
-                                      hintStyle: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                                      ),
-                                      isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                                      filled: true,
-                                      fillColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: BorderSide(
-                                          color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300,
-                                        ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: BorderSide(
-                                          color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-
-                        // 3. TRANSACTION ITEMS Header with View Switcher & Add Button
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  isStock ? 'STOCK INVENTORY ITEMS' : 'TRANSACTION ITEMS',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                // View Mode Toggle (Grid vs Cards)
-                                InkWell(
-                                  onTap: () => setState(() => _isExcelGridView = !_isExcelGridView),
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: _isExcelGridView
-                                          ? const Color(0xFF059669).withValues(alpha: 0.15)
-                                          : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          _isExcelGridView ? Icons.table_chart : Icons.view_agenda_outlined,
-                                          size: 11,
-                                          color: _isExcelGridView ? const Color(0xFF059669) : Colors.grey.shade600,
-                                        ),
-                                        const SizedBox(width: 3),
-                                        Text(
-                                          _isExcelGridView ? 'Excel Grid' : 'Card View',
-                                          style: TextStyle(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: _isExcelGridView ? const Color(0xFF059669) : Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            TextButton.icon(
-                              onPressed: _addItem,
-                              icon: const Icon(Icons.add_circle_outline, size: 14),
-                              label: const Text('Add Row', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                              style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF059669),
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-
-                        // 4. Line Items List (Excel Grid Mode OR Compact Cards Mode)
-                        if (_isExcelGridView)
-                          _buildExcelGrid(isStock)
-                        else
-                          ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _formItems.length,
-                            separatorBuilder: (_, _) => const SizedBox(height: 8),
-                            itemBuilder: (ctx, index) {
-                              return _buildWebStyleItemCard(_formItems[index], index, isStock);
-                            },
-                          ),
-                      ],
-                    ),
+                // Party Name Field
+                Text(
+                  nameLabel,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
                   ),
                 ),
+                const SizedBox(height: 4),
+                TextFormField(
+                  controller: _titleController,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                  decoration: InputDecoration(
+                    hintText: nameHint,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Please enter name' : null,
+                ),
+                const SizedBox(height: 8),
 
-                const SizedBox(height: 10),
-                Divider(height: 1, thickness: 1, color: theme.dividerColor),
+                // Date & Notes Row
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: InkWell(
+                        onTap: _pickDate,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
+                            border: Border.all(color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                DateFormat('yyyy-MM-dd').format(_selectedDate),
+                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                              ),
+                              Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey.shade600),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 7,
+                      child: TextFormField(
+                        controller: _notesController,
+                        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
+                        decoration: InputDecoration(
+                          hintText: 'Note / Phone (Optional)',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 10),
 
-                // 5. Total Summary Footer
+                // Excel Spreadsheet Table Section Header with Add Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.table_chart_outlined, size: 15, color: Color(0xFF006948)),
+                        const SizedBox(width: 5),
+                        Text(
+                          'TRANSACTION ROWS (EXCEL TABLE)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                    TextButton.icon(
+                      onPressed: _addItem,
+                      icon: const Icon(Icons.add, size: 15),
+                      label: const Text('Add Row', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF006948),
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+
+                // Authentic Excel Table Grid
+                Expanded(
+                  child: _buildExcelGrid(false),
+                ),
+                const SizedBox(height: 10),
+
+                // Grand Total Bar
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        isStock ? 'Total Inventory Valuation:' : 'Net Balance Amount:',
+                        'Net Ledger Balance:',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 12.5,
@@ -660,7 +919,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
-                          color: grandTotal >= 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                          color: grandTotal >= 0 ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
                         ),
                       ),
                     ],
@@ -668,352 +927,27 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                 ),
                 const SizedBox(height: 12),
 
-                // 6. Action Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        foregroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      ),
-                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                // Save Action Button
+                SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: _handleSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF006948),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _handleSubmit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF059669),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        widget.editingRecord == null ? 'Save Entry' : 'Save Changes',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
+                    child: Text(
+                      widget.editingRecord == null ? 'Save Entry to Neon DB' : 'Update Entry in Neon DB',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  /// Compact Web-Style Card View
-  Widget _buildWebStyleItemCard(LineItemFormItem item, int index, bool isStock) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final isDebit = item.sign == '+';
-
-    final qty = double.tryParse(item.qtyController.text) ?? item.quantity;
-    final price = double.tryParse(item.priceController.text) ?? item.unitPrice;
-    final customs = double.tryParse(item.customsController.text) ?? (item.customs ?? 0.0);
-    final subtotal = (qty * price) + (isDebit ? customs : 0.0);
-
-    final currentOptions = isDebit ? _stockTypeOptions : _bankOptions;
-    final safeSelectedOption = currentOptions.contains(item.typeOrBank)
-        ? item.typeOrBank
-        : (isDebit ? 'Stock' : 'CBE');
-
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF18181B) : const Color(0xFFFAFAFA),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isDark ? const Color(0xFF27272A) : const Color(0xFFE4E4E7),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Row 1: Sign Toggle Pill + Type/Bank Dropdown + Delete
-          Row(
-            children: [
-              // Sign Toggle Pill (+/-)
-              InkWell(
-                onTap: () => _toggleItemSign(item),
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDebit
-                        ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
-                        : (isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEF2F2)),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isDebit
-                          ? (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
-                          : (isDark ? const Color(0xFFDC2626) : const Color(0xFFFCA5A5)),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        item.sign,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                          color: isDebit ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isStock
-                            ? (isDebit ? 'Stock In (+)' : 'Stock Out (-)')
-                            : (isDebit ? 'Debit (+ Goods)' : 'Credit (- Payment)'),
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.bold,
-                          color: isDebit ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const Spacer(),
-
-              // Type / Bank Dropdown
-              Container(
-                height: 30,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF27272A) : Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF3F3F46) : Colors.grey.shade300,
-                  ),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: safeSelectedOption,
-                    isDense: true,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    items: currentOptions.map((opt) {
-                      return DropdownMenuItem(
-                        value: opt,
-                        child: Text(opt),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) setState(() => item.typeOrBank = val);
-                    },
-                  ),
-                ),
-              ),
-
-              if (_formItems.length > 1) ...[
-                const SizedBox(width: 6),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
-                  onPressed: () => _removeItem(index),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  tooltip: 'Delete row',
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Row 2: Item Description
-          TextFormField(
-            controller: item.nameController,
-            style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurface),
-            decoration: InputDecoration(
-              labelText: isDebit ? 'Item / Goods Description' : 'Payment / Bank Reference',
-              labelStyle: TextStyle(
-                fontSize: 11,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-              ),
-              hintText: isDebit ? 'e.g. 12W SAFARI or Cement Bags' : 'e.g. CBE Bank Transfer #4829',
-              hintStyle: TextStyle(
-                fontSize: 11,
-                color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-              ),
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              filled: true,
-              fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: isDark ? const Color(0xFF3F3F46) : Colors.grey.shade300,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: isDark ? const Color(0xFF3F3F46) : Colors.grey.shade300,
-                ),
-              ),
-            ),
-            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-          ),
-          const SizedBox(height: 8),
-
-          // Row 3: Packaging Breakdown (if Stock)
-          if (isStock) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: item.cartonsController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
-                    decoration: InputDecoration(
-                      labelText: 'Cartons (Ctns)',
-                      labelStyle: TextStyle(fontSize: 10.5, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                      hintText: '10',
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    onChanged: (val) {
-                      final c = double.tryParse(val) ?? 0.0;
-                      final p = double.tryParse(item.pcsController.text) ?? 0.0;
-                      if (c > 0 && p > 0) {
-                        item.qtyController.text = (c * p).toStringAsFixed(0);
-                      }
-                      setState(() {});
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextFormField(
-                    controller: item.pcsController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
-                    decoration: InputDecoration(
-                      labelText: 'Pcs / Carton',
-                      labelStyle: TextStyle(fontSize: 10.5, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                      hintText: '100',
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    onChanged: (val) {
-                      final c = double.tryParse(item.cartonsController.text) ?? 0.0;
-                      final p = double.tryParse(val) ?? 0.0;
-                      if (c > 0 && p > 0) {
-                        item.qtyController.text = (c * p).toStringAsFixed(0);
-                      }
-                      setState(() {});
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-
-          // Row 4: Total Quantity & Unit Price
-          Row(
-            children: [
-              Expanded(
-                flex: 5,
-                child: TextFormField(
-                  controller: item.qtyController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-                  decoration: InputDecoration(
-                    labelText: isStock ? 'Total Units (Pcs)' : 'Total Quantity',
-                    labelStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                  validator: (v) {
-                    final num = double.tryParse(v ?? '');
-                    if (num == null || num <= 0) return 'Invalid';
-                    return null;
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 6,
-                child: TextFormField(
-                  controller: item.priceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-                  decoration: InputDecoration(
-                    labelText: isStock ? 'Unit Cost (ETB)' : 'Unit Price (ETB)',
-                    labelStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                  validator: (v) {
-                    final num = double.tryParse(v ?? '');
-                    if (num == null || num < 0) return 'Invalid';
-                    return null;
-                  },
-                ),
-              ),
-            ],
-          ),
-
-          // Optional Customs Duty (for Stock)
-          if (isStock && _showCustoms) ...[
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: item.customsController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
-              decoration: InputDecoration(
-                labelText: 'Customs Duty / Tariff (ETB)',
-                labelStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                hintText: '0',
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                filled: true,
-                fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ],
-
-          const SizedBox(height: 6),
-
-          // Subtotal display
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            alignment: Alignment.centerRight,
-            child: Text(
-              'Subtotal: ETB ${_currencyFormat.format(subtotal)}',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-                color: isDebit ? const Color(0xFF059669) : const Color(0xFFDC2626),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1026,134 +960,144 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF18181B) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isDark ? const Color(0xFF27272A) : const Color(0xFFE2E8F0),
         ),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Row
-              Row(
-                children: [
-                  _gridHeaderCell('+/-', 36),
-                  _gridHeaderCell(isStock ? 'Type' : 'Channel', 85),
-                  _gridHeaderCell('Item / Description', 140),
-                  if (isStock) ...[
+        child: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header Row
+                Row(
+                  children: [
+                    _gridHeaderCell('+/-', 36),
+                    _gridHeaderCell(isStock ? 'Type' : 'Channel', 85),
+                    _gridHeaderCell('Item / Description', 140),
                     _gridHeaderCell('Ctns', 50),
                     _gridHeaderCell('Pcs/Ctn', 55),
+                    _gridHeaderCell('Total Pcs', 55),
+                    _gridHeaderCell('Price (ETB)', 80),
+                    if (isStock && _showCustoms) _gridHeaderCell('Customs', 65),
+                    _gridHeaderCell('Amount', 90),
+                    _gridHeaderCell('', 32),
                   ],
-                  _gridHeaderCell(isStock ? 'Units' : 'Qty', 55),
-                  _gridHeaderCell('Price (ETB)', 80),
-                  if (isStock && _showCustoms) _gridHeaderCell('Customs', 65),
-                  _gridHeaderCell('Amount', 90),
-                  _gridHeaderCell('', 32),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Divider(height: 1, thickness: 1, color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300),
-              const SizedBox(height: 6),
+                ),
+                const SizedBox(height: 6),
+                Divider(height: 1, thickness: 1, color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300),
+                const SizedBox(height: 6),
 
-              // Data Rows
-              ...List.generate(_formItems.length, (idx) {
-                final item = _formItems[idx];
-                final isDebit = item.sign == '+';
-                final qty = double.tryParse(item.qtyController.text) ?? item.quantity;
-                final price = double.tryParse(item.priceController.text) ?? item.unitPrice;
-                final customs = double.tryParse(item.customsController.text) ?? (item.customs ?? 0.0);
-                final subtotal = (qty * price) + (isDebit ? customs : 0.0);
+                // Data Rows
+                ...List.generate(_formItems.length, (idx) {
+                  final item = _formItems[idx];
+                  final isDebit = item.sign == '+';
+                  final qty = double.tryParse(item.qtyController.text) ?? item.quantity;
+                  final price = double.tryParse(item.priceController.text) ?? item.unitPrice;
+                  final customs = double.tryParse(item.customsController.text) ?? (item.customs ?? 0.0);
+                  final subtotal = (qty * price) + (isDebit ? customs : 0.0);
 
-                final currentOptions = isDebit ? _stockTypeOptions : _bankOptions;
-                final safeOpt = currentOptions.contains(item.typeOrBank)
-                    ? item.typeOrBank
-                    : (isDebit ? 'Stock' : 'CBE');
+                  final currentOptions = isDebit ? _stockTypeOptions : _bankOptions;
+                  final safeOpt = currentOptions.contains(item.typeOrBank)
+                      ? item.typeOrBank
+                      : (isDebit ? 'Stock' : 'CBE');
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6.0),
-                  child: Row(
-                    children: [
-                      // +/- Sign Toggle
-                      SizedBox(
-                        width: 36,
-                        height: 32,
-                        child: OutlinedButton(
-                          onPressed: () => _toggleItemSign(item),
-                          style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            side: BorderSide(
-                              color: isDebit ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6.0),
+                    child: Row(
+                      children: [
+                        // +/- Sign Toggle
+                        SizedBox(
+                          width: 36,
+                          height: 32,
+                          child: OutlinedButton(
+                            onPressed: () => _toggleItemSign(item),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              side: BorderSide(
+                                color: isDebit ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
+                              ),
+                              backgroundColor: isDebit
+                                  ? const Color(0xFF006948).withOpacity(0.1)
+                                  : const Color(0xFFBA1A1A).withOpacity(0.1),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                             ),
-                            backgroundColor: isDebit
-                                ? const Color(0xFF059669).withValues(alpha: 0.1)
-                                : const Color(0xFFDC2626).withValues(alpha: 0.1),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                          child: Text(
-                            item.sign,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
-                              color: isDebit ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                            child: Text(
+                              item.sign,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                color: isDebit ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
+                        const SizedBox(width: 6),
 
-                      // Channel / Type Dropdown
-                      SizedBox(
-                        width: 85,
-                        height: 32,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF27272A) : Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.grey.shade300),
+                        // Channel / Type Dropdown
+                        SizedBox(
+                          width: 85,
+                          height: 32,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF27272A) : Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF3F3F46) : Colors.grey.shade300,
+                              ),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: safeOpt,
+                                isDense: true,
+                                isExpanded: true,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                                items: currentOptions.map((opt) {
+                                  return DropdownMenuItem(
+                                    value: opt,
+                                    child: Text(opt, overflow: TextOverflow.ellipsis),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => item.typeOrBank = val);
+                                },
+                              ),
+                            ),
                           ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: safeOpt,
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Item / Description Field
+                        SizedBox(
+                          width: 140,
+                          height: 32,
+                          child: TextFormField(
+                            controller: item.nameController,
+                            style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurface),
+                            decoration: InputDecoration(
+                              hintText: isDebit ? 'Item (e.g. 12W Safari)' : 'Bank ref (e.g. CBE #1029)',
                               isDense: true,
-                              style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface),
-                              items: currentOptions.map((opt) {
-                                return DropdownMenuItem(value: opt, child: Text(opt));
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) setState(() => item.typeOrBank = val);
-                              },
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                              filled: true,
+                              fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
                             ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Req' : null,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
+                        const SizedBox(width: 6),
 
-                      // Item Description
-                      SizedBox(
-                        width: 140,
-                        height: 32,
-                        child: TextFormField(
-                          controller: item.nameController,
-                          style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            hintText: 'Item name / ref',
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            filled: true,
-                            fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // Stock Cartons & Pcs
-                      if (isStock) ...[
+                        // Cartons
                         SizedBox(
                           width: 50,
                           height: 32,
@@ -1178,6 +1122,8 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           ),
                         ),
                         const SizedBox(width: 6),
+
+                        // Pcs / Carton
                         SizedBox(
                           width: 55,
                           height: 32,
@@ -1202,59 +1148,17 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           ),
                         ),
                         const SizedBox(width: 6),
-                      ],
 
-                      // Total Quantity
-                      SizedBox(
-                        width: 55,
-                        height: 32,
-                        child: TextFormField(
-                          controller: item.qtyController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                            filled: true,
-                            fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // Price
-                      SizedBox(
-                        width: 80,
-                        height: 32,
-                        child: TextFormField(
-                          controller: item.priceController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                            filled: true,
-                            fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // Customs Duty (optional)
-                      if (isStock && _showCustoms) ...[
+                        // Total Quantity
                         SizedBox(
-                          width: 65,
+                          width: 55,
                           height: 32,
                           child: TextFormField(
-                            controller: item.customsController,
+                            controller: item.qtyController,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface),
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                             decoration: InputDecoration(
-                              hintText: 'Duty',
+                              hintText: 'Total',
                               isDense: true,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                               filled: true,
@@ -1265,39 +1169,83 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           ),
                         ),
                         const SizedBox(width: 6),
-                      ],
 
-                      // Amount
-                      SizedBox(
-                        width: 90,
-                        child: Text(
-                          _currencyFormat.format(subtotal),
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: isDebit ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                        // Price
+                        SizedBox(
+                          width: 80,
+                          height: 32,
+                          child: TextFormField(
+                            controller: item.priceController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                            decoration: InputDecoration(
+                              hintText: 'Price',
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                              filled: true,
+                              fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            onChanged: (_) => setState(() {}),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
+                        const SizedBox(width: 6),
 
-                      // Delete
-                      SizedBox(
-                        width: 32,
-                        child: _formItems.length > 1
-                            ? IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
-                                onPressed: () => _removeItem(idx),
-                                padding: EdgeInsets.zero,
-                              )
-                            : null,
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
+                        // Customs (Optional)
+                        if (isStock && _showCustoms) ...[
+                          SizedBox(
+                            width: 65,
+                            height: 32,
+                            child: TextFormField(
+                              controller: item.customsController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface),
+                              decoration: InputDecoration(
+                                hintText: 'Duty',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                filled: true,
+                                fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+
+                        // Amount
+                        SizedBox(
+                          width: 90,
+                          child: Text(
+                            _currencyFormat.format(subtotal),
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: isDebit ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Delete
+                        SizedBox(
+                          width: 32,
+                          child: _formItems.length > 1
+                              ? IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
+                                  onPressed: () => _removeItem(idx),
+                                  padding: EdgeInsets.zero,
+                                )
+                              : null,
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         ),
       ),
