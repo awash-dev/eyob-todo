@@ -5,9 +5,15 @@ import type { TabType } from '../../types/ledger'
 import { Badge } from '../ui/badge'
 import { AdminPanel } from '../admin/AdminPanel'
 
-interface SidebarProps {}
+interface SidebarProps {
+  onOpenExport?: () => void
+  onPrint?: () => void
+}
 
-export const Sidebar: React.FC<SidebarProps> = () => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  onOpenExport,
+  onPrint,
+}) => {
   const { activeTab, setActiveTab, tabRecordCounts } = useLedger()
   const {
     user,
@@ -121,6 +127,32 @@ export const Sidebar: React.FC<SidebarProps> = () => {
               </button>
             )
           })}
+
+          <p className="px-2 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Data &amp; Export
+          </p>
+          <button
+            type="button"
+            onClick={onOpenExport}
+            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+          >
+            <ion-icon
+              name="swap-vertical-outline"
+              class="text-base shrink-0 text-emerald-600"
+            ></ion-icon>
+            <span>Export &amp; Import</span>
+          </button>
+          <button
+            type="button"
+            onClick={onPrint}
+            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+          >
+            <ion-icon
+              name="print-outline"
+              class="text-base shrink-0 text-blue-600"
+            ></ion-icon>
+            <span>Print / PDF Export</span>
+          </button>
 
           {isAdmin && (
             <>

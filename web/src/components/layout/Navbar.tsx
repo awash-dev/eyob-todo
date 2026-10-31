@@ -14,7 +14,7 @@ export const Navbar: React.FC = () => {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false)
 
   return (
-    <header className="md:hidden sticky top-0 z-30 w-full bg-card/95 backdrop-blur-sm border-b border-zinc-100/80 dark:border-zinc-800/80 shadow-xs no-print">
+    <header className="sticky top-0 z-30 w-full bg-card/95 backdrop-blur-sm border-b border-zinc-100/80 dark:border-zinc-800/80 shadow-xs no-print">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Account / shop bar */}
         <div className="flex items-center justify-between gap-2 h-11 border-b border-zinc-100/70 dark:border-zinc-800/60">
