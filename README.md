@@ -1,226 +1,51 @@
-# Eyoba Ledger - React Ionic Mobile & Web App
+# Merkato Credit Record (መርካቶ የብድርና ክምችት መዝገብ)
 
-A modern, responsive multi-tab credit and inventory ledger built with **React**, **Vite**, **Tailwind CSS v4**, **Ionicons**, and **Capacitor Android**.
-
----
-
-## Android APK Setup & Build Workflow
-
-The native Android platform has been fully initialized with `@capacitor/core`, `@capacitor/cli`, and `@capacitor/android`.
-
-### 1. Build and Sync Web Assets to Android
-Whenever you modify your React web code, run:
-```bash
-npm run cap:build
-# Or bun run cap:build
-```
-This builds the production bundle in `dist/` and syncs it into `android/app/src/main/assets/public`.
-
-### 2. Open in Android Studio
-To inspect, debug on an emulator, or run on a connected USB device:
-```bash
-npm run cap:open
-# Or bun run cap:open
-```
-In Android Studio:
-- Select **Build** > **Build Bundle(s) / APK(s)** > **Build APK(s)**.
-- The output APK will be generated at:
-  `android/app/build/outputs/apk/debug/app-debug.apk`.
-
-### 3. Build APK Directly via Command Line (Gradle)
-If Android SDK is configured in your system environment (`ANDROID_HOME`):
-```bash
-# Debug APK
-npm run build:apk
-
-# Release APK
-npm run build:apk:release
-```
+Lightweight multi-shop merchant credit & stock management system for Merkato traders.
 
 ---
 
-## Web Development
+## 📱 Deliverables & APK Downloads
 
-To run the application locally in your browser:
+Directly available in the project root:
+1. **Flutter Android APK**: [`merkato-credit-record-flutter.apk`](file:///d:/project/eyoba-project/New%20folder/merkato-credit-record-flutter.apk) (Native Flutter Material 3 build with PDF statement printing)
+2. **Capacitor Android APK**: [`merkato-credit-record-debug.apk`](file:///d:/project/eyoba-project/New%20folder/merkato-credit-record-debug.apk) (Lightweight Web wrapper build)
 
-```bash
-npm run dev
-# Or bun run dev
-```
+---
 
-## Styling
+## 🏢 Business Structure & Credentials
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+| Role | Email | Password | Assigned Shop | Access Scope |
+| :--- | :--- | :--- | :--- | :--- |
+| **Admin** | `admin@click.et` | `Admin@123` | *All Shops (Central Store)* | Can view/switch Shop 1, Shop 2, or Combined view; manage shopkeepers, reset passwords, activate/deactivate accounts. |
+| **Shopkeeper 1** | `shop1@click.et` | `Shop@123` | **Shop 1 (Merkato)** | Strictly isolated to Shop 1 customer credit, supplier credit, and stock records. |
+| **Shopkeeper 2** | `shop2@click.et` | `Shop@123` | **Shop 2 (Bole)** | Strictly isolated to Shop 2 customer credit, supplier credit, and stock records. |
 
-### Removing Tailwind CSS
+---
 
-If you prefer not to use Tailwind CSS:
+## 🧮 Core Calculations & Rules (Strict ETB Currency)
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+- **Customer Credit**:
+  $$\text{Customer Balance} = \text{Total Debit} - \text{Total Credit (Payments)}$$
+  - *Debit*: Customer buys goods on credit.
+  - *Credit*: Customer makes a payment (Cash or Bank: CBE, Awash, Dashen, etc.).
 
-## Linting & Formatting
+- **Supplier Credit**:
+  $$\text{Supplier Balance} = \text{Total Credit} - \text{Total Debit (Payments)}$$
+  - *Credit*: Goods received from supplier on credit.
+  - *Debit*: Payment sent to supplier.
 
+- **Stock (Inventory)**:
+  - Simple tracking: Item Description, Quantity, Cartons × Pcs/Ctn calculator, Unit Cost, Total ETB Valuation.
+  - Removed all USDT/forex converters; strict Ethiopian Birr (ETB) accounting.
 
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
+- **Excel-Style Ledger**:
+  - Interactive table: Date | Description / Product | Quantity | Unit Price | Debit | Credit | Running Balance.
+  - Automatic column totals and 1-tap PDF statement generation.
 
-```bash
-bun --bun run lint
-bun --bun run format
-bun --bun run check
-```
+---
 
+## 📂 Project Organization
 
+- [`web/`](file:///d:/project/eyoba-project/New%20folder/web/): React + Vite web dashboard and backend API server (`web/server/index.mjs`) on port `8787` connected to Neon PostgreSQL.
+- [`apk/`](file:///d:/project/eyoba-project/New%20folder/apk/): Complete native Flutter application built with Flutter SDK 3.38.6 / Dart 3.10.6.
 
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
-# eyob-todo
