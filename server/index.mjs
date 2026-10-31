@@ -74,6 +74,16 @@ function sessionCookie(token, maxAgeSeconds) {
 }
 
 async function readJson(req) {
+  if (req.body !== undefined && req.body !== null) {
+    if (typeof req.body === 'object') return req.body
+    if (typeof req.body === 'string') {
+      try {
+        return JSON.parse(req.body)
+      } catch {
+        throw new HttpError(400, 'Invalid JSON body')
+      }
+    }
+  }
   let body = ''
   for await (const chunk of req) {
     body += chunk
@@ -590,7 +600,7 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/auth/login' && method === 'POST') {
     const ip =
       req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
-      req.socket.remoteAddress ||
+      req.socket?.remoteAddress ||
       'unknown'
     checkLoginRate(ip)
 
@@ -1181,7 +1191,18 @@ async function start() {
   })
 }
 
-start().catch((error) => {
-  console.error('Failed to start API server:', error)
-  process.exit(1)
-})
+// Only auto-start standalone listener when executed directly (node server/index.mjs)
+const isDirectRun =
+  process.argv[1] &&
+  (fileURLToPath(import.meta.url) === path.resolve(process.argv[1]) ||
+    process.argv[1].endsWith('server/index.mjs') ||
+    process.argv[1].endsWith('server\\index.mjs'))
+
+if (isDirectRun) {
+  start().catch((error) => {
+    console.error('Failed to start API server:', error)
+    process.exit(1)
+  })
+}
+
+export { handleApi, ensureSchema, HttpError, json, server, start }
