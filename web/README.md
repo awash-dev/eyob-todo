@@ -1,0 +1,226 @@
+# Eyoba Ledger - React Ionic Mobile & Web App
+
+A modern, responsive multi-tab credit and inventory ledger built with **React**, **Vite**, **Tailwind CSS v4**, **Ionicons**, and **Capacitor Android**.
+
+---
+
+## Android APK Setup & Build Workflow
+
+The native Android platform has been fully initialized with `@capacitor/core`, `@capacitor/cli`, and `@capacitor/android`.
+
+### 1. Build and Sync Web Assets to Android
+Whenever you modify your React web code, run:
+```bash
+npm run cap:build
+# Or bun run cap:build
+```
+This builds the production bundle in `dist/` and syncs it into `android/app/src/main/assets/public`.
+
+### 2. Open in Android Studio
+To inspect, debug on an emulator, or run on a connected USB device:
+```bash
+npm run cap:open
+# Or bun run cap:open
+```
+In Android Studio:
+- Select **Build** > **Build Bundle(s) / APK(s)** > **Build APK(s)**.
+- The output APK will be generated at:
+  `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+### 3. Build APK Directly via Command Line (Gradle)
+If Android SDK is configured in your system environment (`ANDROID_HOME`):
+```bash
+# Debug APK
+npm run build:apk
+
+# Release APK
+npm run build:apk:release
+```
+
+---
+
+## Web Development
+
+To run the application locally in your browser:
+
+```bash
+npm run dev
+# Or bun run dev
+```
+
+## Styling
+
+This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+
+### Removing Tailwind CSS
+
+If you prefer not to use Tailwind CSS:
+
+1. Remove the demo pages in `src/routes/demo/`
+2. Replace the Tailwind import in `src/styles.css` with your own styles
+3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
+4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+
+## Linting & Formatting
+
+
+This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
+
+```bash
+bun --bun run lint
+bun --bun run format
+bun --bun run check
+```
+
+
+
+## Routing
+
+This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
+
+### Adding A Route
+
+To add a new route to your application just add a new file in the `./src/routes` directory.
+
+TanStack will automatically generate the content of the route file for you.
+
+Now that you have two routes you can use a `Link` component to navigate between them.
+
+### Adding Links
+
+To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
+
+```tsx
+import { Link } from "@tanstack/react-router";
+```
+
+Then anywhere in your JSX you can use it like so:
+
+```tsx
+<Link to="/about">About</Link>
+```
+
+This will create a link that will navigate to the `/about` route.
+
+More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
+
+### Using A Layout
+
+In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
+
+Here is an example layout that includes a header:
+
+```tsx
+import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
+
+export const Route = createRootRoute({
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { title: 'My App' },
+    ],
+  }),
+  shellComponent: ({ children }) => (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <header>
+          <nav>
+            <Link to="/">Home</Link>
+            <Link to="/about">About</Link>
+          </nav>
+        </header>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  ),
+})
+```
+
+More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
+
+## Server Functions
+
+TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
+
+```tsx
+import { createServerFn } from '@tanstack/react-start'
+
+const getServerTime = createServerFn({
+  method: 'GET',
+}).handler(async () => {
+  return new Date().toISOString()
+})
+
+// Use in a component
+function MyComponent() {
+  const [time, setTime] = useState('')
+  
+  useEffect(() => {
+    getServerTime().then(setTime)
+  }, [])
+  
+  return <div>Server time: {time}</div>
+}
+```
+
+## API Routes
+
+You can create API routes by using the `server` property in your route definitions:
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router'
+import { json } from '@tanstack/react-start'
+
+export const Route = createFileRoute('/api/hello')({
+  server: {
+    handlers: {
+      GET: () => json({ message: 'Hello, World!' }),
+    },
+  },
+})
+```
+
+## Data Fetching
+
+There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
+
+For example:
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/people')({
+  loader: async () => {
+    const response = await fetch('https://swapi.dev/api/people')
+    return response.json()
+  },
+  component: PeopleComponent,
+})
+
+function PeopleComponent() {
+  const data = Route.useLoaderData()
+  return (
+    <ul>
+      {data.results.map((person) => (
+        <li key={person.name}>{person.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
+
+
+
+# Learn More
+
+You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
+
+For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+# eyob-todo
