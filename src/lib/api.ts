@@ -258,18 +258,6 @@ export async function deleteShop(id: string): Promise<{ ok: boolean; deleted: st
   return { ok: true, deleted: id, name }
 }
 
-export async function deleteShop(id: string): Promise<{ ok: boolean; deleted: string; name: string }> {
-  const sql = getSql()
-  const existing = await sql`SELECT id, name FROM shops WHERE id = ${id} LIMIT 1`
-  const name = existing[0]?.name ? String(existing[0].name) : id
-
-  await sql`DELETE FROM ledger_records WHERE shop_id = ${id}`
-  await sql`UPDATE users SET shop_id = NULL WHERE shop_id = ${id}`
-  await sql`DELETE FROM shops WHERE id = ${id}`
-
-  return { ok: true, deleted: id, name }
-}
-
 /* ------------------------------- Users ------------------------------ */
 
 export interface Shopkeeper {
@@ -385,17 +373,6 @@ export async function updateUser(
   }
 
   return { user }
-}
-
-export async function deleteUser(id: string): Promise<{ ok: boolean; deleted: string; name: string }> {
-  const sql = getSql()
-  const rows = await sql`SELECT id, name FROM users WHERE id = ${id} LIMIT 1`
-  const name = rows[0]?.name ? String(rows[0].name) : id
-
-  await sql`DELETE FROM sessions WHERE user_id = ${id}`
-  await sql`DELETE FROM users WHERE id = ${id}`
-
-  return { ok: true, deleted: id, name }
 }
 
 export async function deleteUser(id: string): Promise<{ ok: boolean; deleted: string; name: string }> {
