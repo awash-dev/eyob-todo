@@ -1,9 +1,13 @@
 {
+  "dart.projectSearchDepth": 3,
+  "dart.flutterSdkPath": "C:\\Users\\hp\\Documents\\flutter",
   "files.watcherExclude": {
-    "**/routeTree.gen.ts": true
+    "**/routeTree.gen.ts": true,
+    "**/build/**": true
   },
   "search.exclude": {
-    "**/routeTree.gen.ts": true
+    "**/routeTree.gen.ts": true,
+    "**/build/**": true
   },
   "files.readonlyInclude": {
     "**/routeTree.gen.ts": true

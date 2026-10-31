@@ -15,12 +15,7 @@ const DEFAULT_DB_URL =
   'postgresql://neondb_owner:npg_OtyTj7F9Aqnz@ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require'
 
 export const getDbUrl = (): string => {
-  return (
-    (typeof import.meta !== 'undefined' &&
-      import.meta.env &&
-      import.meta.env.VITE_DATABASE_URL) ||
-    DEFAULT_DB_URL
-  )
+  return import.meta.env.VITE_DATABASE_URL || DEFAULT_DB_URL
 }
 
 let sqlClient: ReturnType<typeof neon> | null = null
@@ -149,7 +144,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
     throw new ApiError(0, 'Failed to connect to Neon database. Please check connection.')
   }
 
-  if (!rows || rows.length === 0) {
+  if (rows.length === 0) {
     throw new ApiError(401, 'Invalid email or password')
   }
 
@@ -459,7 +454,7 @@ export async function createRecord(
       ${record.date},
       ${record.notes || null},
       ${record.exchangeRate || 198},
-      ${JSON.stringify(record.items || [])},
+      ${JSON.stringify(record.items)},
       ${finalShopId},
       ${now},
       ${now}
@@ -491,7 +486,7 @@ export async function updateRecord(
       date = ${record.date},
       notes = ${record.notes || null},
       exchange_rate = ${record.exchangeRate || 198},
-      items = ${JSON.stringify(record.items || [])},
+      items = ${JSON.stringify(record.items)},
       updated_at = ${now}
     WHERE id = ${id}
   `
