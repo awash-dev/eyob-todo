@@ -6,7 +6,7 @@ class Shop {
   Shop({
     required this.id,
     required this.name,
-    required this.code,
+    this.code = '',
   });
 
   factory Shop.fromJson(Map<String, dynamic> json) {

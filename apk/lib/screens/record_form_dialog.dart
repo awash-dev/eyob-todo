@@ -741,10 +741,10 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                           decoration: BoxDecoration(
                             color: isCustomer
-                                ? const Color(0xFF006948).withOpacity(0.12)
+                                ? const Color(0xFF006948).withValues(alpha: 0.12)
                                 : isDelala
-                                    ? const Color(0xFFD97706).withOpacity(0.12)
-                                    : const Color(0xFF2563EB).withOpacity(0.12),
+                                    ? const Color(0xFFD97706).withValues(alpha: 0.12)
+                                    : const Color(0xFF2563EB).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -1023,8 +1023,8 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                 color: isDebit ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
                               ),
                               backgroundColor: isDebit
-                                  ? const Color(0xFF006948).withOpacity(0.1)
-                                  : const Color(0xFFBA1A1A).withOpacity(0.1),
+                                  ? const Color(0xFF006948).withValues(alpha: 0.1)
+                                  : const Color(0xFFBA1A1A).withValues(alpha: 0.1),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                             ),
                             child: Text(

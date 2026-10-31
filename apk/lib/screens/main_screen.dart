@@ -382,7 +382,7 @@ class _MainScreenState extends State<MainScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -512,7 +512,7 @@ class _MainScreenState extends State<MainScreen> {
         border: Border.all(color: gridBorderColor, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 4,
             offset: const Offset(0, 1),
           ),
@@ -605,7 +605,7 @@ class _MainScreenState extends State<MainScreen> {
                 horizontalInside: BorderSide(color: gridBorderColor, width: 0.8),
                 verticalInside: BorderSide(color: gridBorderColor, width: 0.8),
               ),
-              headingRowColor: MaterialStateProperty.all(
+              headingRowColor: WidgetStateProperty.all(
                 isDark ? const Color(0xFF1E2638) : const Color(0xFFE2E8F0),
               ),
               columns: const [
