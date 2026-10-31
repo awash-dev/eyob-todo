@@ -132,6 +132,15 @@ export async function createShop(name: string, code?: string) {
   })
 }
 
+export async function deleteShop(id: string) {
+  return request<{ ok: boolean; deleted: string; name: string }>(
+    `/api/shops/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+    },
+  )
+}
+
 /* ------------------------------- Users ------------------------------ */
 
 export interface Shopkeeper {
@@ -174,6 +183,15 @@ export async function updateUser(
     method: 'PATCH',
     body: JSON.stringify(input),
   })
+}
+
+export async function deleteUser(id: string) {
+  return request<{ ok: boolean; deleted: string; name: string }>(
+    `/api/users/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+    },
+  )
 }
 
 /* ------------------------------ Records ----------------------------- */

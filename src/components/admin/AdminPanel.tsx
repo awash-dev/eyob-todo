@@ -1,4 +1,4 @@
-import { CirclePlus, CircleX, RefreshCw, Store, Users } from 'lucide-react'
+import { CirclePlus, CircleX, RefreshCw, Store, Trash2, Users } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import type { Shopkeeper } from '../../lib/api'
@@ -6,7 +6,9 @@ import {
   createUser,
   getUsers,
   updateUser,
+  deleteUser,
   createShop,
+  deleteShop,
 } from '../../lib/api'
 import {
   Dialog,
@@ -31,7 +33,7 @@ const emptyForm = {
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
-  const { shops, refreshShops } = useAuth()
+  const { shops, refreshShops, activeShopId, setActiveShopId } = useAuth()
   const [users, setUsers] = useState<Shopkeeper[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -55,6 +57,53 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       setLoading(false)
     }
   }, [])
+
+  const handleDeleteUser = async (user: Shopkeeper) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete shopkeeper "${user.name}" (${user.email})?`,
+      )
+    ) {
+      return
+    }
+    setError(null)
+    setMessage(null)
+    try {
+      await deleteUser(user.id)
+      setUsers((prev) => prev.filter((item) => item.id !== user.id))
+      setMessage(`Shopkeeper account "${user.name}" deleted`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete shopkeeper')
+    }
+  }
+
+  const handleDeleteShop = async (shop: { id: string; name: string }) => {
+    if (shops.length <= 1) {
+      setError('Cannot delete the only remaining shop site')
+      return
+    }
+    if (
+      !window.confirm(
+        `Are you sure you want to delete shop site "${shop.name}"? Records belonging to this shop will also be removed.`,
+      )
+    ) {
+      return
+    }
+    setError(null)
+    setMessage(null)
+    try {
+      await deleteShop(shop.id)
+      await refreshShops()
+      if (activeShopId === shop.id) {
+        const remaining = shops.filter((s) => s.id !== shop.id)
+        if (remaining[0]) setActiveShopId(remaining[0].id)
+      }
+      setMessage(`Shop site "${shop.name}" deleted`)
+      await loadUsers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete shop site')
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -184,10 +233,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
             {shops.map((s) => (
               <span
                 key={s.id}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-muted/60 text-foreground border border-zinc-200/80 dark:border-zinc-800"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-muted/60 text-foreground border border-zinc-200/80 dark:border-zinc-800"
               >
                 <Store size={12} className="text-emerald-600" />
                 <span>{s.name}</span>
+                {shops.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteShop(s)}
+                    className="text-muted-foreground hover:text-rose-600 p-0.5 rounded cursor-pointer transition-colors"
+                    title={`Delete shop site ${s.name}`}
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                )}
               </span>
             ))}
           </div>
@@ -341,17 +400,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => void handleActiveToggle(u)}
-                    className={`h-8 px-2.5 rounded-md text-[11px] font-semibold cursor-pointer ${
-                      u.active
-                        ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'
-                        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
-                    }`}
-                  >
-                    {u.active ? 'Disable' : 'Enable'}
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => void handleActiveToggle(u)}
+                      className={`h-8 px-2.5 rounded-md text-[11px] font-semibold cursor-pointer ${
+                        u.active
+                          ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                          : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+                      }`}
+                    >
+                      {u.active ? 'Disable' : 'Enable'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteUser(u)}
+                      className="h-8 px-2 rounded-md text-[11px] font-semibold cursor-pointer bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 flex items-center gap-1"
+                      title={`Delete shopkeeper ${u.name}`}
+                    >
+                      <Trash2 size={13} />
+                      <span className="hidden sm:inline">Delete</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

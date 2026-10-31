@@ -133,10 +133,62 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       setLastSyncedAt(new Date())
     } catch (err) {
       console.warn('API sync failed, using local cache:', err)
-      setRecords((prev) => (prev.length > 0 ? prev : readCache(activeShopId)))
+      const cached = readCache(activeShopId)
+      if (cached.length > 0) {
+        setRecords(cached)
+      }
       setSyncStatus('offline')
     }
   }, [activeShopId])
+
+  // Automatically fetch records & sync on initial mount and whenever active shop changes
+  useEffect(() => {
+    if (!activeShopId) {
+      setRecords([])
+      return
+    }
+    // 1. Immediately populate from local cache if present
+    const cached = readCache(activeShopId)
+    setRecords(cached)
+
+    // 2. Automatically sync with server/Neon DB
+    let isCancelled = false
+    setSyncStatus('syncing')
+    apiGetRecords(undefined, activeShopId)
+      .then(({ records: liveRecords }) => {
+        if (!isCancelled) {
+          setRecords(liveRecords)
+          writeCache(activeShopId, liveRecords)
+          setSyncStatus('synced')
+          setLastSyncedAt(new Date())
+        }
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          console.warn('API auto-sync failed, using cache:', err)
+          setSyncStatus('offline')
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [activeShopId])
+
+  // Automatically sync when window gains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      if (activeShopId && document.visibilityState === 'visible') {
+        void syncWithNeon()
+      }
+    }
+    window.addEventListener('visibilitychange', handleFocus)
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      window.removeEventListener('visibilitychange', handleFocus)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [activeShopId, syncWithNeon])
 
   const openCreateModal = useCallback((defaultTab?: TabType) => {
     if (defaultTab) setActiveTab(defaultTab)
@@ -166,19 +218,32 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }
-      setRecords((prev) => [optimistic, ...prev])
+      setRecords((prev) => {
+        const next = [optimistic, ...prev]
+        if (activeShopId) writeCache(activeShopId, next)
+        return next
+      })
       showToast(`Added: "${data.title}"`, 'success')
 
+      setSyncStatus('syncing')
       apiCreateRecord(data, activeShopId)
         .then(({ record }) => {
-          setRecords((prev) =>
-            prev.map((item) => (item.id === tempId ? record : item)),
-          )
+          setRecords((prev) => {
+            const next = prev.map((item) =>
+              item.id === tempId ? record : item,
+            )
+            if (activeShopId) writeCache(activeShopId, next)
+            return next
+          })
           setSyncStatus('synced')
           setLastSyncedAt(new Date())
         })
         .catch((err) => {
-          setRecords((prev) => prev.filter((item) => item.id !== tempId))
+          setRecords((prev) => {
+            const next = prev.filter((item) => item.id !== tempId)
+            if (activeShopId) writeCache(activeShopId, next)
+            return next
+          })
           setSyncStatus('offline')
           showToast(
             err instanceof Error ? err.message : 'Could not save the record',
@@ -198,23 +263,32 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
         ...updates,
         updatedAt: Date.now(),
       }
-      setRecords((prev) =>
-        prev.map((record) => (record.id === id ? updated : record)),
-      )
+      setRecords((prev) => {
+        const next = prev.map((record) => (record.id === id ? updated : record))
+        if (activeShopId) writeCache(activeShopId, next)
+        return next
+      })
       showToast('Record updated successfully', 'success')
 
+      setSyncStatus('syncing')
       apiUpdateRecord(id, updated)
         .then(({ record }) => {
-          setRecords((prev) =>
-            prev.map((item) => (item.id === id ? record : item)),
-          )
+          setRecords((prev) => {
+            const next = prev.map((item) => (item.id === id ? record : item))
+            if (activeShopId) writeCache(activeShopId, next)
+            return next
+          })
           setSyncStatus('synced')
           setLastSyncedAt(new Date())
         })
         .catch((err) => {
-          setRecords((prev) =>
-            prev.map((record) => (record.id === id ? existing : record)),
-          )
+          setRecords((prev) => {
+            const next = prev.map((record) =>
+              record.id === id ? existing : record,
+            )
+            if (activeShopId) writeCache(activeShopId, next)
+            return next
+          })
           setSyncStatus('offline')
           showToast(
             err instanceof Error ? err.message : 'Could not update the record',
@@ -222,22 +296,33 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
           )
         })
     },
-    [records, showToast],
+    [activeShopId, records, showToast],
   )
 
   const deleteRecord = useCallback(
     (id: string) => {
       const target = records.find((record) => record.id === id)
-      setRecords((prev) => prev.filter((record) => record.id !== id))
+      setRecords((prev) => {
+        const next = prev.filter((record) => record.id !== id)
+        if (activeShopId) writeCache(activeShopId, next)
+        return next
+      })
       showToast(target ? `Deleted "${target.title}"` : 'Record removed', 'info')
 
+      setSyncStatus('syncing')
       apiDeleteRecord(id)
         .then(() => {
           setSyncStatus('synced')
           setLastSyncedAt(new Date())
         })
         .catch((err) => {
-          if (target) setRecords((prev) => [target, ...prev])
+          if (target) {
+            setRecords((prev) => {
+              const next = [target, ...prev]
+              if (activeShopId) writeCache(activeShopId, next)
+              return next
+            })
+          }
           setSyncStatus('offline')
           showToast(
             err instanceof Error ? err.message : 'Could not delete the record',
@@ -245,7 +330,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
           )
         })
     },
-    [records, showToast],
+    [activeShopId, records, showToast],
   )
 
   const clearAll = useCallback(() => {

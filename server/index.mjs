@@ -726,6 +726,40 @@ async function handleApi(req, res, url) {
     return
   }
 
+  const shopMatch = pathname.match(/^\/api\/shops\/([^/]+)$/)
+  if (shopMatch && method === 'DELETE') {
+    const user = await requireUser(req)
+    requireAdmin(user)
+    const shopId = decodeURIComponent(shopMatch[1])
+    let allShops = []
+    try {
+      allShops = await sql`SELECT id, name FROM shops`
+    } catch {
+      allShops = cachedShops
+    }
+    if (allShops.length <= 1) {
+      throw new HttpError(400, 'Cannot delete the only remaining shop site')
+    }
+    const targetShop = allShops.find((s) => s.id === shopId)
+    if (!targetShop) throw new HttpError(404, 'Shop site not found')
+
+    const fallbackShop = allShops.find((s) => s.id !== shopId)
+
+    try {
+      await sql`DELETE FROM ledger_records WHERE shop_id = ${shopId}`
+      if (fallbackShop) {
+        await sql`UPDATE users SET shop_id = ${fallbackShop.id} WHERE shop_id = ${shopId}`
+      }
+      await sql`DELETE FROM shops WHERE id = ${shopId}`
+    } catch (err) {
+      console.warn('Neon shop delete warning:', err?.message || err)
+    }
+
+    cachedShops = cachedShops.filter((s) => s.id !== shopId)
+    json(res, 200, { ok: true, deleted: shopId, name: targetShop.name })
+    return
+  }
+
   /* ---------------- Users (admin only) ---------------- */
   if (pathname === '/api/users' && method === 'GET') {
     const user = await requireUser(req)
@@ -838,6 +872,34 @@ async function handleApi(req, res, url) {
         createdAt: Number(row.created_at),
       },
     })
+    return
+  }
+
+  if (userMatch && method === 'DELETE') {
+    const user = await requireUser(req)
+    requireAdmin(user)
+    const targetId = decodeURIComponent(userMatch[1])
+    if (user.id === targetId) throw new HttpError(400, 'Cannot delete your own admin account')
+
+    let target = null
+    try {
+      const rows = await sql`SELECT id, role, name FROM users WHERE id = ${targetId} LIMIT 1`
+      target = rows[0]
+    } catch {
+      target = cachedUsers.find((u) => u.id === targetId)
+    }
+    if (!target) throw new HttpError(404, 'User not found')
+    if (target.role === 'admin') throw new HttpError(400, 'Admin accounts cannot be deleted')
+
+    try {
+      await sql`DELETE FROM sessions WHERE user_id = ${targetId}`
+      await sql`DELETE FROM users WHERE id = ${targetId}`
+    } catch (err) {
+      console.warn('Neon user delete warning:', err?.message || err)
+    }
+
+    cachedUsers = cachedUsers.filter((u) => u.id !== targetId)
+    json(res, 200, { ok: true, deleted: targetId, name: target.name })
     return
   }
 

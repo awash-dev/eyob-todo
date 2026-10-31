@@ -32,6 +32,7 @@ export const RecordModal: React.FC = () => {
     closeModal,
     addRecord,
     updateRecord,
+    deleteRecord,
     formatCurrency,
   } = useLedger()
 
@@ -769,6 +770,26 @@ export const RecordModal: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {modalMode === 'edit' && editingRecord && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Are you sure you want to delete "${editingRecord.title}"?`,
+                      )
+                    ) {
+                      deleteRecord(editingRecord.id)
+                      closeModal()
+                    }
+                  }}
+                  className="text-xs h-8 px-2.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-700 cursor-pointer flex items-center gap-1"
+                >
+                  <Trash2 size={13} />
+                  <span>Delete</span>
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"
