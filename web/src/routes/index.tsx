@@ -65,10 +65,6 @@ function MainAppView() {
     return totalA - totalB
   })
 
-  const handlePrint = () => {
-    window.print()
-  }
-
   const tabLabels = {
     customer: 'customers',
     supplier: 'suppliers',
@@ -77,13 +73,10 @@ function MainAppView() {
 
   return (
     <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 text-foreground flex font-sans">
-      <Sidebar
-        onOpenExport={() => setIsExportDialogOpen(false) || setIsExportDialogOpen(true)}
-        onPrint={handlePrint}
-      />
+      <Sidebar />
 
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top Sticky Navbar (mobile tabs + unified header) */}
+        {/* Top Sticky Navbar (mobile only) */}
         <Navbar />
 
         {/* Main Container - Padded for mobile bottom nav bar */}
