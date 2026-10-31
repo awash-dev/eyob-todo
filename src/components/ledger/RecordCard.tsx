@@ -3,6 +3,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  Handshake,
   Layers,
   MoreVertical,
   Pencil,
@@ -117,13 +118,17 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                     ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                     : record.type === 'supplier'
                       ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                      : 'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                      : record.type === 'delala'
+                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                        : 'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                 }`}
               >
                 {record.type === 'customer' ? (
                   <Users size={12} />
                 ) : record.type === 'supplier' ? (
                   <Building2 size={12} />
+                ) : record.type === 'delala' ? (
+                  <Handshake size={12} />
                 ) : (
                   <Layers size={12} />
                 )}
@@ -132,7 +137,9 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                     ? 'Customer'
                     : record.type === 'supplier'
                       ? 'Supplier'
-                      : 'Stock'}
+                      : record.type === 'delala'
+                        ? 'Delala'
+                        : 'Stock'}
                 </span>
               </span>
 

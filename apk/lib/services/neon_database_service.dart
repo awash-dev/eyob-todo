@@ -153,6 +153,20 @@ class NeonDatabaseService {
     return [];
   }
 
+  /// Normalizes an Ethiopian phone number to canonical E.164 form (+2519XXXXXXXX).
+  ///
+  /// Accepts formats like: 0911111111, 911111111, +251911111111, 251911111111.
+  /// Returns null when the input is not a valid Ethiopian mobile number.
+  static String? normalizePhone(String input) {
+    var digits = input.replaceAll(RegExp(r'[\s\-().]'), '');
+    if (digits.startsWith('+')) digits = digits.substring(1);
+    if (digits.startsWith('251')) {
+      digits = '0${digits.substring(3)}';
+    }
+    if (!RegExp(r'^0[79]\d{8}$').hasMatch(digits)) return null;
+    return '+251${digits.substring(1)}';
+  }
+
   /// Check whether Neon is reachable
   static Future<bool> ping() async {
     try {
@@ -163,18 +177,22 @@ class NeonDatabaseService {
     }
   }
 
-  /// Direct Login against Neon users table
-  static Future<AppUser?> loginDirect(String email, String password) async {
-    final cleanEmail = email.trim().toLowerCase();
+  /// Direct Login against Neon users table using phone number
+  static Future<AppUser?> loginDirect(String phone, String password) async {
+    final cleanPhone = normalizePhone(phone);
+    if (cleanPhone == null) {
+      throw Exception('Enter a valid Ethiopian phone number (e.g. 0911111111)');
+    }
+
     final rows = await executeSql(
       '''
-      SELECT u.id, u.name, u.email, u.password_hash, u.role, u.shop_id, u.active, sh.name AS shop_name
+      SELECT u.id, u.name, u.email, u.phone, u.password_hash, u.role, u.shop_id, u.active, sh.name AS shop_name
       FROM users u
       LEFT JOIN shops sh ON sh.id = u.shop_id
-      WHERE LOWER(u.email) = \$1
+      WHERE u.phone = \$1
       LIMIT 1
       ''',
-      [cleanEmail],
+      [cleanPhone],
     );
 
     if (rows.isEmpty) return null;
@@ -187,13 +205,14 @@ class NeonDatabaseService {
 
     final storedHash = row['password_hash']?.toString() ?? '';
     if (!verifyPassword(password, storedHash)) {
-      throw Exception('Invalid email or password');
+      throw Exception('Invalid phone number or password');
     }
 
     return AppUser(
       id: row['id']?.toString() ?? '',
       name: row['name']?.toString() ?? '',
-      email: row['email']?.toString() ?? '',
+      email: row['email']?.toString(),
+      phone: row['phone']?.toString(),
       role: row['role']?.toString() ?? 'shopkeeper',
       shopId: row['shop_id']?.toString(),
       shopName: row['shop_name']?.toString(),
@@ -374,7 +393,7 @@ class NeonDatabaseService {
   static Future<List<AppUser>> getUsersDirect() async {
     final rows = await executeSql(
       '''
-      SELECT u.id, u.name, u.email, u.role, u.shop_id, u.active, sh.name AS shop_name
+      SELECT u.id, u.name, u.email, u.phone, u.role, u.shop_id, u.active, sh.name AS shop_name
       FROM users u
       LEFT JOIN shops sh ON sh.id = u.shop_id
       WHERE u.role = 'shopkeeper'
@@ -384,7 +403,8 @@ class NeonDatabaseService {
     return rows.map((r) => AppUser(
       id: r['id']?.toString() ?? '',
       name: r['name']?.toString() ?? '',
-      email: r['email']?.toString() ?? '',
+      email: r['email']?.toString(),
+      phone: r['phone']?.toString(),
       role: 'shopkeeper',
       shopId: r['shop_id']?.toString(),
       shopName: r['shop_name']?.toString(),
@@ -395,24 +415,50 @@ class NeonDatabaseService {
   /// Create shopkeeper user directly in Neon
   static Future<AppUser> createShopkeeperDirect({
     required String name,
-    required String email,
+    required String phone,
+    String? email,
     required String password,
     required String shopId,
   }) async {
+    final cleanPhone = normalizePhone(phone);
+    if (cleanPhone == null) {
+      throw Exception('Enter a valid Ethiopian phone number (e.g. 0911111111)');
+    }
+
+    // Reject duplicate phone numbers (unique index safety with clear error)
+    final existing = await executeSql(
+      'SELECT id FROM users WHERE phone = \$1 LIMIT 1',
+      [cleanPhone],
+    );
+    if (existing.isNotEmpty) {
+      throw Exception('A shopkeeper with phone $cleanPhone already exists');
+    }
+
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final id = 'user-$nowMs';
     final hash = hashPasswordWithSalt(password);
     await executeSql(
       '''
-      INSERT INTO users (id, name, email, password_hash, role, shop_id, active, created_at)
-      VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8)
+      INSERT INTO users (id, name, email, phone, password_hash, role, shop_id, active, created_at)
+      VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9)
       ''',
-      [id, name, email.trim().toLowerCase(), hash, 'shopkeeper', shopId, true, nowMs],
+      [
+        id,
+        name,
+        email?.trim().isEmpty == true ? null : email?.trim().toLowerCase(),
+        cleanPhone,
+        hash,
+        'shopkeeper',
+        shopId,
+        true,
+        nowMs,
+      ],
     );
     return AppUser(
       id: id,
       name: name,
-      email: email.trim().toLowerCase(),
+      email: email?.trim().isEmpty == true ? null : email?.trim().toLowerCase(),
+      phone: cleanPhone,
       role: 'shopkeeper',
       shopId: shopId,
       active: true,
@@ -423,12 +469,27 @@ class NeonDatabaseService {
   static Future<AppUser> updateShopkeeperDirect(
     String userId, {
     String? name,
+    String? phone,
     String? shopId,
     bool? active,
     String? password,
   }) async {
     if (name != null) {
       await executeSql('UPDATE users SET name = \$1 WHERE id = \$2', [name, userId]);
+    }
+    if (phone != null && phone.isNotEmpty) {
+      final cleanPhone = normalizePhone(phone);
+      if (cleanPhone == null) {
+        throw Exception('Enter a valid Ethiopian phone number (e.g. 0911111111)');
+      }
+      final existing = await executeSql(
+        'SELECT id FROM users WHERE phone = \$1 AND id != \$2 LIMIT 1',
+        [cleanPhone, userId],
+      );
+      if (existing.isNotEmpty) {
+        throw Exception('Another shopkeeper already uses phone $cleanPhone');
+      }
+      await executeSql('UPDATE users SET phone = \$1 WHERE id = \$2', [cleanPhone, userId]);
     }
     if (shopId != null) {
       await executeSql('UPDATE users SET shop_id = \$1 WHERE id = \$2', [shopId, userId]);
@@ -442,7 +503,7 @@ class NeonDatabaseService {
     }
     final rows = await executeSql(
       '''
-      SELECT u.id, u.name, u.email, u.role, u.shop_id, u.active, sh.name AS shop_name
+      SELECT u.id, u.name, u.email, u.phone, u.role, u.shop_id, u.active, sh.name AS shop_name
       FROM users u
       LEFT JOIN shops sh ON sh.id = u.shop_id
       WHERE u.id = \$1
@@ -455,7 +516,8 @@ class NeonDatabaseService {
       return AppUser(
         id: r['id']?.toString() ?? userId,
         name: r['name']?.toString() ?? '',
-        email: r['email']?.toString() ?? '',
+        email: r['email']?.toString(),
+        phone: r['phone']?.toString(),
         role: 'shopkeeper',
         shopId: r['shop_id']?.toString(),
         shopName: r['shop_name']?.toString(),
@@ -465,7 +527,7 @@ class NeonDatabaseService {
     return AppUser(
       id: userId,
       name: name ?? '',
-      email: '',
+      phone: phone,
       role: 'shopkeeper',
       shopId: shopId,
       active: active ?? true,

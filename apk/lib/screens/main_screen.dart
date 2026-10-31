@@ -21,7 +21,9 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final _currencyFormat = NumberFormat('#,##0.00', 'en_US');
 
-  int _currentTabIndex = 0; // 0: Customer, 1: Supplier, 2: Stock
+  // Tabs: 0: Stocks, 1: Customer, 2: Supplier, 3: Delala
+  int _currentTabIndex = 1; 
+  bool _isTableView = true; // Excel / Table view matching Google Stitch
   List<Shop> _shops = [];
   String? _selectedShopId;
   List<LedgerRecord> _records = [];
@@ -49,7 +51,33 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   String get _currentTabType {
-    return _currentTabIndex == 0 ? 'customer' : 'supplier';
+    switch (_currentTabIndex) {
+      case 0:
+        return 'stock';
+      case 1:
+        return 'customer';
+      case 2:
+        return 'supplier';
+      case 3:
+        return 'delala';
+      default:
+        return 'customer';
+    }
+  }
+
+  String get _currentTabLabel {
+    switch (_currentTabIndex) {
+      case 0:
+        return 'Stock & Inventory';
+      case 1:
+        return 'Customer Credit';
+      case 2:
+        return 'Supplier Credit';
+      case 3:
+        return 'Delala Credit';
+      default:
+        return 'Customer Credit';
+    }
   }
 
   Future<void> _loadShopsAndRecords() async {
@@ -132,7 +160,7 @@ class _MainScreenState extends State<MainScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Saved "${result.title}" to Neon DB'),
-            backgroundColor: const Color(0xFF059669),
+            backgroundColor: const Color(0xFF006948),
           ),
         );
       } catch (e) {
@@ -162,7 +190,7 @@ class _MainScreenState extends State<MainScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Updated "${result.title}" in Neon DB'),
-            backgroundColor: const Color(0xFF059669),
+            backgroundColor: const Color(0xFF006948),
           ),
         );
       } catch (e) {
@@ -183,7 +211,7 @@ class _MainScreenState extends State<MainScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFBA1A1A), foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -261,8 +289,8 @@ class _MainScreenState extends State<MainScreen> {
                               fontSize: 12.5,
                               fontWeight: FontWeight.bold,
                               color: record.balance >= 0
-                                  ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                                  : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                                  ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                                  : (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A)),
                             ),
                           ),
                         ],
@@ -273,15 +301,15 @@ class _MainScreenState extends State<MainScreen> {
               ),
               const Divider(height: 16),
               ListTile(
-                leading: const Icon(Icons.table_chart_outlined, color: Color(0xFF059669)),
-                title: const Text('View Ledger Table & Items'),
+                leading: const Icon(Icons.table_chart_outlined, color: Color(0xFF006948)),
+                title: const Text('View Full Statement & PDF'),
                 onTap: () {
                   Navigator.pop(ctx);
                   _openStatement(record);
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.edit_outlined, color: Color(0xFF2563EB)),
+                leading: const Icon(Icons.edit_outlined, color: Color(0xFF4059AA)),
                 title: const Text('Edit Entry'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -289,7 +317,7 @@ class _MainScreenState extends State<MainScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                leading: const Icon(Icons.delete_outline, color: Color(0xFFBA1A1A)),
                 title: const Text('Delete Entry'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -311,75 +339,636 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  Widget _buildStatementSummary(ThemeData theme, bool isDark) {
+    final records = _filteredRecords;
+    double totalDebit = 0;
+    double totalCredit = 0;
+    for (final r in records) {
+      totalDebit += r.totalDebit;
+      totalCredit += r.totalCredit;
+    }
+
+    double netBalance = 0;
+    String balanceTitle = 'Total Receivables:';
+    String debitTitle = 'Total Debit (Invoiced)';
+    String creditTitle = 'Total Credit (Received)';
+
+    if (_currentTabType == 'customer') {
+      netBalance = totalDebit - totalCredit;
+      balanceTitle = 'Total Receivables:';
+      debitTitle = 'Total Debit (Invoiced)';
+      creditTitle = 'Total Credit (Received)';
+    } else if (_currentTabType == 'supplier') {
+      netBalance = totalCredit - totalDebit;
+      balanceTitle = 'Total Payables:';
+      debitTitle = 'Total Debit (Purchased)';
+      creditTitle = 'Total Credit (Paid)';
+    } else if (_currentTabType == 'delala') {
+      netBalance = totalDebit - totalCredit;
+      balanceTitle = 'Total Delala Balance:';
+      debitTitle = 'Total Debit (Commission/Goods)';
+      creditTitle = 'Total Credit (Settled)';
+    } else {
+      netBalance = records.fold(0.0, (sum, r) => sum + r.totalAmount);
+      balanceTitle = 'Total Inventory:';
+      debitTitle = 'Total Goods In';
+      creditTitle = 'Goods Out / Value Paid';
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 6, 14, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B2234) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                'Statement Summary',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    balanceTitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6D7A72),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'ETB ${_currencyFormat.format(netBalance)}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.2,
+                      color: netBalance >= 0
+                          ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                          : (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Divider(
+            height: 1,
+            thickness: 0.8,
+            color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    debitTitle,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6D7A72),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'ETB ${_currencyFormat.format(totalDebit)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    creditTitle,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6D7A72),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'ETB ${_currencyFormat.format(totalCredit)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecordTable(LedgerRecord rec, ThemeData theme, bool isDark) {
+    double runningBalance = 0;
+    final isCustomerOrDelala = rec.type == 'customer' || rec.type == 'delala';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B2234) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Account Header Row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF242C40) : const Color(0xFFF2F3FF),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _openStatement(rec),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            rec.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.open_in_new,
+                          size: 13,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF4059AA),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Balance: ',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6D7A72),
+                      ),
+                    ),
+                    Text(
+                      'ETB ${_currencyFormat.format(rec.balance)}',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: rec.balance >= 0
+                            ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                            : (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A)),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.more_vert, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      tooltip: 'Actions',
+                      onPressed: () => _showRecordActions(rec),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Scrollable Excel-Style Table
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 14,
+              headingRowHeight: 32,
+              dataRowMinHeight: 32,
+              dataRowMaxHeight: 52,
+              headingRowColor: MaterialStateProperty.all(
+                isDark ? const Color(0xFF242C40) : const Color(0xFFEAEDFF),
+              ),
+              columns: const [
+                DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                DataColumn(label: Text('Item / Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                DataColumn(numeric: true, label: Text('Debit (+)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                DataColumn(numeric: true, label: Text('Credit (-)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                DataColumn(numeric: true, label: Text('Balance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+              ],
+              rows: rec.items.map((item) {
+                final isDebit = item.sign == '+';
+                final subtotal = item.subtotal;
+                if (isCustomerOrDelala) {
+                  if (isDebit) runningBalance += subtotal;
+                  else runningBalance -= subtotal;
+                } else {
+                  if (isDebit) runningBalance -= subtotal;
+                  else runningBalance += subtotal;
+                }
+
+                return DataRow(
+                  cells: [
+                    DataCell(Text(rec.date, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'))),
+                    DataCell(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11.5)),
+                          if (item.cartons != null && item.cartons! > 0)
+                            Text(
+                              '${item.cartons!.toInt()} ctns × ${item.pcsPerCarton?.toInt() ?? 100} pcs @ ${_currencyFormat.format(item.unitPrice)}',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            )
+                          else if (item.quantity > 1 || item.unitPrice > 0)
+                            Text(
+                              '${item.quantity.toInt()} pcs @ ${_currencyFormat.format(item.unitPrice)}',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        isDebit ? _currencyFormat.format(subtotal) : '-',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          color: isDebit ? const Color(0xFF006948) : Colors.grey,
+                          fontWeight: isDebit ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        !isDebit ? _currencyFormat.format(subtotal) : '-',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          color: !isDebit ? const Color(0xFFBA1A1A) : Colors.grey,
+                          fontWeight: !isDebit ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        _currencyFormat.format(runningBalance),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          color: runningBalance >= 0 ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+
+          // Subtotal Footer Row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF242C40) : const Color(0xFFEAEDFF),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
+              border: Border(
+                top: BorderSide(
+                  color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${rec.title.split(' ').first} Balance Due',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, letterSpacing: 0.3),
+                ),
+                Row(
+                  children: [
+                    Text(
+                      'Debit: ${_currencyFormat.format(rec.totalDebit)} | Credit: ${_currencyFormat.format(rec.totalCredit)} | Due: ',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                      ),
+                    ),
+                    Text(
+                      'ETB ${_currencyFormat.format(rec.balance)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: rec.balance >= 0 ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecordCard(LedgerRecord rec, ThemeData theme, bool isDark) {
+    return InkWell(
+      onTap: () => _openStatement(rec),
+      onLongPress: () => _showRecordActions(rec),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    rec.title,
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                      height: 1.25,
+                      letterSpacing: -0.2,
+                    ),
+                    softWrap: true,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${rec.date} • ${rec.items.length} items • ${rec.shopName ?? 'Shop 1'}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      'ETB ${_currencyFormat.format(rec.balance)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: rec.balance >= 0
+                            ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                            : (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A)),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: const Icon(
+                    Icons.unfold_more,
+                    color: Color(0xFF4059AA),
+                    size: 22,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Entry actions',
+                  onPressed: () => _showRecordActions(rec),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final records = _filteredRecords;
 
-    // Total balance of currently viewed tab
     double tabTotalBalance = 0;
     for (final r in records) {
       tabTotalBalance += r.balance;
     }
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor, // Clean white in light mode, system dark in dark mode
+      backgroundColor: isDark ? const Color(0xFF131B2E) : const Color(0xFFFAF8FF),
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.colorScheme.surface,
+        backgroundColor: isDark ? const Color(0xFF182036) : const Color(0xFFFFFFFF),
         elevation: 0.5,
-        titleSpacing: 16,
+        titleSpacing: 14,
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         ),
-        title: Text(
-          'Merkato Credit',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
-            letterSpacing: -0.3,
-          ),
+        title: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: const Color(0xFF006948),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.menu_book, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _currentTabLabel,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  Text(
+                    widget.currentUser.isAdmin
+                        ? (_selectedShopId == 'all' ? 'All Shops (Central)' : (_shops.firstWhere((s) => s.id == _selectedShopId, orElse: () => Shop(id: '', name: 'Shop')).name))
+                        : (widget.currentUser.shopName ?? 'Shop 1 - Merkato'),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6D7A72),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
+          // Excel / Table View Toggle Pill
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _isTableView = !_isTableView;
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isTableView
+                    ? (isDark ? const Color(0xFF2E384D) : const Color(0xFFEAEDFF))
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF3F4E6E) : const Color(0xFFDAE2FD),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isTableView ? Icons.table_chart : Icons.view_agenda,
+                    size: 13,
+                    color: isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _isTableView ? 'Excel View' : 'Card View',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+
           // Sign out
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 20),
+            icon: const Icon(Icons.logout_rounded, color: Color(0xFFBA1A1A), size: 19),
             tooltip: 'Sign Out',
             onPressed: _handleLogout,
           ),
         ],
       ),
 
-      // BOTTOM TABS (Customer Credit & Supplier Credit Only)
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentTabIndex,
-        onTap: (index) {
-          setState(() {
-            _currentTabIndex = index;
-          });
-        },
-        selectedItemColor: isDark ? const Color(0xFF10B981) : const Color(0xFF059669),
-        unselectedItemColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-        unselectedLabelStyle: const TextStyle(fontSize: 12),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: theme.bottomNavigationBarTheme.backgroundColor ?? theme.colorScheme.surface,
-        elevation: 8,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_outline),
-            activeIcon: Icon(Icons.people),
-            label: 'Customer Credit',
+      // 4 BOTTOM NAVIGATION TABS (Stocks, Customer, Supplier, Delala)
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
+              width: 1,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.business_outlined),
-            activeIcon: Icon(Icons.business),
-            label: 'Supplier Credit',
-          ),
-        ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentTabIndex,
+          onTap: (index) {
+            setState(() {
+              _currentTabIndex = index;
+            });
+          },
+          selectedItemColor: isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948),
+          unselectedItemColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF6D7A72),
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5),
+          unselectedLabelStyle: const TextStyle(fontSize: 11),
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: isDark ? const Color(0xFF182036) : Colors.white,
+          elevation: 6,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
+              activeIcon: Icon(Icons.inventory_2),
+              label: 'Stocks',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline),
+              activeIcon: Icon(Icons.people),
+              label: 'Customer',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.business_outlined),
+              activeIcon: Icon(Icons.business),
+              label: 'Supplier',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.handshake_outlined),
+              activeIcon: Icon(Icons.handshake),
+              label: 'Delala',
+            ),
+          ],
+        ),
       ),
 
       body: _isLoading
@@ -388,21 +977,19 @@ class _MainScreenState extends State<MainScreen> {
               onRefresh: _reloadRecordsOnly,
               child: Column(
                 children: [
-                  // Sub-header: Shop selector / shopkeeper indicator
+                  // Sub-header: Shop selector & Tab Balance pill
                   Container(
-                    color: theme.scaffoldBackgroundColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Shop Switcher
                         if (widget.currentUser.isAdmin)
                           Row(
                             children: [
                               Icon(
                                 Icons.storefront,
                                 size: 16,
-                                color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                                color: isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948),
                               ),
                               const SizedBox(width: 6),
                               DropdownButton<String>(
@@ -412,11 +999,11 @@ class _MainScreenState extends State<MainScreen> {
                                 dropdownColor: theme.colorScheme.surface,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 12.5,
+                                  fontSize: 12,
                                   color: theme.colorScheme.onSurface,
                                 ),
                                 items: [
-                                  const DropdownMenuItem(value: 'all', child: Text('All Shops (Combined)')),
+                                  const DropdownMenuItem(value: 'all', child: Text('All Shops')),
                                   ..._shops.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))),
                                 ],
                                 onChanged: _onShopChanged,
@@ -429,23 +1016,23 @@ class _MainScreenState extends State<MainScreen> {
                               Icon(
                                 Icons.storefront,
                                 size: 16,
-                                color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                                color: isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948),
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                widget.currentUser.shopName ?? 'Assigned Shop',
+                                widget.currentUser.shopName ?? 'Shop 1',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 12.5,
+                                  fontSize: 12,
                                   color: theme.colorScheme.onSurface,
                                 ),
                               ),
                             ],
                           ),
 
-                        // Tab Total Balance summary pill
+                        // Tab Total Balance Pill
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: tabTotalBalance >= 0
                                 ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
@@ -453,18 +1040,18 @@ class _MainScreenState extends State<MainScreen> {
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(
                               color: tabTotalBalance >= 0
-                                  ? (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
-                                  : (isDark ? const Color(0xFFDC2626) : const Color(0xFFFCA5A5)),
+                                  ? (isDark ? const Color(0xFF006948) : const Color(0xFFA7F3D0))
+                                  : (isDark ? const Color(0xFFBA1A1A) : const Color(0xFFFCA5A5)),
                             ),
                           ),
                           child: Text(
                             'ETB ${_currencyFormat.format(tabTotalBalance)}',
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 11,
                               fontWeight: FontWeight.w900,
                               color: tabTotalBalance >= 0
-                                  ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669))
-                                  : (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626)),
+                                  ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                                  : (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A)),
                             ),
                           ),
                         ),
@@ -474,18 +1061,17 @@ class _MainScreenState extends State<MainScreen> {
 
                   // Search Bar
                   Container(
-                    color: theme.scaffoldBackgroundColor,
-                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
                     child: TextField(
                       controller: _searchController,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 12,
                         color: theme.colorScheme.onSurface,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Search $_currentTabType by name or item...',
+                        hintText: 'Search $_currentTabLabel by name, item...',
                         hintStyle: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11.5,
                           color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                         ),
                         prefixIcon: Icon(
@@ -503,19 +1089,19 @@ class _MainScreenState extends State<MainScreen> {
                               )
                             : null,
                         filled: true,
-                        fillColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
+                        fillColor: isDark ? const Color(0xFF1B2234) : Colors.white,
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(
-                            color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300,
+                            color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(
-                            color: isDark ? const Color(0xFF27272A) : Colors.grey.shade200,
+                            color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
                           ),
                         ),
                       ),
@@ -525,123 +1111,42 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
 
-                  // Thin divider below search
-                  Divider(height: 1, thickness: 1, color: theme.dividerColor),
+                  // Stitch-Aligned Statement Summary Card
+                  _buildStatementSummary(theme, isDark),
 
-                  // CLEAN SCREENSHOT-STYLE LIST (Title on line 1, Date on line 2, blue double-chevron on right, thin line divider)
+                  // Records Display (Table View vs Card View)
                   Expanded(
                     child: records.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.receipt_long_outlined, size: 42, color: Colors.grey.shade400),
+                                Icon(Icons.receipt_long_outlined, size: 38, color: Colors.grey.shade400),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'No $_currentTabType entries found',
+                                  'No $_currentTabLabel entries found',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                                    fontSize: 13.5,
                                     color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 const Text(
-                                  'Tap the circular pen button below to add an entry',
+                                  'Tap "+" to add a new transaction entry',
                                   style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
                                 ),
                               ],
                             ),
                           )
-                        : ListView.separated(
+                        : ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 70),
                             itemCount: records.length,
-                            separatorBuilder: (ctx, _) => Divider(
-                              height: 1,
-                              thickness: 0.8,
-                              color: Theme.of(ctx).dividerColor,
-                            ),
                             itemBuilder: (ctx, index) {
                               final rec = records[index];
-
-                              return InkWell(
-                                onTap: () => _openStatement(rec),
-                                onLongPress: () => _showRecordActions(rec),
-                                child: Container(
-                                  color: theme.scaffoldBackgroundColor, // Clean white in light mode, system dark in dark mode
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      // LEFT: Title on Line 1, Date / Time on Line 2 (exactly like user screenshot)
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              rec.title,
-                                              style: TextStyle(
-                                                fontSize: 15.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: theme.colorScheme.onSurface,
-                                                height: 1.25,
-                                                letterSpacing: -0.2,
-                                              ),
-                                              softWrap: true,
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '${rec.date} • ${rec.items.length} items • ${rec.shopName ?? 'Shop 1'}',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-
-                                      // RIGHT: Balance amount + Vivid Blue Double Chevron (like user screenshot)
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment: CrossAxisAlignment.center,
-                                        children: [
-                                          Flexible(
-                                            child: FittedBox(
-                                              fit: BoxFit.scaleDown,
-                                              alignment: Alignment.centerRight,
-                                              child: Text(
-                                                'ETB ${_currencyFormat.format(rec.balance)}',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: rec.balance >= 0
-                                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
-                                                      : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-
-                                          // Blue double chevron (unfold_more) as seen in user's image
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.unfold_more,
-                                              color: Color(0xFF2563EB), // Vivid blue icon from reference
-                                              size: 22,
-                                            ),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            tooltip: 'Entry actions',
-                                            onPressed: () => _showRecordActions(rec),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
+                              return _isTableView
+                                  ? _buildRecordTable(rec, theme, isDark)
+                                  : _buildRecordCard(rec, theme, isDark);
                             },
                           ),
                   ),
@@ -649,15 +1154,17 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
 
-      // CIRCULAR ENTRY BUTTON WITH PEN ICON
-      floatingActionButton: FloatingActionButton(
-        shape: const CircleBorder(),
-        backgroundColor: const Color(0xFF059669),
+      // Floating Add Transaction Entry Button
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF006948),
         foregroundColor: Colors.white,
         elevation: 4,
-        tooltip: 'Add Entry (አዲስ መዝገብ)',
+        icon: const Icon(Icons.add, size: 20),
+        label: Text(
+          'Add ${_currentTabIndex == 0 ? "Stock" : _currentTabIndex == 3 ? "Delala" : _currentTabIndex == 2 ? "Supplier" : "Customer"}',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+        ),
         onPressed: _openCreateRecordDialog,
-        child: const Icon(Icons.edit, size: 24),
       ),
     );
   }

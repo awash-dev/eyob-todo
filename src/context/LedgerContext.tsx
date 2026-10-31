@@ -414,6 +414,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
     () => ({
       customer: records.filter((record) => record.type === 'customer').length,
       supplier: records.filter((record) => record.type === 'supplier').length,
+      delala: records.filter((record) => record.type === 'delala').length,
       stock: records.filter((record) => record.type === 'stock').length,
     }),
     [records],

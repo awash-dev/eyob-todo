@@ -46,11 +46,11 @@ class LedgerRecord {
   }
 
   // Formula:
-  // Customer: Total Debit - Total Credit
+  // Customer & Delala: Total Debit - Total Credit
   // Supplier: Total Credit - Total Debit
   // Stock: Remaining Value
   double get balance {
-    if (type == 'customer') {
+    if (type == 'customer' || type == 'delala') {
       return totalDebit - totalCredit;
     } else if (type == 'supplier') {
       return totalCredit - totalDebit;

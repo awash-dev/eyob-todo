@@ -1,7 +1,8 @@
 class AppUser {
   final String id;
   final String name;
-  final String email;
+  final String? email;
+  final String? phone; // login identifier (e.g. +2519...)
   final String role; // 'admin' | 'shopkeeper'
   final String? shopId;
   final String? shopName;
@@ -10,7 +11,8 @@ class AppUser {
   AppUser({
     required this.id,
     required this.name,
-    required this.email,
+    this.email,
+    this.phone,
     required this.role,
     this.shopId,
     this.shopName,
@@ -24,7 +26,8 @@ class AppUser {
     return AppUser(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      email: json['email']?.toString() ?? '',
+      email: json['email']?.toString(),
+      phone: json['phone']?.toString(),
       role: json['role']?.toString() ?? 'shopkeeper',
       shopId: json['shopId']?.toString(),
       shopName: json['shopName']?.toString(),
@@ -37,6 +40,7 @@ class AppUser {
       'id': id,
       'name': name,
       'email': email,
+      'phone': phone,
       'role': role,
       'shopId': shopId,
       'shopName': shopName,
@@ -44,4 +48,3 @@ class AppUser {
     };
   }
 }
-

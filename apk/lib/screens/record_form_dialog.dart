@@ -212,36 +212,47 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   Widget build(BuildContext context) {
     final isCustomer = widget.activeTab == 'customer';
     final isStock = widget.activeTab == 'stock';
+    final isDelala = widget.activeTab == 'delala';
 
     final badgeLabel = isCustomer
         ? 'Customer Credit'
         : isStock
             ? 'Stock & Inventory'
-            : 'Supplier Credit';
+            : isDelala
+                ? 'Delala (Broker) Credit'
+                : 'Supplier Credit';
 
     final headerTitle = widget.editingRecord == null
         ? (isCustomer
             ? 'New Customer Entry'
             : isStock
-                ? 'New Stock Entry'
-                : 'New Supplier Entry')
+                ? 'Stock In (Storekeeper)'
+                : isDelala
+                    ? 'New Delala Entry'
+                    : 'New Supplier Entry')
         : (isCustomer
             ? 'Edit Customer Entry'
             : isStock
                 ? 'Edit Stock Entry'
-                : 'Edit Supplier Entry');
+                : isDelala
+                    ? 'Edit Delala Entry'
+                    : 'Edit Supplier Entry');
 
     final nameLabel = isCustomer
         ? 'Customer Name (የደንበኛ ስም)'
         : isStock
             ? 'Item / Batch Name (የዕቃ ስም)'
-            : 'Supplier Name (የአቅራቢ ስም)';
+            : isDelala
+                ? 'Delala / Broker Name (የደላላ ስም)'
+                : 'Supplier Name (የአቅራቢ ስም)';
 
     final nameHint = isCustomer
-        ? 'e.g. Alex Johnson, Kelil Aginbi, Alazar Trading'
+        ? 'e.g. Apex Construction Ltd., Kelil Aginbi, Sarah Connor'
         : isStock
             ? 'e.g. 12W SAFARI LED Bulbs Batch #4'
-            : 'e.g. Summit Raw Materials, Global Tech';
+            : isDelala
+                ? 'e.g. Abebe Delala, Merkato Broker Agent'
+                : 'e.g. Summit Raw Materials, Global Tech';
 
     final grandTotal = _calculateGrandTotal();
 
@@ -252,25 +263,33 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
         ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
         : isStock
             ? (isDark ? const Color(0xFF3B0764) : const Color(0xFFFAF5FF))
-            : (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF));
+            : isDelala
+                ? (isDark ? const Color(0xFF451A03) : const Color(0xFFFFFBEB))
+                : (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF));
 
     final badgeBorder = isCustomer
         ? (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
         : isStock
             ? (isDark ? const Color(0xFF9333EA) : const Color(0xFFE9D5FF))
-            : (isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE));
+            : isDelala
+                ? (isDark ? const Color(0xFFD97706) : const Color(0xFFFDE68A))
+                : (isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE));
 
     final badgeColor = isCustomer
         ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669))
         : isStock
             ? (isDark ? const Color(0xFFD8B4FE) : const Color(0xFF7C3AED))
-            : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8));
+            : isDelala
+                ? (isDark ? const Color(0xFFFCD34D) : const Color(0xFFD97706))
+                : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8));
 
     final badgeIcon = isCustomer
         ? Icons.people_outline
         : isStock
             ? Icons.layers_outlined
-            : Icons.business_outlined;
+            : isDelala
+                ? Icons.handshake_outlined
+                : Icons.business_outlined;
 
     return Dialog(
       backgroundColor: theme.colorScheme.surface,

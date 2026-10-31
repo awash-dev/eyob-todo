@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   Building2,
+  Handshake,
   Layers,
   Plus,
   ShieldCheck,
@@ -256,6 +257,18 @@ export const RecordModal: React.FC = () => {
           badgeColor:
             'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
           Icon: Building2,
+        }
+      case 'delala':
+        return {
+          header:
+            modalMode === 'create'
+              ? 'New Delala Entry'
+              : 'Edit Delala Entry',
+          placeholder: 'Delala / Broker name (e.g. Abebe Delala, Merkato Agent)',
+          badge: 'Delala Credit',
+          badgeColor:
+            'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+          Icon: Handshake,
         }
       case 'stock':
         return {

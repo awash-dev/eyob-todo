@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../models/shop.dart';
@@ -12,38 +10,21 @@ import 'neon_database_service.dart';
 
 enum DatabaseSource {
   neonCloud,
-  localServer,
   offlineCache,
 }
 
+/// Application service layer.
+///
+/// Talks directly to Neon PostgreSQL via [NeonDatabaseService] — there is
+/// no middle-man REST API. Records keep a local offline cache so the app
+/// remains usable without a network connection.
 class ApiService {
   static const String keyToken = 'merkato_token';
   static const String keyUser = 'merkato_user';
-  static const String keyBaseUrl = 'merkato_base_url';
   static const String keyActiveShopId = 'merkato_active_shop_id';
   static const String keyCachedRecords = 'merkato_cached_records';
 
   static DatabaseSource currentSource = DatabaseSource.neonCloud;
-
-  static String get defaultBaseUrl {
-    if (kIsWeb) return 'http://localhost:8787';
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8787'; // Android emulator host alias
-      }
-    } catch (_) {}
-    return 'http://localhost:8787';
-  }
-
-  static Future<String> getBaseUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(keyBaseUrl) ?? defaultBaseUrl;
-  }
-
-  static Future<void> setBaseUrl(String url) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(keyBaseUrl, url.trim().replaceAll(RegExp(r'/+$'), ''));
-  }
 
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -87,296 +68,104 @@ class ApiService {
     }
   }
 
-  /* ------------------- HTTP Headers ------------------- */
-  static Future<Map<String, String>> _headers() async {
-    final token = await getToken();
-    final headers = {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Accept': 'application/json',
-    };
-    if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
-    }
-    return headers;
-  }
-
-  /* ------------------- Auth ------------------- */
-  static Future<AppUser> login(String email, String password) async {
-    // 1. Try Direct Neon DB First
+  /* ------------------- Auth (direct Neon) ------------------- */
+  static Future<AppUser> login(String phone, String password) async {
     try {
-      final user = await NeonDatabaseService.loginDirect(email, password);
-      if (user != null) {
-        currentSource = DatabaseSource.neonCloud;
-        final token = 'neon-session-${DateTime.now().millisecondsSinceEpoch}';
-        await saveSession(token, user);
-        return user;
+      final user = await NeonDatabaseService.loginDirect(phone, password);
+      if (user == null) {
+        throw Exception('Invalid phone number or password');
       }
+      currentSource = DatabaseSource.neonCloud;
+      final token = 'neon-session-${DateTime.now().millisecondsSinceEpoch}';
+      await saveSession(token, user);
+      return user;
     } catch (e) {
       final err = e.toString().toLowerCase();
-      if (err.contains('deactivated')) {
+      // Deactivated / invalid-credential / bad-phone errors are real answers
+      // from the DB — never fall back to demo mode for these.
+      if (err.contains('deactivated') ||
+          err.contains('invalid phone') ||
+          err.contains('valid ethiopian phone')) {
         rethrow;
       }
-      // If network, auth mismatch, or timeout, continue to server / offline fallback
-    }
-
-    // 2. Try Local REST Server
-    final baseUrl = await getBaseUrl();
-    try {
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/api/auth/login'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'email': email.trim().toLowerCase(),
-              'password': password,
-            }),
-          )
-          .timeout(const Duration(seconds: 4));
-
-      if (response.statusCode == 200) {
-        currentSource = DatabaseSource.localServer;
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final token = data['token']?.toString() ??
-            'token-${DateTime.now().millisecondsSinceEpoch}';
-        final user = AppUser.fromJson(data['user'] as Map<String, dynamic>);
-        await saveSession(token, user);
-        return user;
-      } else {
-        final errorMsg = _extractError(response.body) ?? 'Invalid email or password';
-        throw Exception(errorMsg);
-      }
-    } catch (e) {
-      if (e.toString().contains('Invalid email') ||
-          e.toString().contains('deactivated')) {
-        rethrow;
-      }
-      // 3. Fallback to offline demo login
+      // Network / timeout — fall back to offline demo login
       currentSource = DatabaseSource.offlineCache;
-      return _offlineLogin(email, password);
+      return _offlineLogin(phone, password);
     }
   }
 
   static Future<void> logout() async {
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      await http
-          .post(Uri.parse('$baseUrl/api/auth/logout'), headers: headers)
-          .timeout(const Duration(seconds: 2));
-    } catch (_) {}
     await clearSession();
   }
 
-  /* ------------------- Shops ------------------- */
+  /* ------------------- Shops (direct Neon) ------------------- */
   static Future<List<Shop>> getShops() async {
-    // 1. Try Direct Neon DB
     try {
       final shops = await NeonDatabaseService.getShopsDirect();
-      if (shops.isNotEmpty) {
-        currentSource = DatabaseSource.neonCloud;
-        return shops;
-      }
-    } catch (_) {}
-
-    // 2. Try Local Server
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      final res = await http
-          .get(Uri.parse('$baseUrl/api/shops'), headers: headers)
-          .timeout(const Duration(seconds: 4));
-      if (res.statusCode == 200) {
-        currentSource = DatabaseSource.localServer;
-        final data = jsonDecode(res.body);
-        final list = data['shops'] as List? ?? [];
-        return list.map((s) => Shop.fromJson(s as Map<String, dynamic>)).toList();
-      }
-    } catch (_) {}
-
-    // 3. Default fallback
-    currentSource = DatabaseSource.offlineCache;
-    return [
-      Shop(id: 'shop-1', name: 'Shop 1 - Merkato', code: 'SHOP1'),
-      Shop(id: 'shop-2', name: 'Shop 2 - Bole', code: 'SHOP2'),
-    ];
+      currentSource = DatabaseSource.neonCloud;
+      return shops;
+    } catch (_) {
+      // Offline fallback
+      currentSource = DatabaseSource.offlineCache;
+      return [
+        Shop(id: 'shop-1', name: 'Shop 1 - Merkato', code: 'SHOP1'),
+        Shop(id: 'shop-2', name: 'Shop 2 - Bole', code: 'SHOP2'),
+      ];
+    }
   }
 
-  /* ------------------- Records ------------------- */
+  /* ------------------- Records (direct Neon + offline cache) ------------------- */
   static Future<List<LedgerRecord>> getRecords({
     String? shopId,
     String? type,
   }) async {
-    // 1. Try Direct Neon DB
     try {
       final records = await NeonDatabaseService.getRecordsDirect(
         shopId: shopId,
         type: type,
       );
-      if (records.isNotEmpty) {
-        currentSource = DatabaseSource.neonCloud;
-        await _cacheRecords(records);
-        return records;
-      }
-    } catch (_) {}
-
-    // 2. Try Local REST Server
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      final queryParams = <String, String>{};
-      if (shopId != null && shopId.isNotEmpty) queryParams['shopId'] = shopId;
-      if (type != null && type.isNotEmpty) queryParams['type'] = type;
-
-      final uri = Uri.parse('$baseUrl/api/records')
-          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
-      final res = await http.get(uri, headers: headers).timeout(const Duration(seconds: 4));
-      if (res.statusCode == 200) {
-        currentSource = DatabaseSource.localServer;
-        final data = jsonDecode(res.body);
-        final list = data['records'] as List? ?? [];
-        final records =
-            list.map((r) => LedgerRecord.fromJson(r as Map<String, dynamic>)).toList();
-        await _cacheRecords(records);
-        return records;
-      }
-    } catch (_) {}
-
-    // 3. Return cached or offline seed records
-    currentSource = DatabaseSource.offlineCache;
-    return _getCachedRecords(shopId: shopId, type: type);
+      currentSource = DatabaseSource.neonCloud;
+      await _cacheRecords(records);
+      return records;
+    } catch (_) {
+      // Offline: serve cached records
+      currentSource = DatabaseSource.offlineCache;
+      return _getCachedRecords(shopId: shopId, type: type);
+    }
   }
 
   static Future<LedgerRecord> createRecord(
     LedgerRecord record, {
     String? shopId,
   }) async {
-    // 1. Try Direct Neon DB
-    try {
-      final created = await NeonDatabaseService.createRecordDirect(
-        record,
-        shopId: shopId,
-      );
-      currentSource = DatabaseSource.neonCloud;
-      await _upsertLocalRecord(created);
-      return created;
-    } catch (_) {}
-
-    // 2. Try Local REST Server
-    final baseUrl = await getBaseUrl();
-    final bodyMap = record.toJson();
-    if (shopId != null) bodyMap['shopId'] = shopId;
-
-    try {
-      final headers = await _headers();
-      final res = await http
-          .post(
-            Uri.parse('$baseUrl/api/records'),
-            headers: headers,
-            body: jsonEncode(bodyMap),
-          )
-          .timeout(const Duration(seconds: 4));
-
-      if (res.statusCode == 201 || res.statusCode == 200) {
-        currentSource = DatabaseSource.localServer;
-        final data = jsonDecode(res.body);
-        final created =
-            LedgerRecord.fromJson(data['record'] as Map<String, dynamic>);
-        await _upsertLocalRecord(created);
-        return created;
-      }
-    } catch (_) {}
-
-    // 3. Save locally in offline cache
-    currentSource = DatabaseSource.offlineCache;
-    await _upsertLocalRecord(record);
-    return record;
+    final created = await NeonDatabaseService.createRecordDirect(
+      record,
+      shopId: shopId,
+    );
+    currentSource = DatabaseSource.neonCloud;
+    await _upsertLocalRecord(created);
+    return created;
   }
 
   static Future<LedgerRecord> updateRecord(LedgerRecord record) async {
-    // 1. Try Direct Neon DB
-    try {
-      await NeonDatabaseService.updateRecordDirect(record);
-      currentSource = DatabaseSource.neonCloud;
-      await _upsertLocalRecord(record);
-      return record;
-    } catch (_) {}
-
-    // 2. Try Local REST Server
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      final res = await http
-          .put(
-            Uri.parse('$baseUrl/api/records/${record.id}'),
-            headers: headers,
-            body: jsonEncode(record.toJson()),
-          )
-          .timeout(const Duration(seconds: 4));
-
-      if (res.statusCode == 200) {
-        currentSource = DatabaseSource.localServer;
-        final data = jsonDecode(res.body);
-        final updated =
-            LedgerRecord.fromJson(data['record'] as Map<String, dynamic>);
-        await _upsertLocalRecord(updated);
-        return updated;
-      }
-    } catch (_) {}
-
-    // 3. Update locally
-    currentSource = DatabaseSource.offlineCache;
+    await NeonDatabaseService.updateRecordDirect(record);
+    currentSource = DatabaseSource.neonCloud;
     await _upsertLocalRecord(record);
     return record;
   }
 
   static Future<void> deleteRecord(String recordId) async {
-    // 1. Try Direct Neon DB
-    try {
-      await NeonDatabaseService.deleteRecordDirect(recordId);
-      currentSource = DatabaseSource.neonCloud;
-      await _deleteLocalRecord(recordId);
-      return;
-    } catch (_) {}
-
-    // 2. Try Local REST Server
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      await http
-          .delete(Uri.parse('$baseUrl/api/records/$recordId'), headers: headers)
-          .timeout(const Duration(seconds: 4));
-    } catch (_) {}
-
-    // 3. Remove locally
+    await NeonDatabaseService.deleteRecordDirect(recordId);
+    currentSource = DatabaseSource.neonCloud;
     await _deleteLocalRecord(recordId);
   }
 
-  /* ------------------- Statements ------------------- */
+  /* ------------------- Statements (computed locally from records) ------------------- */
   static Future<AccountStatement> getStatement({
     required String name,
     required String type,
     String? shopId,
   }) async {
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      final uri = Uri.parse('$baseUrl/api/statements').replace(
-        queryParameters: {
-          'name': name,
-          'type': type,
-          if (shopId != null && shopId.isNotEmpty) 'shopId': shopId,
-        },
-      );
-      final res =
-          await http.get(uri, headers: headers).timeout(const Duration(seconds: 4));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return AccountStatement.fromJson(
-            data['statement'] as Map<String, dynamic>);
-      }
-    } catch (_) {}
-
-    // Calculate local statement from records
     final records = await getRecords(shopId: shopId, type: type);
     final matching = records
         .where((r) => r.title.trim().toLowerCase() == name.trim().toLowerCase())
@@ -385,220 +174,103 @@ class ApiService {
     return _generateLocalStatement(name, type, shopId, matching);
   }
 
-  /* ------------------- Shopkeeper Admin Management ------------------- */
+  /* ------------------- Shopkeeper Admin Management (direct Neon) ------------------- */
   static Future<List<AppUser>> getShopkeepers() async {
-    // 1. Try Direct Neon DB
-    try {
-      final users = await NeonDatabaseService.getUsersDirect();
-      if (users.isNotEmpty) {
-        currentSource = DatabaseSource.neonCloud;
-        return users;
-      }
-    } catch (_) {}
-
-    // 2. Try Local REST Server
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      final res = await http
-          .get(Uri.parse('$baseUrl/api/users'), headers: headers)
-          .timeout(const Duration(seconds: 4));
-      if (res.statusCode == 200) {
-        currentSource = DatabaseSource.localServer;
-        final data = jsonDecode(res.body);
-        final list = data['users'] as List? ?? [];
-        return list.map((u) => AppUser.fromJson(u as Map<String, dynamic>)).toList();
-      }
-    } catch (_) {}
-
-    return [
-      AppUser(
-        id: 'u-1',
-        name: 'Shopkeeper 1',
-        email: 'shop1@click.et',
-        role: 'shopkeeper',
-        shopId: 'shop-1',
-        shopName: 'Shop 1 - Merkato',
-        active: true,
-      ),
-      AppUser(
-        id: 'u-2',
-        name: 'Shopkeeper 2',
-        email: 'shop2@click.et',
-        role: 'shopkeeper',
-        shopId: 'shop-2',
-        shopName: 'Shop 2 - Bole',
-        active: true,
-      ),
-    ];
+    return NeonDatabaseService.getUsersDirect();
   }
 
   static Future<AppUser> createShopkeeper({
     required String name,
-    required String email,
+    required String phone,
+    String? email,
     required String password,
     required String shopId,
   }) async {
-    // 1. Try Direct Neon DB
-    try {
-      final user = await NeonDatabaseService.createShopkeeperDirect(
-        name: name,
-        email: email,
-        password: password,
-        shopId: shopId,
-      );
-      currentSource = DatabaseSource.neonCloud;
-      return user;
-    } catch (_) {}
-
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      final res = await http
-          .post(
-            Uri.parse('$baseUrl/api/users'),
-            headers: headers,
-            body: jsonEncode({
-              'name': name,
-              'email': email,
-              'password': password,
-              'shopId': shopId,
-            }),
-          )
-          .timeout(const Duration(seconds: 4));
-      if (res.statusCode == 201 || res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return AppUser.fromJson(data['user'] as Map<String, dynamic>);
-      }
-    } catch (_) {}
-
-    return AppUser(
-      id: 'u-${DateTime.now().millisecondsSinceEpoch}',
+    final user = await NeonDatabaseService.createShopkeeperDirect(
       name: name,
+      phone: phone,
       email: email,
-      role: 'shopkeeper',
+      password: password,
       shopId: shopId,
-      shopName: shopId == 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato',
-      active: true,
     );
+    currentSource = DatabaseSource.neonCloud;
+    return user;
   }
 
   static Future<AppUser> updateShopkeeper(
     String userId, {
     String? name,
+    String? phone,
     String? shopId,
     bool? active,
     String? password,
   }) async {
-    // 1. Try Direct Neon DB
-    try {
-      final user = await NeonDatabaseService.updateShopkeeperDirect(
-        userId,
-        name: name,
-        shopId: shopId,
-        active: active,
-        password: password,
-      );
-      currentSource = DatabaseSource.neonCloud;
-      return user;
-    } catch (_) {}
-
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      final body = <String, dynamic>{};
-      if (name != null) body['name'] = name;
-      if (shopId != null) body['shopId'] = shopId;
-      if (active != null) body['active'] = active;
-      if (password != null && password.isNotEmpty) body['password'] = password;
-
-      final res = await http
-          .patch(
-            Uri.parse('$baseUrl/api/users/$userId'),
-            headers: headers,
-            body: jsonEncode(body),
-          )
-          .timeout(const Duration(seconds: 4));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return AppUser.fromJson(data['user'] as Map<String, dynamic>);
-      }
-    } catch (_) {}
-
-    return AppUser(
-      id: userId,
-      name: name ?? 'Shopkeeper',
-      email: 'shop@click.et',
-      role: 'shopkeeper',
-      shopId: shopId ?? 'shop-1',
-      shopName: shopId == 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato',
-      active: active ?? true,
+    final user = await NeonDatabaseService.updateShopkeeperDirect(
+      userId,
+      name: name,
+      phone: phone,
+      shopId: shopId,
+      active: active,
+      password: password,
     );
+    currentSource = DatabaseSource.neonCloud;
+    return user;
   }
 
   static Future<void> deleteShopkeeper(String userId) async {
-    try {
-      await NeonDatabaseService.deleteShopkeeperDirect(userId);
-      currentSource = DatabaseSource.neonCloud;
-      return;
-    } catch (_) {}
-
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      await http
-          .delete(Uri.parse('$baseUrl/api/users/$userId'), headers: headers)
-          .timeout(const Duration(seconds: 4));
-    } catch (_) {}
+    await NeonDatabaseService.deleteShopkeeperDirect(userId);
+    currentSource = DatabaseSource.neonCloud;
   }
 
   static Future<Shop> createShop(String name, [String? code]) async {
-    try {
-      final shop = await NeonDatabaseService.createShopDirect(name, code);
-      currentSource = DatabaseSource.neonCloud;
-      return shop;
-    } catch (_) {}
-
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      final res = await http
-          .post(
-            Uri.parse('$baseUrl/api/shops'),
-            headers: headers,
-            body: jsonEncode({'name': name, 'code': code}),
-          )
-          .timeout(const Duration(seconds: 4));
-      if (res.statusCode == 201 || res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        return Shop.fromJson(data['shop'] as Map<String, dynamic>);
-      }
-    } catch (_) {}
-
-    return Shop(
-      id: 'shop-${DateTime.now().millisecondsSinceEpoch}',
-      name: name,
-      code: code ?? name.toUpperCase(),
-    );
+    final shop = await NeonDatabaseService.createShopDirect(name, code);
+    currentSource = DatabaseSource.neonCloud;
+    return shop;
   }
 
   static Future<void> deleteShop(String shopId) async {
-    try {
-      await NeonDatabaseService.deleteShopDirect(shopId);
-      currentSource = DatabaseSource.neonCloud;
-      return;
-    } catch (_) {}
-
-    final baseUrl = await getBaseUrl();
-    try {
-      final headers = await _headers();
-      await http
-          .delete(Uri.parse('$baseUrl/api/shops/$shopId'), headers: headers)
-          .timeout(const Duration(seconds: 4));
-    } catch (_) {}
+    await NeonDatabaseService.deleteShopDirect(shopId);
+    currentSource = DatabaseSource.neonCloud;
   }
 
-  /* ------------------- Offline & Cache Helpers ------------------- */
+  /* ------------------- Offline Demo Login ------------------- */
+  static AppUser _offlineLogin(String phone, String password) {
+    final clean = NeonDatabaseService.normalizePhone(phone) ?? phone.trim();
+    if (clean == '+251911111111' && password == 'Admin@123') {
+      return AppUser(
+        id: 'admin-id',
+        name: 'Central Admin',
+        phone: clean,
+        role: 'admin',
+        active: true,
+      );
+    }
+    if (clean == '+251922222222' && password == 'Shop@123') {
+      return AppUser(
+        id: 'shop1-id',
+        name: 'Shopkeeper 1',
+        phone: clean,
+        role: 'shopkeeper',
+        shopId: 'shop-1',
+        shopName: 'Shop 1 - Merkato',
+        active: true,
+      );
+    }
+    if (clean == '+251933333333' && password == 'Shop@123') {
+      return AppUser(
+        id: 'shop2-id',
+        name: 'Shopkeeper 2',
+        phone: clean,
+        role: 'shopkeeper',
+        shopId: 'shop-2',
+        shopName: 'Shop 2 - Bole',
+        active: true,
+      );
+    }
+    throw Exception('Could not reach the database. Check your connection and try again.');
+  }
+
+  /* ------------------- Cache Helpers ------------------- */
 
   static Future<void> _cacheRecords(List<LedgerRecord> records) async {
     try {
@@ -660,51 +332,6 @@ class ApiService {
     final all = await _getCachedRecords();
     all.removeWhere((r) => r.id == id);
     await _cacheRecords(all);
-  }
-
-  static AppUser _offlineLogin(String email, String password) {
-    final clean = email.trim().toLowerCase();
-    if (clean == 'admin@click.et' && password == 'Admin@123') {
-      return AppUser(
-        id: 'admin-id',
-        name: 'Central Admin',
-        email: 'admin@click.et',
-        role: 'admin',
-        active: true,
-      );
-    }
-    if (clean == 'shop1@click.et' && password == 'Shop@123') {
-      return AppUser(
-        id: 'shop1-id',
-        name: 'Shopkeeper 1',
-        email: 'shop1@click.et',
-        role: 'shopkeeper',
-        shopId: 'shop-1',
-        shopName: 'Shop 1 - Merkato',
-        active: true,
-      );
-    }
-    if (clean == 'shop2@click.et' && password == 'Shop@123') {
-      return AppUser(
-        id: 'shop2-id',
-        name: 'Shopkeeper 2',
-        email: 'shop2@click.et',
-        role: 'shopkeeper',
-        shopId: 'shop-2',
-        shopName: 'Shop 2 - Bole',
-        active: true,
-      );
-    }
-    throw Exception('Invalid email or password (offline demo mode)');
-  }
-
-  static String? _extractError(String body) {
-    try {
-      final data = jsonDecode(body);
-      return data['error']?.toString();
-    } catch (_) {
-      return null;
-    }
   }
 
   static AccountStatement _generateLocalStatement(
@@ -1018,6 +645,38 @@ class ApiService {
               sign: '-',
               bank: 'CBE',
               paymentMethod: 'CBE'),
+        ],
+      ),
+      // Delala (Broker) Credit: Abebe Delala (Merkato Broker)
+      LedgerRecord(
+        id: 'rec-delala-1',
+        type: 'delala',
+        title: 'Abebe Delala (Merkato Broker)',
+        date: '2026-10-29',
+        notes: 'Commission on electric goods brokered to regional clients',
+        shopId: 'shop-1',
+        shopName: 'Shop 1 - Merkato',
+        createdAt: 1720000400000,
+        updatedAt: 1720000400000,
+        items: [
+          LineItem(
+            id: 'd1',
+            name: 'Commission: 12W Safari 20 Ctns consignment',
+            unitPrice: 50.0,
+            quantity: 2000.0,
+            sign: '+',
+            cartons: 20.0,
+            pcsPerCarton: 100.0,
+          ),
+          LineItem(
+            id: 'd2',
+            name: 'Settlement via Telebirr',
+            unitPrice: 40000.0,
+            quantity: 1.0,
+            sign: '-',
+            bank: 'Telebirr',
+            paymentMethod: 'Telebirr',
+          ),
         ],
       ),
     ];

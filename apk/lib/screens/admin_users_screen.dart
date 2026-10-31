@@ -45,7 +45,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Future<void> _showCreateUserDialog() async {
     final nameCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
     final passCtrl = TextEditingController();
     String selectedShopId = 'shop-1';
 
@@ -65,9 +65,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   ),
                   const SizedBox(height: 10),
                   TextField(
-                    controller: emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email Address', hintText: 'e.g. abebe@click.et'),
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: 'Phone Number', hintText: 'e.g. 0911111111'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -103,9 +103,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 ),
                 onPressed: () async {
                   final name = nameCtrl.text.trim();
-                  final email = emailCtrl.text.trim();
+                  final phone = phoneCtrl.text.trim();
                   final pass = passCtrl.text;
-                  if (name.isEmpty || email.isEmpty || pass.length < 6) {
+                  if (name.isEmpty || phone.isEmpty || pass.length < 6) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Please fill all fields (password min 6 chars)')),
                     );
@@ -115,7 +115,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   try {
                     await ApiService.createShopkeeper(
                       name: name,
-                      email: email,
+                      phone: phone,
                       password: pass,
                       shopId: selectedShopId,
                     );
@@ -142,6 +142,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
   Future<void> _showEditUserDialog(AppUser user) async {
     final nameCtrl = TextEditingController(text: user.name);
+    final phoneCtrl = TextEditingController(text: user.phone ?? '');
     final passCtrl = TextEditingController();
     String selectedShopId = user.shopId ?? 'shop-1';
     bool active = user.active;
@@ -159,6 +160,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   TextField(
                     controller: nameCtrl,
                     decoration: const InputDecoration(labelText: 'Full Name'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone Number',
+                      hintText: 'e.g. 0911111111',
+                    ),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
@@ -210,6 +220,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     await ApiService.updateShopkeeper(
                       user.id,
                       name: nameCtrl.text.trim(),
+                      phone: phoneCtrl.text.trim(),
                       shopId: selectedShopId,
                       active: active,
                       password: passCtrl.text.isNotEmpty ? passCtrl.text : null,
@@ -319,7 +330,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(u.email, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                Text(u.phone ?? 'No phone', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                                 Text(
                                   u.active ? 'Status: Active' : 'Status: Deactivated',
                                   style: TextStyle(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/neon_database_service.dart';
 import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -12,7 +13,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'shop1@click.et');
+  final _phoneController = TextEditingController(text: '0922222222');
   final _passwordController = TextEditingController(text: 'Shop@123');
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -21,16 +22,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedEmail();
+    _loadSavedPhone();
   }
 
-  Future<void> _loadSavedEmail() async {
+  Future<void> _loadSavedPhone() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedEmail = prefs.getString('last_login_email');
-      if (savedEmail != null && savedEmail.isNotEmpty && mounted) {
+      final savedPhone = prefs.getString('last_login_phone');
+      if (savedPhone != null && savedPhone.isNotEmpty && mounted) {
         setState(() {
-          _emailController.text = savedEmail;
+          _phoneController.text = savedPhone;
         });
       }
     } catch (_) {}
@@ -38,18 +39,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
-    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
     final password = _passwordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
+    if (phone.isEmpty || password.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter both email and password';
+        _errorMessage = 'Please enter both phone number and password';
+      });
+      return;
+    }
+
+    if (NeonDatabaseService.normalizePhone(phone) == null) {
+      setState(() {
+        _errorMessage = 'Enter a valid Ethiopian phone number (e.g. 0911111111)';
       });
       return;
     }
@@ -60,9 +68,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final user = await ApiService.login(email, password);
+      final user = await ApiService.login(phone, password);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('last_login_email', email);
+      await prefs.setString('last_login_phone', phone);
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -81,93 +89,34 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _fillCredentials(String email, String password) {
+  void _fillCredentials(String phone, String password) {
     setState(() {
-      _emailController.text = email;
+      _phoneController.text = phone;
       _passwordController.text = password;
       _errorMessage = null;
     });
   }
 
-  Future<void> _showServerSettings() async {
-    final currentUrl = await ApiService.getBaseUrl();
-    final urlController = TextEditingController(text: currentUrl);
-
-    if (!mounted) return;
+  Future<void> _showDemoAccounts() async {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Server Configuration'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Backend API Server URL:',
-                style: TextStyle(fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: urlController,
-                decoration: const InputDecoration(
-                  labelText: 'Server Base URL',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Quick Fill Account (Testing):',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  OutlinedButton(
-                    onPressed: () {
-                      _fillCredentials('shop1@click.et', 'Shop@123');
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text('Shop 1 (Merkato)', style: TextStyle(fontSize: 11)),
-                  ),
-                  OutlinedButton(
-                    onPressed: () {
-                      _fillCredentials('shop2@click.et', 'Shop@123');
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text('Shop 2 (Bole)', style: TextStyle(fontSize: 11)),
-                  ),
-                  OutlinedButton(
-                    onPressed: () {
-                      _fillCredentials('admin@click.et', 'Admin@123');
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text('Admin', style: TextStyle(fontSize: 11)),
-                  ),
-                ],
-              ),
-            ],
-          ),
+        title: const Text('Demo Accounts'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Admin: 0911111111 / Admin@123', style: TextStyle(fontSize: 13)),
+            SizedBox(height: 6),
+            Text('Shop 1 (Merkato): 0922222222 / Shop@123', style: TextStyle(fontSize: 13)),
+            SizedBox(height: 6),
+            Text('Shop 2 (Bole): 0933333333 / Shop@123', style: TextStyle(fontSize: 13)),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await ApiService.setBaseUrl(urlController.text.trim());
-              if (!ctx.mounted) return;
-              Navigator.pop(ctx);
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Server URL updated')),
-              );
-            },
-            child: const Text('Save'),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -192,11 +141,11 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           IconButton(
             icon: Icon(
-              Icons.settings_outlined,
+              Icons.info_outline,
               color: isDark ? const Color(0xFF94A3B8) : Colors.blueGrey,
             ),
-            tooltip: 'Server Settings',
-            onPressed: _showServerSettings,
+            tooltip: 'Demo Accounts',
+            onPressed: _showDemoAccounts,
           ),
         ],
       ),
@@ -295,14 +244,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 14),
                           ],
 
-                          // Email
+                          // Phone Number
                           TextField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-() ]')),
+                            ],
                             decoration: InputDecoration(
-                              labelText: 'Email Address',
-                              hintText: 'name@click.et',
-                              prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                              labelText: 'Phone Number',
+                              hintText: '0911111111',
+                              prefixIcon: const Icon(Icons.phone_outlined, size: 20),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             ),

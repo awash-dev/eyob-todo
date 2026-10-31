@@ -1,4 +1,4 @@
-import { Building2, Layers, Plus, Users } from 'lucide-react'
+import { Building2, Handshake, Layers, Plus, Users } from 'lucide-react'
 import React from 'react'
 import { useLedger } from '../../context/LedgerContext'
 import type { TabType } from '../../types/ledger'
@@ -23,6 +23,11 @@ export const MobileBottomNav: React.FC = () => {
       Icon: Building2,
     },
     {
+      id: 'delala',
+      label: 'Delala',
+      Icon: Handshake,
+    },
+    {
       id: 'stock',
       label: 'Stock',
       Icon: Layers,
@@ -41,14 +46,18 @@ export const MobileBottomNav: React.FC = () => {
               ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
               : tab.id === 'supplier'
                 ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                : 'text-purple-600 dark:text-purple-400 font-semibold'
+                : tab.id === 'delala'
+                  ? 'text-amber-600 dark:text-amber-400 font-semibold'
+                  : 'text-purple-600 dark:text-purple-400 font-semibold'
 
           const activeBadgeClass =
             tab.id === 'customer'
               ? 'bg-emerald-600 text-white'
               : tab.id === 'supplier'
                 ? 'bg-blue-600 text-white'
-                : 'bg-purple-600 text-white'
+                : tab.id === 'delala'
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-purple-600 text-white'
 
           return (
             <button

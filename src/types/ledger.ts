@@ -1,4 +1,4 @@
-export type TabType = 'customer' | 'supplier' | 'stock'
+export type TabType = 'customer' | 'supplier' | 'stock' | 'delala'
 
 export type SignType = '+' | '-'
 

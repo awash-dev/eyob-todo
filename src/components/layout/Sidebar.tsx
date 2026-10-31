@@ -1,4 +1,4 @@
-import { BookOpen, Building2, Layers, LogOut, Users } from 'lucide-react'
+import { BookOpen, Building2, Handshake, Layers, LogOut, Users } from 'lucide-react'
 import React, { useState } from 'react'
 import { useLedger } from '../../context/LedgerContext'
 import { useAuth } from '../../context/AuthContext'
@@ -38,6 +38,13 @@ export const Sidebar: React.FC = () => {
       Icon: Building2,
       activeClass:
         'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+    },
+    {
+      id: 'delala',
+      label: 'Delala Credit',
+      Icon: Handshake,
+      activeClass:
+        'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
     },
     {
       id: 'stock',

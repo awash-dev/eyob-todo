@@ -68,6 +68,7 @@ function MainAppView() {
     customer: 'customers',
     supplier: 'suppliers',
     stock: 'stock items',
+    delala: 'delala brokers',
   }[activeTab]
 
   return (
