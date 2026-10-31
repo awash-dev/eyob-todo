@@ -6,12 +6,14 @@ import '../models/line_item.dart';
 class RecordFormDialog extends StatefulWidget {
   final String activeTab; // 'customer' | 'supplier' | 'stock' | 'delala'
   final LedgerRecord? editingRecord;
+  final List<LedgerRecord>? existingRecords;
   final String? shopId;
 
   const RecordFormDialog({
     super.key,
     required this.activeTab,
     this.editingRecord,
+    this.existingRecords,
     this.shopId,
   });
 
@@ -27,10 +29,9 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   late TextEditingController _notesController;
   late DateTime _selectedDate;
   late List<LineItemFormItem> _formItems;
+  int _activeItemIndex = 0;
 
-  String _stockPackagingUnit = 'Carton';
   final TextEditingController _otherUnitController = TextEditingController();
-  bool _showCustoms = false;
 
   static const List<String> _stockSuggestions = [
     '12W Safari',
@@ -57,30 +58,30 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     'Other',
   ];
 
-  static const List<String> _stockTypeOptions = [
-    'Stock',
-    'Goods',
-    'Product',
-    'Delivery',
-    'Return',
-  ];
-
   static const List<String> _bankOptions = [
     'CBE',
+    'CBE Birr',
     'Awash',
     'Dashen',
-    'Telebirr',
+    'BoA',
     'Abyssinia',
     'Pawza',
-    'Cash',
+    'Telebirr',
+    'Amhara',
+    'Oromia',
     'Coop',
     'Hibret',
-    'Nib',
-    'Berhan',
     'Zemen',
+    'Berhan',
+    'Nib',
     'Wegagen',
+    'Abay',
+    'Bunna',
     'Enat',
-    'Other Bank',
+    'Sinqee',
+    'Cash',
+    'Check',
+    'Other',
   ];
 
   @override
@@ -98,13 +99,13 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
     if (rec != null && rec.items.isNotEmpty) {
       _formItems = rec.items.map((it) => LineItemFormItem.fromLineItem(it)).toList();
-      _showCustoms = rec.items.any((it) => (it.customs ?? 0.0) > 0);
-      if (rec.items.first.packagingUnit != null && rec.items.first.packagingUnit!.isNotEmpty) {
-        final u = rec.items.first.packagingUnit!;
+      final firstItem = rec.items.first;
+      if (firstItem.packagingUnit != null && firstItem.packagingUnit!.isNotEmpty) {
+        final u = firstItem.packagingUnit!;
         if (_packagingUnits.contains(u)) {
-          _stockPackagingUnit = u;
+          _formItems.first.packagingUnit = u;
         } else {
-          _stockPackagingUnit = 'Other';
+          _formItems.first.packagingUnit = 'Other';
           _otherUnitController.text = u;
         }
       }
@@ -116,7 +117,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
           unitPrice: 0.0,
           quantity: 1.0,
           sign: '+',
-          typeOrBank: widget.activeTab == 'stock' ? 'Stock' : 'Stock',
+          typeOrBank: 'CBE',
           packagingUnit: 'Carton',
         ),
       ];
@@ -149,10 +150,11 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
           unitPrice: 0.0,
           quantity: 1.0,
           sign: '+',
-          typeOrBank: 'Stock',
+          typeOrBank: 'CBE',
           packagingUnit: 'Carton',
         ),
       );
+      _activeItemIndex = _formItems.length - 1;
     });
   }
 
@@ -161,48 +163,10 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     setState(() {
       final removed = _formItems.removeAt(index);
       removed.dispose();
-    });
-  }
-
-  void _toggleItemSign(LineItemFormItem item) {
-    setState(() {
-      if (item.sign == '+') {
-        item.sign = '-';
-        if (_stockTypeOptions.contains(item.typeOrBank)) {
-          item.typeOrBank = 'CBE';
-        }
-      } else {
-        item.sign = '+';
-        if (_bankOptions.contains(item.typeOrBank)) {
-          item.typeOrBank = 'Stock';
-        }
+      if (_activeItemIndex >= _formItems.length) {
+        _activeItemIndex = _formItems.length - 1;
       }
     });
-  }
-
-  double _calculateGrandTotal() {
-    double total = 0;
-    for (final item in _formItems) {
-      final ctns = double.tryParse(item.cartonsController.text);
-      final pcs = double.tryParse(item.pcsController.text);
-      final p = double.tryParse(item.priceController.text) ?? item.unitPrice;
-      final customs = double.tryParse(item.customsController.text) ?? (item.customs ?? 0.0);
-
-      double amount = 0.0;
-      if (item.packagingUnit == 'Carton' && ctns != null && ctns > 0 && pcs != null && pcs > 0) {
-        amount = ctns * pcs * p;
-      } else {
-        final q = double.tryParse(item.qtyController.text) ?? item.quantity;
-        amount = q * p;
-      }
-
-      if (item.sign == '+') {
-        total += (amount + customs);
-      } else {
-        total -= amount;
-      }
-    }
-    return total;
   }
 
   Future<void> _pickDate() async {
@@ -224,52 +188,51 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
-    // In Stock tab, ensure title and item name are synchronized
+    // If Stock tab, ensure party name is the item name
     if (widget.activeTab == 'stock' && _formItems.isNotEmpty) {
-      final item = _formItems.first;
-      if (item.nameController.text.trim().isNotEmpty && _titleController.text.trim().isEmpty) {
-        _titleController.text = item.nameController.text.trim();
-      } else if (_titleController.text.trim().isNotEmpty && item.nameController.text.trim().isEmpty) {
-        item.nameController.text = _titleController.text.trim();
-      }
-
-      final unitName = _stockPackagingUnit == 'Other'
-          ? (_otherUnitController.text.trim().isNotEmpty ? _otherUnitController.text.trim() : 'Other')
-          : _stockPackagingUnit;
-      item.packagingUnit = unitName;
-
-      // Auto compute total units if packaging is carton
-      if (_stockPackagingUnit == 'Carton') {
-        final c = double.tryParse(item.cartonsController.text) ?? 0.0;
-        final p = double.tryParse(item.pcsController.text) ?? 0.0;
-        if (c > 0 && p > 0) {
-          item.qtyController.text = (c * p).toStringAsFixed(0);
-        }
+      final first = _formItems.first;
+      if (first.nameController.text.trim().isNotEmpty) {
+        _titleController.text = first.nameController.text.trim();
       }
     }
 
     final lineItems = _formItems.map((f) {
-      final q = double.tryParse(f.qtyController.text) ?? f.quantity;
-      final p = double.tryParse(f.priceController.text) ?? f.unitPrice;
+      final isDebit = f.sign == '+';
+      final unitName = f.packagingUnit == 'Other'
+          ? (_otherUnitController.text.trim().isNotEmpty ? _otherUnitController.text.trim() : 'Other')
+          : f.packagingUnit;
+
+      double price = double.tryParse(f.priceController.text) ?? f.unitPrice;
+      double qty = double.tryParse(f.qtyController.text) ?? f.quantity;
       final ctns = double.tryParse(f.cartonsController.text);
       final pcs = double.tryParse(f.pcsController.text);
-      final customs = double.tryParse(f.customsController.text);
 
-      final isDeduct = f.sign == '-';
+      String itemName = f.nameController.text.trim();
+
+      // If credit (payment), ensure item description indicates the bank
+      if (!isDebit) {
+        if (itemName.isEmpty) {
+          itemName = 'Payment via ${f.typeOrBank}';
+        }
+        qty = 1.0;
+      } else {
+        if (unitName == 'Carton' && ctns != null && ctns > 0 && pcs != null && pcs > 0) {
+          qty = ctns * pcs;
+        }
+      }
 
       return LineItem(
         id: f.id,
-        name: f.nameController.text.trim(),
-        unitPrice: p,
-        quantity: q,
+        name: itemName,
+        unitPrice: price,
+        quantity: qty,
         sign: f.sign,
-        bank: isDeduct ? f.typeOrBank : null,
-        paymentMethod: isDeduct ? f.typeOrBank : null,
-        customType: !isDeduct ? f.typeOrBank : null,
-        cartons: ctns != null && ctns > 0 ? ctns : null,
-        pcsPerCarton: pcs != null && pcs > 0 ? pcs : null,
-        customs: customs != null && customs > 0 ? customs : null,
-        packagingUnit: f.packagingUnit,
+        bank: !isDebit ? f.typeOrBank : null,
+        paymentMethod: !isDebit ? f.typeOrBank : null,
+        customType: isDebit ? 'Goods' : null,
+        cartons: isDebit ? ctns : null,
+        pcsPerCarton: isDebit ? pcs : null,
+        packagingUnit: isDebit ? unitName : null,
         date: dateStr,
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       );
@@ -278,7 +241,9 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     final record = LedgerRecord(
       id: widget.editingRecord?.id ?? 'rec-${DateTime.now().millisecondsSinceEpoch}',
       type: widget.activeTab,
-      title: _titleController.text.trim(),
+      title: _titleController.text.trim().isNotEmpty
+          ? _titleController.text.trim()
+          : (lineItems.isNotEmpty ? lineItems.first.name : 'Record'),
       date: dateStr,
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       items: lineItems,
@@ -297,39 +262,80 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Dedicated Stock In Form Layout (matching Google Stitch reference image)
-    if (isStock) {
-      return _buildStockInDialog(theme, isDark);
-    }
-
-    // Ledger Entry Form with Bank Selection & Packaging Breakdown (Customer, Supplier, Delala)
-    return _buildLedgerTableDialog(theme, isDark, isCustomer, isDelala);
-  }
-
-  /// Google Stitch Stock In Form (Pixel-Matched to Reference Screenshot)
-  Widget _buildStockInDialog(ThemeData theme, bool isDark) {
-    final item = _formItems.first;
-    final cartons = double.tryParse(item.cartonsController.text) ?? 0.0;
-    final pcs = double.tryParse(item.pcsController.text) ?? 0.0;
-    final price = double.tryParse(item.priceController.text) ?? 0.0;
-
-    double calculatedTotal = 0.0;
-    if (_stockPackagingUnit == 'Carton' && cartons > 0 && pcs > 0 && price > 0) {
-      calculatedTotal = cartons * pcs * price;
-    } else {
-      final q = double.tryParse(item.qtyController.text) ?? cartons;
-      calculatedTotal = q * price;
-    }
-
     final inputFill = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
     final inputBorder = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+
+    // Title label
+    final headerTitle = widget.editingRecord == null
+        ? (isStock
+            ? 'Stock In (Storekeeper)'
+            : isCustomer
+                ? 'Customer Credit Entry'
+                : isDelala
+                    ? 'Delala (Broker) Entry'
+                    : 'Supplier Credit Entry')
+        : (isStock
+            ? 'Edit Stock Entry'
+            : isCustomer
+                ? 'Edit Customer Entry'
+                : isDelala
+                    ? 'Edit Delala Entry'
+                    : 'Edit Supplier Entry');
+
+    final nameLabel = isCustomer
+        ? 'Customer Name (የደንበኛ ስም)'
+        : isDelala
+            ? 'Delala / Broker Name (የደላላ ስም)'
+            : isStock
+                ? 'Item Name (የዕቃ ስም)'
+                : 'Supplier Name (የአቅራቢ ስም)';
+
+    final nameHint = isCustomer
+        ? 'e.g. Apex Construction, Kelil Aginbi, Esmiz'
+        : isDelala
+            ? 'e.g. Abebe Delala, Merkato Agent'
+            : isStock
+                ? 'e.g. 12W Safari'
+                : 'e.g. Summit Raw Materials Ltd.';
+
+    // Current active line item
+    if (_activeItemIndex >= _formItems.length) {
+      _activeItemIndex = _formItems.length - 1;
+    }
+    final currentItem = _formItems[_activeItemIndex];
+    final isDebit = currentItem.sign == '+';
+
+    final cartons = double.tryParse(currentItem.cartonsController.text) ?? 0.0;
+    final pcs = double.tryParse(currentItem.pcsController.text) ?? 0.0;
+    final price = double.tryParse(currentItem.priceController.text) ?? 0.0;
+
+    double calculatedTotal = 0.0;
+    if (isDebit) {
+      if (currentItem.packagingUnit == 'Carton' && cartons > 0 && pcs > 0 && price > 0) {
+        calculatedTotal = cartons * pcs * price;
+      } else {
+        final q = double.tryParse(currentItem.qtyController.text) ?? cartons;
+        calculatedTotal = q * price;
+      }
+    } else {
+      calculatedTotal = price;
+    }
+
+    // Existing party names for auto-suggest
+    final existingPartyNames = widget.existingRecords != null
+        ? widget.existingRecords!
+            .where((r) => r.type == widget.activeTab)
+            .map((r) => r.title)
+            .toSet()
+            .toList()
+        : <String>[];
 
     return Dialog(
       backgroundColor: theme.colorScheme.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
+        constraints: const BoxConstraints(maxWidth: 460),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
           child: Form(
@@ -339,7 +345,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Header: Back Arrow & Title
+                  // 1. Header: Back Arrow & Title
                   Row(
                     children: [
                       IconButton(
@@ -352,99 +358,56 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          widget.editingRecord == null
-                              ? 'Stock In (Storekeeper)'
-                              : 'Edit Stock Entry',
+                          headerTitle,
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 16.5,
                             fontWeight: FontWeight.bold,
                             color: theme.colorScheme.onSurface,
                           ),
                         ),
                       ),
+                      if (!isStock && _formItems.length > 1)
+                        Text(
+                          '${_activeItemIndex + 1} of ${_formItems.length}',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
-                  // 1. Item Field
-                  _buildFieldLabel('Item', isDark),
-                  const SizedBox(height: 6),
-                  Autocomplete<String>(
-                    initialValue: TextEditingValue(
-                      text: item.nameController.text.isNotEmpty
-                          ? item.nameController.text
-                          : _titleController.text,
-                    ),
-                    optionsBuilder: (textEditingValue) {
-                      if (textEditingValue.text.isEmpty) {
-                        return _stockSuggestions;
-                      }
-                      return _stockSuggestions.where((s) => s
-                          .toLowerCase()
-                          .contains(textEditingValue.text.toLowerCase()));
-                    },
-                    onSelected: (selection) {
-                      item.nameController.text = selection;
-                      _titleController.text = selection;
-                      setState(() {});
-                    },
-                    fieldViewBuilder: (ctx, textEditingController, focusNode, onFieldSubmitted) {
-                      return TextFormField(
-                        controller: textEditingController,
-                        focusNode: focusNode,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: '12W Safari',
-                          hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                          ),
-                          suffixIcon: const Icon(Icons.keyboard_arrow_down, size: 20),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          filled: true,
-                          fillColor: inputFill,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: inputBorder),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: inputBorder),
-                          ),
-                        ),
-                        onChanged: (val) {
-                          item.nameController.text = val;
-                          _titleController.text = val;
-                        },
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Please enter item name' : null,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 2. Quantity (Cartons / Units) + Unit Dropdown
-                  _buildFieldLabel('Quantity', isDark),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 6,
-                        child: TextFormField(
-                          controller: item.cartonsController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  // 2. Party Name (Customer, Supplier, Delala)
+                  if (!isStock) ...[
+                    _buildFieldLabel(nameLabel, isDark),
+                    const SizedBox(height: 6),
+                    Autocomplete<String>(
+                      initialValue: TextEditingValue(text: _titleController.text),
+                      optionsBuilder: (textEditingValue) {
+                        if (textEditingValue.text.isEmpty) {
+                          return existingPartyNames;
+                        }
+                        return existingPartyNames.where((s) => s
+                            .toLowerCase()
+                            .contains(textEditingValue.text.toLowerCase()));
+                      },
+                      onSelected: (selection) {
+                        _titleController.text = selection;
+                        setState(() {});
+                      },
+                      fieldViewBuilder: (ctx, textEditingController, focusNode, onFieldSubmitted) {
+                        return TextFormField(
+                          controller: textEditingController,
+                          focusNode: focusNode,
                           style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                             color: theme.colorScheme.onSurface,
                           ),
                           decoration: InputDecoration(
-                            hintText: '10',
+                            hintText: nameHint,
+                            hintStyle: TextStyle(
+                              fontSize: 12.5,
+                              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                            ),
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             filled: true,
@@ -459,175 +422,421 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                             ),
                           ),
                           onChanged: (val) {
-                            final c = double.tryParse(val) ?? 0.0;
-                            final p = double.tryParse(item.pcsController.text) ?? 0.0;
-                            if (c > 0 && p > 0) {
-                              item.qtyController.text = (c * p).toStringAsFixed(0);
-                            } else {
-                              item.qtyController.text = val;
-                            }
-                            setState(() {});
+                            _titleController.text = val;
                           },
                           validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Enter qty' : null,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 4,
-                        child: Container(
-                          height: 44,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: inputFill,
+                              v == null || v.trim().isEmpty ? 'Please enter party name' : null,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 3. Transaction Type Toggle: Debit (+) Goods vs Credit (-) Payment / Loan Return
+                    _buildFieldLabel('Transaction Type (የመዝገብ አይነት)', isDark),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        // Debit (+) Goods / Delivery / Loan Button
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setState(() => currentItem.sign = '+'),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: inputBorder),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _stockPackagingUnit,
-                              isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down, size: 20),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: theme.colorScheme.onSurface,
+                            child: Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: isDebit
+                                    ? const Color(0xFF006948).withValues(alpha: 0.12)
+                                    : inputFill,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isDebit ? const Color(0xFF006948) : inputBorder,
+                                  width: isDebit ? 1.8 : 1.0,
+                                ),
                               ),
-                              items: _packagingUnits.map((u) {
-                                return DropdownMenuItem(value: u, child: Text(u));
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) setState(() => _stockPackagingUnit = val);
-                              },
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_shopping_cart,
+                                    size: 16,
+                                    color: isDebit ? const Color(0xFF006948) : Colors.grey,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Debit (+) Goods / Loan\n(ዕቃ / ብድር)',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: isDebit ? FontWeight.w900 : FontWeight.w600,
+                                      color: isDebit
+                                          ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                                          : Colors.grey,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
+
+                        // Credit (-) Payment / Bank Transfer Button
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                currentItem.sign = '-';
+                                if (!_bankOptions.contains(currentItem.typeOrBank)) {
+                                  currentItem.typeOrBank = 'CBE';
+                                }
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: !isDebit
+                                    ? const Color(0xFFB45309).withValues(alpha: 0.12)
+                                    : inputFill,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: !isDebit ? const Color(0xFFB45309) : inputBorder,
+                                  width: !isDebit ? 1.8 : 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.account_balance,
+                                    size: 16,
+                                    color: !isDebit ? const Color(0xFFB45309) : Colors.grey,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Credit (-) Payment\n(ክፍያ / ባንክ)',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: !isDebit ? FontWeight.w900 : FontWeight.w600,
+                                      color: !isDebit
+                                          ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                                          : Colors.grey,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // 4A. If Debit (+) Goods / Delivery / Consignment
+                  if (isDebit) ...[
+                    // Item Field
+                    _buildFieldLabel('Item / Description (የዕቃው አይነት)', isDark),
+                    const SizedBox(height: 6),
+                    Autocomplete<String>(
+                      initialValue: TextEditingValue(text: currentItem.nameController.text),
+                      optionsBuilder: (textEditingValue) {
+                        if (textEditingValue.text.isEmpty) {
+                          return _stockSuggestions;
+                        }
+                        return _stockSuggestions.where((s) => s
+                            .toLowerCase()
+                            .contains(textEditingValue.text.toLowerCase()));
+                      },
+                      onSelected: (selection) {
+                        currentItem.nameController.text = selection;
+                        if (isStock) _titleController.text = selection;
+                        setState(() {});
+                      },
+                      fieldViewBuilder: (ctx, textEditingController, focusNode, onFieldSubmitted) {
+                        return TextFormField(
+                          controller: textEditingController,
+                          focusNode: focusNode,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '12W Safari or 2.5 bmt',
+                            hintStyle: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                            ),
+                            suffixIcon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            filled: true,
+                            fillColor: inputFill,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                          ),
+                          onChanged: (val) {
+                            currentItem.nameController.text = val;
+                            if (isStock) _titleController.text = val;
+                          },
+                          validator: (v) =>
+                              v == null || v.trim().isEmpty ? 'Please enter item name' : null,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Quantity (Cartons / Units) + Unit Selector
+                    _buildFieldLabel('Quantity & Packaging (ብዛት)', isDark),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 6,
+                          child: TextFormField(
+                            controller: currentItem.cartonsController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                            decoration: InputDecoration(
+                              hintText: '10',
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              filled: true,
+                              fillColor: inputFill,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                            ),
+                            onChanged: (val) {
+                              final c = double.tryParse(val) ?? 0.0;
+                              final p = double.tryParse(currentItem.pcsController.text) ?? 0.0;
+                              if (c > 0 && p > 0) {
+                                currentItem.qtyController.text = (c * p).toStringAsFixed(0);
+                              } else {
+                                currentItem.qtyController.text = val;
+                              }
+                              setState(() {});
+                            },
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Enter qty' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 4,
+                          child: Container(
+                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: inputFill,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: inputBorder),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _packagingUnits.contains(currentItem.packagingUnit)
+                                    ? currentItem.packagingUnit
+                                    : 'Carton',
+                                isExpanded: true,
+                                icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                                items: _packagingUnits.map((u) {
+                                  return DropdownMenuItem(value: u, child: Text(u));
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() => currentItem.packagingUnit = val);
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Custom packaging unit field if "Other"
+                    if (currentItem.packagingUnit == 'Other') ...[
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _otherUnitController,
+                        style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurface),
+                        decoration: InputDecoration(
+                          labelText: 'Specify Custom Unit (e.g. Bundle, Kg, Pack)',
+                          labelStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          filled: true,
+                          fillColor: inputFill,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                        ),
                       ),
                     ],
-                  ),
+                    const SizedBox(height: 14),
 
-                  // If "Other" packaging unit selected, show custom unit name field
-                  if (_stockPackagingUnit == 'Other') ...[
-                    const SizedBox(height: 8),
+                    // Pieces per Carton (visible if Carton)
+                    if (currentItem.packagingUnit == 'Carton') ...[
+                      _buildFieldLabel('Pieces per Carton (በካርቶን ውስጥ ያለው ብዛት)', isDark),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: currentItem.pcsController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                        decoration: InputDecoration(
+                          hintText: '100',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          filled: true,
+                          fillColor: inputFill,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                        ),
+                        onChanged: (val) {
+                          final p = double.tryParse(val) ?? 0.0;
+                          final c = double.tryParse(currentItem.cartonsController.text) ?? 0.0;
+                          if (c > 0 && p > 0) {
+                            currentItem.qtyController.text = (c * p).toStringAsFixed(0);
+                          }
+                          setState(() {});
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // Unit Price (ETB)
+                    _buildFieldLabel('Unit Price (ETB) (የአንዱ ዋጋ)', isDark),
+                    const SizedBox(height: 6),
                     TextFormField(
-                      controller: _otherUnitController,
-                      style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurface),
+                      controller: currentItem.priceController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                       decoration: InputDecoration(
-                        labelText: 'Specify Custom Unit (e.g. Bundle, Kg, Pack)',
-                        labelStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        hintText: '65',
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        filled: true,
+                        fillColor: inputFill,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Enter unit price' : null,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Total Price (ETB) Auto-Computed
+                    _buildFieldLabel('Total Price (ETB) (ጠቅላላ ድምር)', isDark),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 46,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      alignment: Alignment.centerLeft,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                      ),
+                      child: Text(
+                        calculatedTotal > 0
+                            ? _currencyFormat.format(calculatedTotal)
+                            : '65,000.00',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                          color: calculatedTotal > 0
+                              ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ] else ...[
+                    // 4B. If Credit (-) Payment / Bank Transfer / Loan Repayment
+                    _buildFieldLabel('Which Bank Transfer? (የተከፈለበት ባንክ)', isDark),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 44,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF382D05) : const Color(0xFFFEF9C3), // Yellow highlight matching Image 1
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFB45309)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _bankOptions.contains(currentItem.typeOrBank)
+                              ? currentItem.typeOrBank
+                              : 'CBE',
+                          isExpanded: true,
+                          icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309),
+                          ),
+                          items: _bankOptions.map((b) {
+                            return DropdownMenuItem(value: b, child: Text(b));
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => currentItem.typeOrBank = val);
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Payment Amount (ETB)
+                    _buildFieldLabel('Payment Amount (ETB) (የተከፈለ ብር)', isDark),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: currentItem.priceController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w900,
+                        color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '180,000.00',
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        filled: true,
+                        fillColor: inputFill,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Enter payment amount' : null,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Payment Reference / Slip Note
+                    _buildFieldLabel('Payment Reference / Slip # (የደረሰኝ ቁጥር)', isDark),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: currentItem.nameController,
+                      style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. CBE 22/12/17 or AWASHI 4/2/2018',
+                        hintStyle: TextStyle(fontSize: 12.5, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         filled: true,
                         fillColor: inputFill,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 14),
-
-                  // 3. Pieces per Carton (visible when Carton is selected)
-                  if (_stockPackagingUnit == 'Carton') ...[
-                    _buildFieldLabel('Pieces per Carton', isDark),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: item.pcsController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: '100',
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        filled: true,
-                        fillColor: inputFill,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: inputBorder),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: inputBorder),
-                        ),
-                      ),
-                      onChanged: (val) {
-                        final p = double.tryParse(val) ?? 0.0;
-                        final c = double.tryParse(item.cartonsController.text) ?? 0.0;
-                        if (c > 0 && p > 0) {
-                          item.qtyController.text = (c * p).toStringAsFixed(0);
-                        }
-                        setState(() {});
-                      },
-                    ),
                     const SizedBox(height: 14),
                   ],
 
-                  // 4. Unit Price (ETB)
-                  _buildFieldLabel('Unit Price (ETB)', isDark),
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: item.priceController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: '65',
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      filled: true,
-                      fillColor: inputFill,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: inputBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: inputBorder),
-                      ),
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Enter unit price' : null,
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 5. Total (ETB) Auto-Computed Field
-                  _buildFieldLabel('Total (ETB)', isDark),
-                  const SizedBox(height: 6),
-                  Container(
-                    height: 46,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    alignment: Alignment.centerLeft,
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                      ),
-                    ),
-                    child: Text(
-                      calculatedTotal > 0
-                          ? _currencyFormat.format(calculatedTotal)
-                          : '65,000',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w900,
-                        color: calculatedTotal > 0
-                            ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
-                            : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 6. Date Field with Calendar Picker
-                  _buildFieldLabel('Date', isDark),
+                  // 5. Date Field with Calendar Picker
+                  _buildFieldLabel('Date (ቀን)', isDark),
                   const SizedBox(height: 6),
                   InkWell(
                     onTap: _pickDate,
@@ -662,17 +871,14 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                   ),
                   const SizedBox(height: 14),
 
-                  // 7. Note (optional)
-                  _buildFieldLabel('Note (optional)', isDark),
+                  // 6. Note (optional)
+                  _buildFieldLabel('Note (optional) (ማስታወሻ)', isDark),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _notesController,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: theme.colorScheme.onSurface,
-                    ),
+                    style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface),
                     decoration: InputDecoration(
-                      hintText: 'From supplier',
+                      hintText: 'From supplier, 28-Aug, or reference',
                       hintStyle: TextStyle(
                         fontSize: 12.5,
                         color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
@@ -681,19 +887,37 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       filled: true,
                       fillColor: inputFill,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: inputBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: inputBorder),
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
                     ),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 16),
 
-                  // 8. Save Full-Width Action Button
+                  // Optional Add Another Row (for Customer / Supplier / Delala)
+                  if (!isStock) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (_formItems.length > 1)
+                          TextButton.icon(
+                            onPressed: () => _removeItem(_activeItemIndex),
+                            icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
+                            label: const Text('Delete this item', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                          )
+                        else
+                          const SizedBox(),
+                        TextButton.icon(
+                          onPressed: _addItem,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('+ Add Another Row', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                          style: TextButton.styleFrom(foregroundColor: const Color(0xFF2563EB)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+
+                  // 7. Save Full-Width Action Button (matching Stitch Image 3)
                   SizedBox(
                     height: 48,
                     width: double.infinity,
@@ -735,641 +959,6 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
       ),
     );
   }
-
-  /// Authentic Horizontal Excel Spreadsheet Table Dialog for Ledger Accounts (Customer, Supplier, Delala)
-  Widget _buildLedgerTableDialog(
-    ThemeData theme,
-    bool isDark,
-    bool isCustomer,
-    bool isDelala,
-  ) {
-    final badgeLabel = isCustomer
-        ? 'Customer Credit Ledger'
-        : isDelala
-            ? 'Delala (Broker) Ledger'
-            : 'Supplier Credit Ledger';
-
-    final headerTitle = widget.editingRecord == null
-        ? (isCustomer
-            ? 'New Customer Ledger'
-            : isDelala
-                ? 'New Delala Entry'
-                : 'New Supplier Ledger')
-        : (isCustomer
-            ? 'Edit Customer Ledger'
-            : isDelala
-                ? 'Edit Delala Entry'
-                : 'Edit Supplier Ledger');
-
-    final nameLabel = isCustomer
-        ? 'Customer / Party Name (የደንበኛ ስም)'
-        : isDelala
-            ? 'Delala / Broker Name (የደላላ ስም)'
-            : 'Supplier / Vendor Name (የአቅራቢ ስም)';
-
-    final nameHint = isCustomer
-        ? 'e.g. Apex Construction Ltd. or Kelil Aginbi'
-        : isDelala
-            ? 'e.g. Abebe Delala, Merkato Agent'
-            : 'e.g. Summit Raw Materials Ltd.';
-
-    final grandTotal = _calculateGrandTotal();
-
-    return Dialog(
-      backgroundColor: theme.colorScheme.surface,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 680,
-          maxHeight: MediaQuery.of(context).size.height * 0.94,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header with Badge & Title
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isCustomer
-                                ? const Color(0xFF006948).withValues(alpha: 0.12)
-                                : isDelala
-                                    ? const Color(0xFFD97706).withValues(alpha: 0.12)
-                                    : const Color(0xFF2563EB).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            badgeLabel,
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
-                              color: isCustomer
-                                  ? const Color(0xFF006948)
-                                  : isDelala
-                                      ? const Color(0xFFD97706)
-                                      : const Color(0xFF2563EB),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          headerTitle,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Divider(height: 1, thickness: 1, color: theme.dividerColor),
-                const SizedBox(height: 10),
-
-                // Party Name Field
-                Text(
-                  nameLabel,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                TextFormField(
-                  controller: _titleController,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
-                  decoration: InputDecoration(
-                    hintText: nameHint,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Please enter name' : null,
-                ),
-                const SizedBox(height: 8),
-
-                // Date & Notes Row
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 5,
-                      child: InkWell(
-                        onTap: _pickDate,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
-                            border: Border.all(color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                DateFormat('yyyy-MM-dd').format(_selectedDate),
-                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
-                              ),
-                              Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey.shade600),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 7,
-                      child: TextFormField(
-                        controller: _notesController,
-                        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface),
-                        decoration: InputDecoration(
-                          hintText: 'Note / Phone (Optional)',
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                          filled: true,
-                          fillColor: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // Excel Spreadsheet Table Section Header with Add Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.table_chart_outlined, size: 15, color: Color(0xFF006948)),
-                        const SizedBox(width: 5),
-                        Text(
-                          'TRANSACTION ROWS (EXCEL TABLE)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                    TextButton.icon(
-                      onPressed: _addItem,
-                      icon: const Icon(Icons.add, size: 15),
-                      label: const Text('Add Row', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF006948),
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-
-                // Authentic Excel Table Grid
-                Expanded(
-                  child: _buildExcelGrid(false),
-                ),
-                const SizedBox(height: 10),
-
-                // Grand Total Bar
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Net Ledger Balance:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12.5,
-                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
-                        ),
-                      ),
-                      Text(
-                        'ETB ${_currencyFormat.format(grandTotal)}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: grandTotal >= 0 ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Save Action Button
-                SizedBox(
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _handleSubmit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB), // Stitch Primary Blue
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      widget.editingRecord == null ? 'Save Entry to Neon DB' : 'Update Entry in Neon DB',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Authentic Web-Style Horizontal Excel Spreadsheet Table
-  Widget _buildExcelGrid(bool isStock) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF18181B) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark ? const Color(0xFF27272A) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header Row matching Image 1 (KELIL AGINBI) & Image 2 (Esmiz)
-                Row(
-                  children: [
-                    _gridHeaderCell('+/-', 38),
-                    _gridHeaderCell('Bank / Channel', 95),
-                    _gridHeaderCell('Item (የዕቃው አይነት)', 140),
-                    _gridHeaderCell('Unit', 68),
-                    _gridHeaderCell('Ctns', 50),
-                    _gridHeaderCell('Pcs/Ctn', 55),
-                    _gridHeaderCell('Total Pcs', 55),
-                    _gridHeaderCell('Price (ዋጋ)', 80),
-                    if (isStock && _showCustoms) _gridHeaderCell('Customs', 65),
-                    _gridHeaderCell('Total (ድምር)', 92),
-                    _gridHeaderCell('', 32),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Divider(height: 1, thickness: 1, color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300),
-                const SizedBox(height: 6),
-
-                // Data Rows
-                ...List.generate(_formItems.length, (idx) {
-                  final item = _formItems[idx];
-                  final isDebit = item.sign == '+';
-                  final ctns = double.tryParse(item.cartonsController.text);
-                  final pcs = double.tryParse(item.pcsController.text);
-                  final price = double.tryParse(item.priceController.text) ?? item.unitPrice;
-                  final customs = double.tryParse(item.customsController.text) ?? (item.customs ?? 0.0);
-
-                  double subtotal = 0.0;
-                  if (item.packagingUnit == 'Carton' && ctns != null && ctns > 0 && pcs != null && pcs > 0) {
-                    subtotal = (ctns * pcs * price) + (isDebit ? customs : 0.0);
-                  } else {
-                    final qty = double.tryParse(item.qtyController.text) ?? item.quantity;
-                    subtotal = (qty * price) + (isDebit ? customs : 0.0);
-                  }
-
-                  final currentOptions = isDebit ? _stockTypeOptions : _bankOptions;
-                  final safeOpt = currentOptions.contains(item.typeOrBank)
-                      ? item.typeOrBank
-                      : (isDebit ? 'Stock' : 'CBE');
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 6.0),
-                    child: Row(
-                      children: [
-                        // +/- Sign Toggle (Debit Goods vs Credit Payment)
-                        SizedBox(
-                          width: 38,
-                          height: 32,
-                          child: OutlinedButton(
-                            onPressed: () => _toggleItemSign(item),
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              side: BorderSide(
-                                color: isDebit ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
-                              ),
-                              backgroundColor: isDebit
-                                  ? const Color(0xFF006948).withValues(alpha: 0.1)
-                                  : const Color(0xFFBA1A1A).withValues(alpha: 0.1),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            child: Text(
-                              item.sign,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
-                                color: isDebit ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Bank / Channel Dropdown (Which Bank Transfer: CBE, Awash, Dashen, Pawza, etc.)
-                        SizedBox(
-                          width: 95,
-                          height: 32,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              color: !isDebit
-                                  ? (isDark ? const Color(0xFF382D05) : const Color(0xFFFEF9C3)) // Yellow highlight like Excel
-                                  : (isDark ? const Color(0xFF27272A) : Colors.white),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: !isDebit
-                                    ? const Color(0xFFB45309)
-                                    : (isDark ? const Color(0xFF3F3F46) : Colors.grey.shade300),
-                              ),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: safeOpt,
-                                isDense: true,
-                                isExpanded: true,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: !isDebit
-                                      ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
-                                      : theme.colorScheme.onSurface,
-                                ),
-                                items: currentOptions.map((opt) {
-                                  return DropdownMenuItem(
-                                    value: opt,
-                                    child: Text(opt, overflow: TextOverflow.ellipsis),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val != null) setState(() => item.typeOrBank = val);
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Item / Description Field (e.g. 12W Safari, 2.5 bmt, yebefit keri)
-                        SizedBox(
-                          width: 140,
-                          height: 32,
-                          child: TextFormField(
-                            controller: item.nameController,
-                            style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurface),
-                            decoration: InputDecoration(
-                              hintText: isDebit ? 'Item (e.g. 12W Safari)' : 'Bank ref (e.g. CBE #1029)',
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                              filled: true,
-                              fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Req' : null,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Packaging Unit Dropdown (Carton, Pcs, Dozen, Box, Other)
-                        SizedBox(
-                          width: 68,
-                          height: 32,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF27272A) : Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: isDark ? const Color(0xFF3F3F46) : Colors.grey.shade300),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _packagingUnits.contains(item.packagingUnit) ? item.packagingUnit : 'Carton',
-                                isDense: true,
-                                isExpanded: true,
-                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
-                                items: _packagingUnits.map((u) {
-                                  return DropdownMenuItem(value: u, child: Text(u));
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val != null) setState(() => item.packagingUnit = val);
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Cartons
-                        SizedBox(
-                          width: 50,
-                          height: 32,
-                          child: TextFormField(
-                            controller: item.cartonsController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurface),
-                            decoration: InputDecoration(
-                              hintText: 'Ctns',
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                              filled: true,
-                              fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            onChanged: (val) {
-                              final c = double.tryParse(val) ?? 0.0;
-                              final p = double.tryParse(item.pcsController.text) ?? 0.0;
-                              if (c > 0 && p > 0) item.qtyController.text = (c * p).toStringAsFixed(0);
-                              setState(() {});
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Pcs / Carton
-                        SizedBox(
-                          width: 55,
-                          height: 32,
-                          child: TextFormField(
-                            controller: item.pcsController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurface),
-                            decoration: InputDecoration(
-                              hintText: 'Pcs',
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                              filled: true,
-                              fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            onChanged: (val) {
-                              final c = double.tryParse(item.cartonsController.text) ?? 0.0;
-                              final p = double.tryParse(val) ?? 0.0;
-                              if (c > 0 && p > 0) item.qtyController.text = (c * p).toStringAsFixed(0);
-                              setState(() {});
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Total Quantity
-                        SizedBox(
-                          width: 55,
-                          height: 32,
-                          child: TextFormField(
-                            controller: item.qtyController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-                            decoration: InputDecoration(
-                              hintText: 'Total',
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                              filled: true,
-                              fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Price (ዋጋ)
-                        SizedBox(
-                          width: 80,
-                          height: 32,
-                          child: TextFormField(
-                            controller: item.priceController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-                            decoration: InputDecoration(
-                              hintText: 'Price',
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                              filled: true,
-                              fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Customs (Optional)
-                        if (isStock && _showCustoms) ...[
-                          SizedBox(
-                            width: 65,
-                            height: 32,
-                            child: TextFormField(
-                              controller: item.customsController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface),
-                              decoration: InputDecoration(
-                                hintText: 'Duty',
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                                filled: true,
-                                fillColor: isDark ? const Color(0xFF27272A) : Colors.white,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-
-                        // Total Amount (ድምር)
-                        SizedBox(
-                          width: 92,
-                          child: Text(
-                            _currencyFormat.format(subtotal),
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                              color: isDebit ? const Color(0xFF006948) : const Color(0xFFBA1A1A),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Delete
-                        SizedBox(
-                          width: 32,
-                          child: _formItems.length > 1
-                              ? IconButton(
-                                  icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
-                                  onPressed: () => _removeItem(idx),
-                                  padding: EdgeInsets.zero,
-                                )
-                              : null,
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _gridHeaderCell(String text, double width) {
-    return SizedBox(
-      width: width,
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF64748B),
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
 }
 
 class LineItemFormItem {
@@ -1380,6 +969,7 @@ class LineItemFormItem {
   late TextEditingController cartonsController;
   late TextEditingController pcsController;
   late TextEditingController customsController;
+  late TextEditingController bankCustomController;
   String sign;
   String typeOrBank;
   String packagingUnit;
@@ -1398,6 +988,7 @@ class LineItemFormItem {
     double? cartons,
     double? pcsPerCarton,
     this.customs,
+    String customBankName = '',
   }) {
     nameController = TextEditingController(text: name);
     qtyController = TextEditingController(

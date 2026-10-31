@@ -142,6 +142,7 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (ctx) => RecordFormDialog(
         activeTab: _currentTabType,
+        existingRecords: _records,
         shopId: widget.currentUser.isShopkeeper
             ? widget.currentUser.shopId
             : (_selectedShopId == 'all' ? 'shop-1' : _selectedShopId),
@@ -150,15 +151,39 @@ class _MainScreenState extends State<MainScreen> {
 
     if (result != null) {
       try {
-        await ApiService.createRecord(result, shopId: result.shopId);
-        _reloadRecordsOnly();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Saved "${result.title}" to Neon DB'),
-            backgroundColor: const Color(0xFF006948),
-          ),
-        );
+        // Smart merge: if party ledger already exists in this shop, append the new transaction rows
+        final existingIdx = _records.indexWhere((r) =>
+            r.type == result.type &&
+            r.title.trim().toLowerCase() == result.title.trim().toLowerCase() &&
+            (r.shopId == result.shopId || r.shopId == null || result.shopId == null));
+
+        if (existingIdx >= 0 && result.type != 'stock') {
+          final existing = _records[existingIdx];
+          final updated = existing.copyWith(
+            items: [...existing.items, ...result.items],
+            notes: (result.notes != null && result.notes!.isNotEmpty) ? result.notes : existing.notes,
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          );
+          await ApiService.updateRecord(updated);
+          _reloadRecordsOnly();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Added transaction to "${existing.title}" in Neon DB'),
+              backgroundColor: const Color(0xFF006948),
+            ),
+          );
+        } else {
+          await ApiService.createRecord(result, shopId: result.shopId);
+          _reloadRecordsOnly();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Saved "${result.title}" to Neon DB'),
+              backgroundColor: const Color(0xFF006948),
+            ),
+          );
+        }
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -174,6 +199,7 @@ class _MainScreenState extends State<MainScreen> {
       builder: (ctx) => RecordFormDialog(
         activeTab: record.type,
         editingRecord: record,
+        existingRecords: _records,
         shopId: record.shopId,
       ),
     );
