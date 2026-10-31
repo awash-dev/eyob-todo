@@ -350,4 +350,131 @@ class NeonDatabaseService {
   static Future<void> deleteRecordDirect(String recordId) async {
     await executeSql('DELETE FROM ledger_records WHERE id = \$1', [recordId]);
   }
+
+  /// Create shop directly in Neon
+  static Future<Shop> createShopDirect(String name, [String? code]) async {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final id = 'shop-$nowMs';
+    final finalCode = (code ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-')).toUpperCase();
+    await executeSql(
+      'INSERT INTO shops (id, name, code, created_at) VALUES (\$1, \$2, \$3, \$4)',
+      [id, name, finalCode, nowMs],
+    );
+    return Shop(id: id, name: name, code: finalCode);
+  }
+
+  /// Delete shop directly in Neon
+  static Future<void> deleteShopDirect(String shopId) async {
+    await executeSql('DELETE FROM ledger_records WHERE shop_id = \$1', [shopId]);
+    await executeSql('UPDATE users SET shop_id = NULL WHERE shop_id = \$1', [shopId]);
+    await executeSql('DELETE FROM shops WHERE id = \$1', [shopId]);
+  }
+
+  /// Get shopkeeper users directly from Neon
+  static Future<List<AppUser>> getUsersDirect() async {
+    final rows = await executeSql(
+      '''
+      SELECT u.id, u.name, u.email, u.role, u.shop_id, u.active, sh.name AS shop_name
+      FROM users u
+      LEFT JOIN shops sh ON sh.id = u.shop_id
+      WHERE u.role = 'shopkeeper'
+      ORDER BY u.created_at ASC
+      ''',
+    );
+    return rows.map((r) => AppUser(
+      id: r['id']?.toString() ?? '',
+      name: r['name']?.toString() ?? '',
+      email: r['email']?.toString() ?? '',
+      role: 'shopkeeper',
+      shopId: r['shop_id']?.toString(),
+      shopName: r['shop_name']?.toString(),
+      active: r['active'] != false && r['active'] != 'false',
+    )).toList();
+  }
+
+  /// Create shopkeeper user directly in Neon
+  static Future<AppUser> createShopkeeperDirect({
+    required String name,
+    required String email,
+    required String password,
+    required String shopId,
+  }) async {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final id = 'user-$nowMs';
+    final hash = hashPasswordWithSalt(password);
+    await executeSql(
+      '''
+      INSERT INTO users (id, name, email, password_hash, role, shop_id, active, created_at)
+      VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8)
+      ''',
+      [id, name, email.trim().toLowerCase(), hash, 'shopkeeper', shopId, true, nowMs],
+    );
+    return AppUser(
+      id: id,
+      name: name,
+      email: email.trim().toLowerCase(),
+      role: 'shopkeeper',
+      shopId: shopId,
+      active: true,
+    );
+  }
+
+  /// Update shopkeeper user directly in Neon
+  static Future<AppUser> updateShopkeeperDirect(
+    String userId, {
+    String? name,
+    String? shopId,
+    bool? active,
+    String? password,
+  }) async {
+    if (name != null) {
+      await executeSql('UPDATE users SET name = \$1 WHERE id = \$2', [name, userId]);
+    }
+    if (shopId != null) {
+      await executeSql('UPDATE users SET shop_id = \$1 WHERE id = \$2', [shopId, userId]);
+    }
+    if (active != null) {
+      await executeSql('UPDATE users SET active = \$1 WHERE id = \$2', [active, userId]);
+    }
+    if (password != null && password.isNotEmpty) {
+      final hash = hashPasswordWithSalt(password);
+      await executeSql('UPDATE users SET password_hash = \$1 WHERE id = \$2', [hash, userId]);
+    }
+    final rows = await executeSql(
+      '''
+      SELECT u.id, u.name, u.email, u.role, u.shop_id, u.active, sh.name AS shop_name
+      FROM users u
+      LEFT JOIN shops sh ON sh.id = u.shop_id
+      WHERE u.id = \$1
+      LIMIT 1
+      ''',
+      [userId],
+    );
+    if (rows.isNotEmpty) {
+      final r = rows.first;
+      return AppUser(
+        id: r['id']?.toString() ?? userId,
+        name: r['name']?.toString() ?? '',
+        email: r['email']?.toString() ?? '',
+        role: 'shopkeeper',
+        shopId: r['shop_id']?.toString(),
+        shopName: r['shop_name']?.toString(),
+        active: r['active'] != false && r['active'] != 'false',
+      );
+    }
+    return AppUser(
+      id: userId,
+      name: name ?? '',
+      email: '',
+      role: 'shopkeeper',
+      shopId: shopId,
+      active: active ?? true,
+    );
+  }
+
+  /// Delete shopkeeper user directly in Neon
+  static Future<void> deleteShopkeeperDirect(String userId) async {
+    await executeSql('DELETE FROM sessions WHERE user_id = \$1', [userId]);
+    await executeSql('DELETE FROM users WHERE id = \$1', [userId]);
+  }
 }

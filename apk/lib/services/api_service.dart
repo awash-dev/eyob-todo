@@ -387,6 +387,16 @@ class ApiService {
 
   /* ------------------- Shopkeeper Admin Management ------------------- */
   static Future<List<AppUser>> getShopkeepers() async {
+    // 1. Try Direct Neon DB
+    try {
+      final users = await NeonDatabaseService.getUsersDirect();
+      if (users.isNotEmpty) {
+        currentSource = DatabaseSource.neonCloud;
+        return users;
+      }
+    } catch (_) {}
+
+    // 2. Try Local REST Server
     final baseUrl = await getBaseUrl();
     try {
       final headers = await _headers();
@@ -394,6 +404,7 @@ class ApiService {
           .get(Uri.parse('$baseUrl/api/users'), headers: headers)
           .timeout(const Duration(seconds: 4));
       if (res.statusCode == 200) {
+        currentSource = DatabaseSource.localServer;
         final data = jsonDecode(res.body);
         final list = data['users'] as List? ?? [];
         return list.map((u) => AppUser.fromJson(u as Map<String, dynamic>)).toList();
@@ -428,6 +439,18 @@ class ApiService {
     required String password,
     required String shopId,
   }) async {
+    // 1. Try Direct Neon DB
+    try {
+      final user = await NeonDatabaseService.createShopkeeperDirect(
+        name: name,
+        email: email,
+        password: password,
+        shopId: shopId,
+      );
+      currentSource = DatabaseSource.neonCloud;
+      return user;
+    } catch (_) {}
+
     final baseUrl = await getBaseUrl();
     try {
       final headers = await _headers();
@@ -467,6 +490,19 @@ class ApiService {
     bool? active,
     String? password,
   }) async {
+    // 1. Try Direct Neon DB
+    try {
+      final user = await NeonDatabaseService.updateShopkeeperDirect(
+        userId,
+        name: name,
+        shopId: shopId,
+        active: active,
+        password: password,
+      );
+      currentSource = DatabaseSource.neonCloud;
+      return user;
+    } catch (_) {}
+
     final baseUrl = await getBaseUrl();
     try {
       final headers = await _headers();
@@ -477,7 +513,7 @@ class ApiService {
       if (password != null && password.isNotEmpty) body['password'] = password;
 
       final res = await http
-          .put(
+          .patch(
             Uri.parse('$baseUrl/api/users/$userId'),
             headers: headers,
             body: jsonEncode(body),
@@ -498,6 +534,68 @@ class ApiService {
       shopName: shopId == 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato',
       active: active ?? true,
     );
+  }
+
+  static Future<void> deleteShopkeeper(String userId) async {
+    try {
+      await NeonDatabaseService.deleteShopkeeperDirect(userId);
+      currentSource = DatabaseSource.neonCloud;
+      return;
+    } catch (_) {}
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final headers = await _headers();
+      await http
+          .delete(Uri.parse('$baseUrl/api/users/$userId'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+    } catch (_) {}
+  }
+
+  static Future<Shop> createShop(String name, [String? code]) async {
+    try {
+      final shop = await NeonDatabaseService.createShopDirect(name, code);
+      currentSource = DatabaseSource.neonCloud;
+      return shop;
+    } catch (_) {}
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final headers = await _headers();
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/api/shops'),
+            headers: headers,
+            body: jsonEncode({'name': name, 'code': code}),
+          )
+          .timeout(const Duration(seconds: 4));
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return Shop.fromJson(data['shop'] as Map<String, dynamic>);
+      }
+    } catch (_) {}
+
+    return Shop(
+      id: 'shop-${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      code: code ?? name.toUpperCase(),
+    );
+  }
+
+  static Future<void> deleteShop(String shopId) async {
+    try {
+      await NeonDatabaseService.deleteShopDirect(shopId);
+      currentSource = DatabaseSource.neonCloud;
+      return;
+    } catch (_) {}
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final headers = await _headers();
+      await http
+          .delete(Uri.parse('$baseUrl/api/shops/$shopId'), headers: headers)
+          .timeout(const Duration(seconds: 4));
+    } catch (_) {}
   }
 
   /* ------------------- Offline & Cache Helpers ------------------- */
