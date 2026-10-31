@@ -1159,6 +1159,14 @@ const server = http.createServer(async (req, res) => {
   }
 })
 
+process.on('uncaughtException', (err) => {
+  console.error('Process uncaughtException (recovered):', err?.message || err)
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Process unhandledRejection (recovered):', reason?.message || reason)
+})
+
 async function start() {
   try {
     await ensureSchema()

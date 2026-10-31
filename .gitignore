@@ -13,6 +13,6 @@ __unconfig*
 todos.json
 
 # Local build artifacts
-apk/
+
 *.apk
 *.aab
