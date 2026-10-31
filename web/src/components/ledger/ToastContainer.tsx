@@ -1,3 +1,4 @@
+import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react'
 import React from 'react'
 import { useLedger } from '../../context/LedgerContext'
 
@@ -21,22 +22,13 @@ export const ToastContainer: React.FC = () => {
         >
           <div className="flex items-center gap-2">
             {toast.type === 'success' && (
-              <ion-icon
-                name="checkmark-circle-outline"
-                class="text-base text-emerald-400 shrink-0"
-              ></ion-icon>
+              <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
             )}
             {toast.type === 'error' && (
-              <ion-icon
-                name="alert-circle-outline"
-                class="text-base text-rose-400 shrink-0"
-              ></ion-icon>
+              <AlertCircle size={16} className="text-rose-400 shrink-0" />
             )}
             {toast.type === 'info' && (
-              <ion-icon
-                name="information-circle-outline"
-                class="text-base text-blue-400 shrink-0"
-              ></ion-icon>
+              <Info size={16} className="text-blue-400 shrink-0" />
             )}
             <span>{toast.message}</span>
           </div>
@@ -45,7 +37,7 @@ export const ToastContainer: React.FC = () => {
             className="text-zinc-400 hover:text-white ml-3 p-1 rounded transition-colors flex items-center justify-center cursor-pointer"
             title="Dismiss"
           >
-            <ion-icon name="close-outline" class="text-base"></ion-icon>
+            <X size={16} />
           </button>
         </div>
       ))}

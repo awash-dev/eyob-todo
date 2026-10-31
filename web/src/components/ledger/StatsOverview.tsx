@@ -1,3 +1,4 @@
+import { Box, Building2, CheckCircle2, CircleArrowDown, CircleArrowUp, Receipt, Users, Wallet } from 'lucide-react'
 import React from 'react'
 import { useLedger } from '../../context/LedgerContext'
 import { calculateRecordTotal, calculateItemTotal } from '../../lib/formatters'
@@ -55,7 +56,7 @@ export const StatsOverview: React.FC = () => {
               Total Credit Due
             </span>
             <div className="p-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 flex items-center justify-center">
-              <ion-icon name="wallet-outline" class="text-sm"></ion-icon>
+              <Wallet size={14} />
             </div>
           </div>
           <div className="mt-1">
@@ -75,10 +76,7 @@ export const StatsOverview: React.FC = () => {
               Credit Given
             </span>
             <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
-              <ion-icon
-                name="arrow-up-circle-outline"
-                class="text-sm"
-              ></ion-icon>
+              <CircleArrowUp size={14} />
             </div>
           </div>
           <div className="mt-1">
@@ -98,10 +96,7 @@ export const StatsOverview: React.FC = () => {
               Payments In
             </span>
             <div className="p-1 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 shrink-0 flex items-center justify-center">
-              <ion-icon
-                name="arrow-down-circle-outline"
-                class="text-sm"
-              ></ion-icon>
+              <CircleArrowDown size={14} />
             </div>
           </div>
           <div className="mt-1">
@@ -121,7 +116,7 @@ export const StatsOverview: React.FC = () => {
               Accounts
             </span>
             <div className="p-1 rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400 shrink-0 flex items-center justify-center">
-              <ion-icon name="people-outline" class="text-sm"></ion-icon>
+              <Users size={14} />
             </div>
           </div>
           <div className="mt-1">
@@ -147,7 +142,7 @@ export const StatsOverview: React.FC = () => {
               Total Payables Due
             </span>
             <div className="p-1 rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400 shrink-0 flex items-center justify-center">
-              <ion-icon name="wallet-outline" class="text-sm"></ion-icon>
+              <Wallet size={14} />
             </div>
           </div>
           <div className="mt-1">
@@ -167,7 +162,7 @@ export const StatsOverview: React.FC = () => {
               Total Purchases
             </span>
             <div className="p-1 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 shrink-0 flex items-center justify-center">
-              <ion-icon name="receipt-outline" class="text-sm"></ion-icon>
+              <Receipt size={14} />
             </div>
           </div>
           <div className="mt-1">
@@ -187,10 +182,7 @@ export const StatsOverview: React.FC = () => {
               Payments Disbursed
             </span>
             <div className="p-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 flex items-center justify-center">
-              <ion-icon
-                name="checkmark-done-circle-outline"
-                class="text-sm"
-              ></ion-icon>
+              <CheckCircle2 size={14} />
             </div>
           </div>
           <div className="mt-1">
@@ -210,7 +202,7 @@ export const StatsOverview: React.FC = () => {
               Active Suppliers
             </span>
             <div className="p-1 rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400 shrink-0 flex items-center justify-center">
-              <ion-icon name="business-outline" class="text-sm"></ion-icon>
+              <Building2 size={14} />
             </div>
           </div>
           <div className="mt-1">
@@ -236,7 +228,7 @@ export const StatsOverview: React.FC = () => {
             Net Balance
           </span>
           <div className="p-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 flex items-center justify-center">
-            <ion-icon name="wallet-outline" class="text-sm"></ion-icon>
+            <Wallet size={14} />
           </div>
         </div>
         <div className="mt-1">
@@ -262,7 +254,7 @@ export const StatsOverview: React.FC = () => {
             Goods In
           </span>
           <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
-            <ion-icon name="arrow-up-circle-outline" class="text-sm"></ion-icon>
+            <CircleArrowUp size={14} />
           </div>
         </div>
         <div className="mt-1">
@@ -282,7 +274,7 @@ export const StatsOverview: React.FC = () => {
             Payments Out
           </span>
           <div className="p-1 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 shrink-0 flex items-center justify-center">
-            <ion-icon name="business-outline" class="text-sm"></ion-icon>
+            <Building2 size={14} />
           </div>
         </div>
         <div className="mt-1">
@@ -302,7 +294,7 @@ export const StatsOverview: React.FC = () => {
             Total Units
           </span>
           <div className="p-1 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 shrink-0 flex items-center justify-center">
-            <ion-icon name="cube-outline" class="text-sm"></ion-icon>
+            <Box size={14} />
           </div>
         </div>
         <div className="mt-1">

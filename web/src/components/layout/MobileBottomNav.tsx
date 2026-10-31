@@ -1,3 +1,4 @@
+import { Building2, Layers, Plus, Users } from 'lucide-react'
 import React from 'react'
 import { useLedger } from '../../context/LedgerContext'
 import type { TabType } from '../../types/ledger'
@@ -9,26 +10,22 @@ export const MobileBottomNav: React.FC = () => {
   const tabs: {
     id: TabType
     label: string
-    iconName: string
-    activeIconName: string
+    Icon: React.ComponentType<{ size?: number; className?: string }>
   }[] = [
     {
       id: 'customer',
       label: 'Customer',
-      iconName: 'people-outline',
-      activeIconName: 'people',
+      Icon: Users,
     },
     {
       id: 'supplier',
       label: 'Supplier',
-      iconName: 'business-outline',
-      activeIconName: 'business',
+      Icon: Building2,
     },
     {
       id: 'stock',
       label: 'Stock',
-      iconName: 'layers-outline',
-      activeIconName: 'layers',
+      Icon: Layers,
     },
   ]
 
@@ -65,12 +62,12 @@ export const MobileBottomNav: React.FC = () => {
               }`}
             >
               <div className="relative">
-                <ion-icon
-                  name={isActive ? tab.activeIconName : tab.iconName}
-                  class={`text-2xl transition-transform ${
+                <tab.Icon
+                  size={24}
+                  className={`transition-transform ${
                     isActive ? 'scale-110' : ''
                   }`}
-                ></ion-icon>
+                />
                 {count > 0 && (
                   <span
                     className={`absolute -top-1 -right-2 text-[9px] font-mono px-1 min-w-[15px] h-[15px] flex items-center justify-center rounded-full leading-none ${
@@ -98,7 +95,7 @@ export const MobileBottomNav: React.FC = () => {
           title="Add New Entry"
         >
           <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md active:scale-95 transition-transform">
-            <ion-icon name="add-outline" class="text-2xl stroke-2"></ion-icon>
+            <Plus size={24} className="stroke-2" />
           </div>
           <span className="text-[10px] font-semibold mt-0.5">New</span>
         </button>

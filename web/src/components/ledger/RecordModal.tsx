@@ -1,3 +1,12 @@
+import {
+  AlertCircle,
+  Building2,
+  Layers,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  Users,
+} from 'lucide-react'
 import React, { useState, useEffect, useRef } from 'react'
 import { useLedger } from '../../context/LedgerContext'
 import type { LineItem, SignType } from '../../types/ledger'
@@ -233,7 +242,7 @@ export const RecordModal: React.FC = () => {
           badge: 'Customer Credit',
           badgeColor:
             'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-          icon: 'people-outline',
+          Icon: Users,
         }
       case 'supplier':
         return {
@@ -245,7 +254,7 @@ export const RecordModal: React.FC = () => {
           badge: 'Supplier Credit',
           badgeColor:
             'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-          icon: 'business-outline',
+          Icon: Building2,
         }
       case 'stock':
         return {
@@ -255,12 +264,12 @@ export const RecordModal: React.FC = () => {
           badge: 'Stock & Inventory',
           badgeColor:
             'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-          icon: 'layers-outline',
+          Icon: Layers,
         }
     }
   }
 
-  const { header, placeholder, badge, badgeColor, icon } = getTabLabel()
+  const { header, placeholder, badge, badgeColor, Icon } = getTabLabel()
 
   const isStockTab = activeTab === 'stock'
   const lineLabels = isStockTab
@@ -338,7 +347,7 @@ export const RecordModal: React.FC = () => {
               <span
                 className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${badgeColor}`}
               >
-                <ion-icon name={icon} class="text-xs"></ion-icon>
+                <Icon size={12} />
                 <span>{badge}</span>
               </span>
               <DialogTitle className="text-base sm:text-lg font-bold text-foreground truncate">
@@ -357,10 +366,7 @@ export const RecordModal: React.FC = () => {
                   }`}
                   title="Toggle optional Customs duty / tariff column for imported items"
                 >
-                  <ion-icon
-                    name="shield-checkmark-outline"
-                    class="text-sm"
-                  ></ion-icon>
+                  <ShieldCheck size={14} />
                   <span>{showCustoms ? 'Hide Customs' : '+ Customs Duty'}</span>
                 </button>
               )}
@@ -371,10 +377,7 @@ export const RecordModal: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-3 pt-1 w-full min-w-0 max-w-full">
           {error && (
             <div className="flex items-center gap-2 p-2.5 text-xs text-rose-700 bg-rose-50 dark:bg-rose-950/50 dark:text-rose-300 rounded-lg">
-              <ion-icon
-                name="alert-circle-outline"
-                class="text-base shrink-0"
-              ></ion-icon>
+              <AlertCircle size={16} className="shrink-0" />
               <span>{error}</span>
             </div>
           )}
@@ -719,17 +722,14 @@ export const RecordModal: React.FC = () => {
                           </span>
                         </div>
 
-                        {/* Remove item button with ion-icon */}
+                        {/* Remove item button */}
                         <button
                           type="button"
                           onClick={() => handleRemoveItem(index)}
                           className="w-8 h-8 shrink-0 text-muted-foreground hover:text-rose-600 flex items-center justify-center rounded transition-colors cursor-pointer"
                           title="Remove row"
                         >
-                          <ion-icon
-                            name="trash-outline"
-                            class="text-sm"
-                          ></ion-icon>
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     )
@@ -744,7 +744,7 @@ export const RecordModal: React.FC = () => {
               onClick={handleAddItem}
               className="mt-2 text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1.5 py-1 cursor-pointer"
             >
-              <ion-icon name="add-outline" class="text-base"></ion-icon>
+              <Plus size={16} />
               <span>Add another item</span>
             </button>
           </div>

@@ -1,3 +1,4 @@
+import { ArrowUpDown, CircleX, FolderOpen, Plus, Search, Store } from 'lucide-react'
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { LedgerProvider, useLedger } from '../context/LedgerContext'
@@ -65,10 +66,6 @@ function MainAppView() {
     return totalA - totalB
   })
 
-  const handlePrint = () => {
-    window.print()
-  }
-
   const tabLabels = {
     customer: 'customers',
     supplier: 'suppliers',
@@ -77,10 +74,7 @@ function MainAppView() {
 
   return (
     <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 text-foreground flex font-sans">
-      <Sidebar
-        onOpenExport={() => setIsExportDialogOpen(false) || setIsExportDialogOpen(true)}
-        onPrint={handlePrint}
-      />
+      <Sidebar />
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Top Sticky Navbar (mobile tabs + unified header) */}
@@ -91,10 +85,7 @@ function MainAppView() {
 
         {activeTab === 'stock' && activeShop && (
           <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 ring-1 ring-purple-200/60 dark:ring-purple-900/40 text-[11px]">
-            <ion-icon
-              name="storefront-outline"
-              class="text-purple-600 dark:text-purple-300 text-sm"
-            ></ion-icon>
+            <Store size={14} className="text-purple-600 dark:text-purple-300" />
             <span className="text-purple-800 dark:text-purple-200">
               Store: <strong>{activeShop.name}</strong>
             </span>
@@ -109,7 +100,7 @@ function MainAppView() {
           {/* Left: Clean Integrated Search */}
           <div className="relative flex-1">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none text-muted-foreground">
-              <ion-icon name="search-outline" class="text-base"></ion-icon>
+              <Search size={16} />
             </span>
             <input
               type="text"
@@ -124,10 +115,7 @@ function MainAppView() {
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md flex items-center justify-center cursor-pointer"
                 title="Clear search"
               >
-                <ion-icon
-                  name="close-circle-outline"
-                  class="text-base"
-                ></ion-icon>
+                <CircleX size={16} />
               </button>
             )}
           </div>
@@ -141,7 +129,7 @@ function MainAppView() {
               className="text-xs h-8 px-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
               title="Export (Excel, JSON, PDF) & Import"
             >
-              <ion-icon name="swap-vertical-outline" class="text-sm"></ion-icon>
+              <ArrowUpDown size={14} />
               <span>Export / Import</span>
             </Button>
 
@@ -150,7 +138,7 @@ function MainAppView() {
               size="sm"
               className="text-xs font-semibold shadow-xs flex items-center gap-1.5 h-8 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
             >
-              <ion-icon name="add-outline" class="text-base"></ion-icon>
+              <Plus size={16} />
               <span>Add Entry</span>
             </Button>
           </div>
@@ -189,12 +177,9 @@ function MainAppView() {
           <div className="p-8 sm:p-10 text-center rounded-2xl bg-card shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5 my-4">
             <div className="w-12 h-12 rounded-2xl bg-muted/70 text-muted-foreground flex items-center justify-center mx-auto mb-3 shadow-inner">
               {searchQuery ? (
-                <ion-icon name="search-outline" class="text-2xl"></ion-icon>
+                <Search size={24} />
               ) : (
-                <ion-icon
-                  name="folder-open-outline"
-                  class="text-2xl"
-                ></ion-icon>
+                <FolderOpen size={24} />
               )}
             </div>
 
@@ -226,7 +211,7 @@ function MainAppView() {
                   onClick={() => openCreateModal(activeTab)}
                   className="font-semibold shadow-xs text-xs h-8 rounded-xl flex items-center gap-1.5"
                 >
-                  <ion-icon name="add-outline" class="text-base"></ion-icon>
+                  <Plus size={16} />
                   <span>Create First Record</span>
                 </Button>
               )}
@@ -235,7 +220,7 @@ function MainAppView() {
         )}
       </main>
 
-      {/* Mobile Sticky Bottom Navigation (PWA / Capacitor thumb-friendly) */}
+      {/* Mobile Sticky Bottom Navigation (thumb-friendly) */}
       <MobileBottomNav />
 
       {/* Modals & Portals */}

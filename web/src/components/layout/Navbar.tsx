@@ -1,3 +1,4 @@
+import { BookOpen, LogOut, Store, Users } from 'lucide-react'
 import React, { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { AdminPanel } from '../admin/AdminPanel'
@@ -14,13 +15,13 @@ export const Navbar: React.FC = () => {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-card/95 backdrop-blur-sm border-b border-zinc-100/80 dark:border-zinc-800/80 shadow-xs no-print">
+    <header className="md:hidden sticky top-0 z-30 w-full bg-card/95 backdrop-blur-sm border-b border-zinc-100/80 dark:border-zinc-800/80 shadow-xs no-print">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Account / shop bar */}
         <div className="flex items-center justify-between gap-2 h-11 border-b border-zinc-100/70 dark:border-zinc-800/60">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
-              <ion-icon name="book-outline" class="text-base"></ion-icon>
+              <BookOpen size={16} />
             </div>
             <span className="text-sm font-black tracking-tight text-foreground">
               Merkato Credit Record
@@ -30,10 +31,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             {isAdmin && shops.length > 0 && (
               <div className="flex items-center gap-1 min-w-0">
-                <ion-icon
-                  name="storefront-outline"
-                  class="text-sm text-muted-foreground hidden sm:inline"
-                ></ion-icon>
+                <Store size={14} className="text-muted-foreground hidden sm:inline" />
                 <select
                   value={activeShopId || ''}
                   onChange={(event) => setActiveShopId(event.target.value)}
@@ -56,7 +54,7 @@ export const Navbar: React.FC = () => {
                 className="h-7 px-2 rounded-lg bg-muted/60 hover:bg-muted text-[11px] font-semibold text-foreground inline-flex items-center gap-1"
                 title="Create and assign shopkeeper accounts"
               >
-                <ion-icon name="people-outline" class="text-sm"></ion-icon>
+                <Users size={14} />
                 <span className="hidden sm:inline">Shopkeepers</span>
               </button>
             )}
@@ -78,7 +76,7 @@ export const Navbar: React.FC = () => {
               className="h-7 w-7 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center"
               title="Sign out"
             >
-              <ion-icon name="log-out-outline" class="text-base"></ion-icon>
+              <LogOut size={16} />
             </button>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { BookOpen, Building2, Layers, LogOut, Users } from 'lucide-react'
 import React, { useState } from 'react'
 import { useLedger } from '../../context/LedgerContext'
 import { useAuth } from '../../context/AuthContext'
@@ -5,15 +6,7 @@ import type { TabType } from '../../types/ledger'
 import { Badge } from '../ui/badge'
 import { AdminPanel } from '../admin/AdminPanel'
 
-interface SidebarProps {
-  onOpenExport?: () => void
-  onPrint?: () => void
-}
-
-export const Sidebar: React.FC<SidebarProps> = ({
-  onOpenExport,
-  onPrint,
-}) => {
+export const Sidebar: React.FC = () => {
   const { activeTab, setActiveTab, tabRecordCounts } = useLedger()
   const {
     user,
@@ -29,27 +22,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const tabs: {
     id: TabType
     label: string
-    icon: string
+    Icon: React.ComponentType<{ size?: number; className?: string }>
     activeClass: string
   }[] = [
     {
       id: 'customer',
       label: 'Customer Credit',
-      icon: 'people-outline',
+      Icon: Users,
       activeClass:
         'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
     },
     {
       id: 'supplier',
       label: 'Supplier Credit',
-      icon: 'business-outline',
+      Icon: Building2,
       activeClass:
         'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
     },
     {
       id: 'stock',
       label: 'Stock & Inventory',
-      icon: 'layers-outline',
+      Icon: Layers,
       activeClass:
         'bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300',
     },
@@ -61,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/70">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-              <ion-icon name="book-outline" class="text-lg"></ion-icon>
+              <BookOpen size={18} />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-black tracking-tight text-foreground">
@@ -115,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }`}
               >
                 <span className="flex items-center gap-2 min-w-0">
-                  <ion-icon name={tab.icon} class="text-base shrink-0"></ion-icon>
+                  <tab.Icon size={16} className="shrink-0" />
                   <span className="truncate">{tab.label}</span>
                 </span>
                 <Badge
@@ -128,32 +121,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )
           })}
 
-          <p className="px-2 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Data &amp; Export
-          </p>
-          <button
-            type="button"
-            onClick={onOpenExport}
-            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-          >
-            <ion-icon
-              name="swap-vertical-outline"
-              class="text-base shrink-0 text-emerald-600"
-            ></ion-icon>
-            <span>Export &amp; Import</span>
-          </button>
-          <button
-            type="button"
-            onClick={onPrint}
-            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-          >
-            <ion-icon
-              name="print-outline"
-              class="text-base shrink-0 text-blue-600"
-            ></ion-icon>
-            <span>Print / PDF Export</span>
-          </button>
-
           {isAdmin && (
             <>
               <p className="px-2 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -164,10 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsAdminPanelOpen(true)}
                 className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer"
               >
-                <ion-icon
-                  name="people-outline"
-                  class="text-base shrink-0"
-                ></ion-icon>
+                <Users size={16} className="shrink-0" />
                 <span>Shopkeepers</span>
               </button>
             </>
@@ -193,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="w-7 h-7 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center"
               title="Sign out"
             >
-              <ion-icon name="log-out-outline" class="text-base"></ion-icon>
+              <LogOut size={16} />
             </button>
           </div>
         </div>

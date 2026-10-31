@@ -62,18 +62,12 @@
   height: 0;
 }
 
-/* Ionicons web component base styling */
-ion-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  line-height: 1;
-  pointer-events: none;
+/* Keep inline icons from collapsing inside flex layouts */
+.lucide {
   flex-shrink: 0;
 }
 
-/* Mobile safe area padding for PWA / Capacitor */
+/* Mobile safe area padding for the web app */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }

@@ -1,3 +1,4 @@
+import { AlertCircle, BookOpen, LogIn, RefreshCw, ShieldCheck } from 'lucide-react'
 import React, { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { Button } from '../ui/button'
@@ -27,7 +28,7 @@ export const LoginScreen: React.FC = () => {
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-emerald-600/20">
-            <ion-icon name="book-outline" class="text-3xl"></ion-icon>
+            <BookOpen size={30} />
           </div>
           <h1 className="mt-4 text-2xl font-black tracking-tight text-foreground">
             Merkato Credit Record
@@ -50,10 +51,7 @@ export const LoginScreen: React.FC = () => {
 
           {error && (
             <div className="flex items-start gap-2 p-2.5 text-xs text-rose-700 bg-rose-50 dark:bg-rose-950/50 dark:text-rose-300 rounded-lg">
-              <ion-icon
-                name="alert-circle-outline"
-                class="text-base shrink-0 mt-0.5"
-              ></ion-icon>
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -110,19 +108,19 @@ export const LoginScreen: React.FC = () => {
           >
             {isSubmitting ? (
               <>
-                <ion-icon name="sync-outline" class="text-base animate-spin"></ion-icon>
+                <RefreshCw size={16} className="animate-spin" />
                 <span>Signing in...</span>
               </>
             ) : (
               <>
-                <ion-icon name="log-in-outline" class="text-base"></ion-icon>
+                <LogIn size={16} />
                 <span>Sign in</span>
               </>
             )}
           </Button>
 
           <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground pt-1">
-            <ion-icon name="shield-checkmark-outline" class="text-xs"></ion-icon>
+            <ShieldCheck size={12} />
             <span>Shop data is protected on the server</span>
           </div>
         </form>

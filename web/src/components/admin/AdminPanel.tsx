@@ -1,3 +1,4 @@
+import { CirclePlus, CircleX, RefreshCw, Store, Users } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import type { Shopkeeper } from '../../lib/api'
@@ -140,10 +141,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
       <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto sm:rounded-2xl p-4 sm:p-6">
         <DialogHeader className="text-left">
           <DialogTitle className="text-lg font-bold flex items-center gap-2">
-            <ion-icon
-              name="people-outline"
-              class="text-primary text-xl"
-            ></ion-icon>
+            <Users size={20} className="text-primary" />
             <span>Admin Shopkeepers &amp; Shop Sites</span>
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
@@ -173,7 +171,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
               onClick={() => setShowNewShop(!showNewShop)}
               className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
-              <ion-icon name={showNewShop ? 'close-circle-outline' : 'add-circle-outline'} class="text-sm"></ion-icon>
+              {showNewShop ? (
+                <CircleX size={14} />
+              ) : (
+                <CirclePlus size={14} />
+              )}
               <span>{showNewShop ? 'Cancel' : '+ Add New Shop Site'}</span>
             </button>
           </div>
@@ -184,7 +186,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                 key={s.id}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-muted/60 text-foreground border border-zinc-200/80 dark:border-zinc-800"
               >
-                <ion-icon name="storefront-outline" class="text-xs text-emerald-600"></ion-icon>
+                <Store size={12} className="text-emerald-600" />
                 <span>{s.name}</span>
               </span>
             ))}
@@ -293,7 +295,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
               onClick={() => void loadUsers()}
               className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 cursor-pointer"
             >
-              <ion-icon name="refresh-outline" class="text-sm"></ion-icon>
+              <RefreshCw size={14} />
               Refresh
             </button>
           </div>

@@ -1,3 +1,4 @@
+import { ArrowUpDown, CloudUpload, Code, Download, FileText, Inbox, Printer, RefreshCw } from 'lucide-react'
 import React, { useRef, useState } from 'react'
 import { useLedger } from '../../context/LedgerContext'
 import {
@@ -148,10 +149,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       <DialogContent className="max-w-md sm:rounded-2xl p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <ion-icon
-              name="swap-vertical-outline"
-              class="text-primary text-xl"
-            ></ion-icon>
+            <ArrowUpDown size={20} className="text-primary" />
             <span>Export &amp; Import Data</span>
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
@@ -190,10 +188,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 shrink-0 flex items-center justify-center">
-                    <ion-icon
-                      name="document-text-outline"
-                      class="text-xl"
-                    ></ion-icon>
+                    <FileText size={20} />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-sm font-semibold text-foreground truncate">
@@ -210,7 +205,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   onClick={handleExportExcel}
                   className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-emerald-500 hover:text-emerald-600"
                 >
-                  <ion-icon name="download-outline" class="text-sm"></ion-icon>
+                  <Download size={14} />
                   <span>Export</span>
                 </Button>
               </div>
@@ -219,10 +214,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 shrink-0 flex items-center justify-center">
-                    <ion-icon
-                      name="code-slash-outline"
-                      class="text-xl"
-                    ></ion-icon>
+                    <Code size={20} />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-sm font-semibold text-foreground truncate">
@@ -239,7 +231,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   onClick={handleExportJson}
                   className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-indigo-500 hover:text-indigo-600"
                 >
-                  <ion-icon name="download-outline" class="text-sm"></ion-icon>
+                  <Download size={14} />
                   <span>Export</span>
                 </Button>
               </div>
@@ -248,10 +240,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 shrink-0 flex items-center justify-center">
-                    <ion-icon
-                      name="print-outline"
-                      class="text-xl"
-                    ></ion-icon>
+                    <Printer size={20} />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-sm font-semibold text-foreground truncate">
@@ -268,7 +257,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   onClick={handleExportPdf}
                   className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-blue-500 hover:text-blue-600"
                 >
-                  <ion-icon name="print-outline" class="text-sm"></ion-icon>
+                  <Printer size={14} />
                   <span>Print / PDF</span>
                 </Button>
               </div>
@@ -289,10 +278,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2.5 rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-950/60 dark:text-teal-400 shrink-0 flex items-center justify-center">
-                    <ion-icon
-                      name="cloud-upload-outline"
-                      class="text-xl"
-                    ></ion-icon>
+                    <CloudUpload size={20} />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-sm font-semibold text-foreground truncate">
@@ -312,18 +298,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 >
                   {isProcessingExcel ? (
                     <>
-                      <ion-icon
-                        name="sync-outline"
-                        class="text-sm animate-spin"
-                      ></ion-icon>
+                      <RefreshCw size={14} className="animate-spin" />
                       <span>Loading...</span>
                     </>
                   ) : (
                     <>
-                      <ion-icon
-                        name="cloud-upload-outline"
-                        class="text-sm"
-                      ></ion-icon>
+                      <CloudUpload size={14} />
                       <span>Import</span>
                     </>
                   )}
@@ -334,10 +314,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2.5 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 shrink-0 flex items-center justify-center">
-                    <ion-icon
-                      name="file-tray-full-outline"
-                      class="text-xl"
-                    ></ion-icon>
+                    <Inbox size={20} />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-sm font-semibold text-foreground truncate">
@@ -354,10 +331,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   onClick={() => jsonFileInputRef.current?.click()}
                   className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-amber-500 hover:text-amber-600"
                 >
-                  <ion-icon
-                    name="cloud-upload-outline"
-                    class="text-sm"
-                  ></ion-icon>
+                  <CloudUpload size={14} />
                   <span>Import</span>
                 </Button>
               </div>

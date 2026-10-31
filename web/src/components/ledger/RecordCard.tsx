@@ -1,3 +1,14 @@
+import {
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Layers,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Users,
+} from 'lucide-react'
 import React, { useState } from 'react'
 import type { LedgerRecord } from '../../types/ledger'
 import { useLedger } from '../../context/LedgerContext'
@@ -91,10 +102,11 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
             className="p-1 rounded-md text-muted-foreground hover:bg-muted transition-colors mt-0.5 shrink-0"
             aria-label={isExpanded ? 'Collapse' : 'Expand'}
           >
-            <ion-icon
-              name={isExpanded ? 'chevron-up-outline' : 'chevron-down-outline'}
-              class="text-base text-muted-foreground"
-            ></ion-icon>
+            {isExpanded ? (
+              <ChevronUp size={16} className="text-muted-foreground" />
+            ) : (
+              <ChevronDown size={16} className="text-muted-foreground" />
+            )}
           </button>
 
           <div className="min-w-0">
@@ -108,16 +120,13 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                       : 'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
                 }`}
               >
-                <ion-icon
-                  name={
-                    record.type === 'customer'
-                      ? 'people-outline'
-                      : record.type === 'supplier'
-                        ? 'business-outline'
-                        : 'layers-outline'
-                  }
-                  class="text-xs"
-                ></ion-icon>
+                {record.type === 'customer' ? (
+                  <Users size={12} />
+                ) : record.type === 'supplier' ? (
+                  <Building2 size={12} />
+                ) : (
+                  <Layers size={12} />
+                )}
                 <span>
                   {record.type === 'customer'
                     ? 'Customer'
@@ -178,7 +187,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
               className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
               title="Edit"
             >
-              <ion-icon name="create-outline" class="text-base"></ion-icon>
+              <Pencil size={16} />
             </Button>
 
             <DropdownMenu>
@@ -189,24 +198,21 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                   className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <ion-icon
-                    name="ellipsis-vertical-outline"
-                    class="text-base"
-                  ></ion-icon>
+                  <MoreVertical size={16} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onClick={handleEdit} className="cursor-pointer text-xs">
-                  <ion-icon name="create-outline" class="text-sm mr-2"></ion-icon>
+                  <Pencil size={14} className="mr-2" />
                   <span>Edit</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleCopy} className="cursor-pointer text-xs">
-                  <ion-icon name="copy-outline" class="text-sm mr-2"></ion-icon>
+                  <Copy size={14} className="mr-2" />
                   <span>Copy Summary</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleDelete} className="cursor-pointer text-rose-600 text-xs">
-                  <ion-icon name="trash-outline" class="text-sm mr-2"></ion-icon>
+                  <Trash2 size={14} className="mr-2" />
                   <span>Delete</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
