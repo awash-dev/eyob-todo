@@ -155,7 +155,7 @@ export const Sidebar: React.FC = () => {
                 {user?.name}
               </p>
               <p className="text-[10px] text-muted-foreground truncate">
-                {user?.email}
+                {user?.phone}
               </p>
             </div>
             <button

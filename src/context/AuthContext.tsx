@@ -28,7 +28,7 @@ interface AuthContextType {
   loading: boolean
   error: string | null
   refreshShops: () => Promise<void>
-  login: (email: string, password: string) => Promise<AuthUser>
+  login: (phone: string, password: string) => Promise<AuthUser>
   logout: () => Promise<void>
   setActiveShopId: (shopId: string) => void
   clearError: () => void
@@ -114,10 +114,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [])
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (phone: string, password: string) => {
       setError(null)
       try {
-        const data = await apiLogin(email, password)
+        const data = await apiLogin(phone, password)
         await applyUser(data.user)
         return data.user
       } catch (err) {

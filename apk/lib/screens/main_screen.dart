@@ -22,8 +22,8 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final _currencyFormat = NumberFormat('#,##0.00', 'en_US');
 
-  // Tabs: 0: Stocks, 1: Customer, 2: Supplier, 3: Delala
-  int _currentTabIndex = 1;
+  // Tabs: 0: Customer, 1: Supplier, 2: Delala, 3: Stocks
+  int _currentTabIndex = 0;
   List<Shop> _shops = [];
   String? _selectedShopId;
   List<LedgerRecord> _records = [];
@@ -53,13 +53,13 @@ class _MainScreenState extends State<MainScreen> {
   String get _currentTabType {
     switch (_currentTabIndex) {
       case 0:
-        return 'stock';
-      case 1:
         return 'customer';
-      case 2:
+      case 1:
         return 'supplier';
-      case 3:
+      case 2:
         return 'delala';
+      case 3:
+        return 'stock';
       default:
         return 'customer';
     }
@@ -68,13 +68,13 @@ class _MainScreenState extends State<MainScreen> {
   String get _currentTabLabel {
     switch (_currentTabIndex) {
       case 0:
-        return 'Stock & Inventory';
-      case 1:
         return 'Customer Credit';
-      case 2:
+      case 1:
         return 'Supplier Credit';
-      case 3:
+      case 2:
         return 'Delala Credit';
+      case 3:
+        return 'Stock & Inventory';
       default:
         return 'Customer Credit';
     }
@@ -610,13 +610,13 @@ class _MainScreenState extends State<MainScreen> {
               ),
               columns: const [
                 DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
-                DataColumn(label: Text('Item / Description', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
+                DataColumn(label: Text('Item (የዕቃው አይነት)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
                 DataColumn(numeric: true, label: Text('Ctns', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
                 DataColumn(numeric: true, label: Text('Pcs/Ctn', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
-                DataColumn(numeric: true, label: Text('Unit Price', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
-                DataColumn(numeric: true, label: Text('Debit (+)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFF006948)))),
-                DataColumn(numeric: true, label: Text('Credit (-)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFFB45309)))),
-                DataColumn(numeric: true, label: Text('Balance', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
+                DataColumn(numeric: true, label: Text('Price (ዋጋ)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
+                DataColumn(numeric: true, label: Text('Debit (+) (ዕቃ)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFF006948)))),
+                DataColumn(numeric: true, label: Text('Credit (-) (ክፍያ)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFFB45309)))),
+                DataColumn(numeric: true, label: Text('Balance (ቀሪ)', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11))),
               ],
               rows: rec.items.map((item) {
                 final isDebit = item.sign == '+';
@@ -650,13 +650,13 @@ class _MainScreenState extends State<MainScreen> {
                             item.name,
                             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
                           ),
-                          if (item.paymentMethod != null && item.paymentMethod!.isNotEmpty)
+                          if ((item.paymentMethod != null && item.paymentMethod!.isNotEmpty) || (item.bank != null && item.bank!.isNotEmpty))
                             Text(
-                              'via ${item.paymentMethod}${item.reference != null ? " (${item.reference})" : ""}',
+                              'via ${item.paymentMethod ?? item.bank}${item.reference != null ? " (${item.reference})" : ""}',
                               style: TextStyle(
                                 fontSize: 9.5,
                                 color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                         ],
@@ -875,7 +875,7 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
 
-      // 4 BOTTOM NAVIGATION TABS (Stocks, Customer, Supplier, Delala)
+      // 4 BOTTOM NAVIGATION TABS (Customer, Supplier, Delala, Stocks)
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           border: Border(
@@ -901,11 +901,6 @@ class _MainScreenState extends State<MainScreen> {
           elevation: 6,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.inventory_2_outlined),
-              activeIcon: Icon(Icons.inventory_2),
-              label: 'Stocks',
-            ),
-            BottomNavigationBarItem(
               icon: Icon(Icons.people_outline),
               activeIcon: Icon(Icons.people),
               label: 'Customer',
@@ -919,6 +914,11 @@ class _MainScreenState extends State<MainScreen> {
               icon: Icon(Icons.handshake_outlined),
               activeIcon: Icon(Icons.handshake),
               label: 'Delala',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
+              activeIcon: Icon(Icons.inventory_2),
+              label: 'Stocks',
             ),
           ],
         ),
@@ -1111,7 +1111,7 @@ class _MainScreenState extends State<MainScreen> {
         elevation: 4,
         icon: const Icon(Icons.add, size: 20),
         label: Text(
-          'Add ${_currentTabIndex == 0 ? "Stock" : _currentTabIndex == 3 ? "Delala" : _currentTabIndex == 2 ? "Supplier" : "Customer"}',
+          'Add ${_currentTabIndex == 3 ? "Stock" : _currentTabIndex == 2 ? "Delala" : _currentTabIndex == 1 ? "Supplier" : "Customer"}',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
         ),
         onPressed: _openCreateRecordDialog,

@@ -27,7 +27,7 @@ interface AdminPanelProps {
 
 const emptyForm = {
   name: '',
-  email: '',
+  phone: '',
   password: '',
   shopId: '',
 }
@@ -61,7 +61,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
   const handleDeleteUser = async (user: Shopkeeper) => {
     if (
       !window.confirm(
-        `Are you sure you want to permanently delete shopkeeper "${user.name}" (${user.email})?`,
+        `Are you sure you want to permanently delete shopkeeper "${user.name}" (${user.phone || 'no phone'})?`,
       )
     ) {
       return
@@ -295,11 +295,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
               className="h-9 text-xs bg-background"
             />
             <Input
-              type="email"
-              placeholder="Email address"
-              value={form.email}
+              type="tel"
+              inputMode="tel"
+              placeholder="Phone number (e.g. 0911111111)"
+              value={form.phone}
               onChange={(event) =>
-                setForm((prev) => ({ ...prev, email: event.target.value }))
+                setForm((prev) => ({ ...prev, phone: event.target.value }))
               }
               required
               className="h-9 text-xs bg-background"
@@ -384,7 +385,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                       )}
                     </p>
                     <p className="text-[11px] text-muted-foreground truncate">
-                      {u.email}
+                      {u.phone || 'No phone'}
                     </p>
                   </div>
                   <select

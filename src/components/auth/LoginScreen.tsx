@@ -6,7 +6,7 @@ import { Input } from '../ui/input'
 
 export const LoginScreen: React.FC = () => {
   const { login, error, clearError } = useAuth()
-  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -15,7 +15,7 @@ export const LoginScreen: React.FC = () => {
     if (isSubmitting) return
     setIsSubmitting(true)
     try {
-      await login(email.trim(), password)
+      await login(phone.trim(), password)
     } catch {
       // Error is shown from auth context.
     } finally {
@@ -58,19 +58,20 @@ export const LoginScreen: React.FC = () => {
 
           <div className="space-y-1.5">
             <label
-              htmlFor="login-email"
+              htmlFor="login-phone"
               className="text-xs font-semibold text-foreground"
             >
-              Email
+              Phone number
             </label>
             <Input
-              id="login-email"
-              type="email"
+              id="login-phone"
+              type="tel"
+              inputMode="tel"
               autoComplete="username"
-              placeholder="you@click.et"
-              value={email}
+              placeholder="0911111111"
+              value={phone}
               onChange={(event) => {
-                setEmail(event.target.value)
+                setPhone(event.target.value)
                 if (error) clearError()
               }}
               required
@@ -131,9 +132,9 @@ export const LoginScreen: React.FC = () => {
               Test accounts (development only)
             </summary>
             <div className="mt-2 space-y-1 font-mono">
-              <p>Admin: admin@click.et / Admin@123</p>
-              <p>Shop 1: shop1@click.et / Shop@123</p>
-              <p>Shop 2: shop2@click.et / Shop@123</p>
+              <p>Admin: 0911111111 / Admin@123</p>
+              <p>Shop 1: 0922222222 / Shop@123</p>
+              <p>Shop 2: 0933333333 / Shop@123</p>
             </div>
           </details>
         )}

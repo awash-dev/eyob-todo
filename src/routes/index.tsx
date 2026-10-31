@@ -28,7 +28,7 @@ function AppContentWrapper() {
 
 function MainAppView() {
   const { activeShop } = useAuth()
-  const [sortBy, setSortBy] = useState<
+  const [sortBy] = useState<
     'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
   >('date-desc')
 
@@ -37,8 +37,6 @@ function MainAppView() {
     filteredRecords,
     searchQuery,
     setSearchQuery,
-    syncStatus,
-    syncWithNeon,
     openCreateModal,
   } = useLedger()
 

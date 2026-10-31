@@ -130,11 +130,24 @@ function makeId(prefix) {
   return `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`
 }
 
+/**
+ * Normalizes an Ethiopian phone number to canonical E.164 form (+2519XXXXXXXX).
+ * Returns null when the input is not a valid Ethiopian mobile number.
+ */
+function normalizePhone(input) {
+  let digits = String(input).replace(/[\s\-().]/g, '')
+  if (digits.startsWith('+')) digits = digits.slice(1)
+  if (digits.startsWith('251')) digits = `0${digits.slice(3)}`
+  if (!/^0[79]\d{8}$/.test(digits)) return null
+  return `+251${digits.slice(1)}`
+}
+
 function publicUser(row) {
   return {
     id: row.id,
     name: row.name,
-    email: row.email,
+    phone: row.phone || '',
+    email: row.email || undefined,
     role: row.role,
     shopId: row.shop_id || null,
     shopName: row.shop_name || null,
@@ -280,7 +293,8 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS users (
       id varchar(64) PRIMARY KEY,
       name varchar(160) NOT NULL,
-      email varchar(200) NOT NULL UNIQUE,
+      email varchar(200),
+      phone varchar(30),
       password_hash text NOT NULL,
       role varchar(20) NOT NULL CHECK (role IN ('admin', 'shopkeeper')),
       shop_id varchar(64) REFERENCES shops(id),
@@ -288,6 +302,10 @@ async function ensureSchema() {
       created_at bigint NOT NULL
     )
   `
+  // Migrate pre-phone databases (email stays for reference; phone is the login id)
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar(30)`
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique_idx ON users (phone) WHERE phone IS NOT NULL`
+  await sql`ALTER TABLE users ALTER COLUMN email DROP NOT NULL`
   await sql`
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash varchar(128) PRIMARY KEY,
@@ -315,6 +333,7 @@ async function ensureSchema() {
 
   await seedUser({
     name: 'Central Admin',
+    phone: '+251911111111',
     email: 'admin@click.et',
     password: 'Admin@123',
     role: 'admin',
@@ -322,6 +341,7 @@ async function ensureSchema() {
   })
   await seedUser({
     name: 'Shopkeeper 1',
+    phone: '+251922222222',
     email: 'shop1@click.et',
     password: 'Shop@123',
     role: 'shopkeeper',
@@ -329,6 +349,7 @@ async function ensureSchema() {
   })
   await seedUser({
     name: 'Shopkeeper 2',
+    phone: '+251933333333',
     email: 'shop2@click.et',
     password: 'Shop@123',
     role: 'shopkeeper',
@@ -336,12 +357,18 @@ async function ensureSchema() {
   })
 }
 
-async function seedUser({ name, email, password, role, shopId }) {
-  const existing = await sql`SELECT id FROM users WHERE email = ${email.toLowerCase()}`
-  if (existing.length > 0) return
+async function seedUser({ name, phone, email, password, role, shopId }) {
+  const existing = await sql`SELECT id, phone FROM users WHERE phone = ${phone} OR email = ${email.toLowerCase()} LIMIT 1`
+  if (existing.length > 0) {
+    // Backfill phone on pre-migration rows
+    if (!existing[0].phone && phone) {
+      await sql`UPDATE users SET phone = ${phone} WHERE id = ${existing[0].id}`
+    }
+    return
+  }
   await sql`
-    INSERT INTO users (id, name, email, password_hash, role, shop_id, active, created_at)
-    VALUES (${makeId('user')}, ${name}, ${email.toLowerCase()}, ${hashPassword(password)}, ${role}, ${shopId}, true, ${now()})
+    INSERT INTO users (id, name, email, phone, password_hash, role, shop_id, active, created_at)
+    VALUES (${makeId('user')}, ${name}, ${email.toLowerCase()}, ${phone}, ${hashPassword(password)}, ${role}, ${shopId}, true, ${now()})
   `
 }
 
@@ -357,16 +384,17 @@ let cachedShops = [
 ]
 
 let cachedUsers = [
-  { id: 'user-shop1', name: 'Shopkeeper 1', email: 'shop1@click.et', role: 'shopkeeper', shopId: 'shop-1', shopName: 'Shop 1 - Merkato', active: true, createdAt: Date.now() },
-  { id: 'user-shop2', name: 'Shopkeeper 2', email: 'shop2@click.et', role: 'shopkeeper', shopId: 'shop-2', shopName: 'Shop 2 - Bole', active: true, createdAt: Date.now() },
+  { id: 'user-shop1', name: 'Shopkeeper 1', phone: '+251922222222', email: 'shop1@click.et', role: 'shopkeeper', shopId: 'shop-1', shopName: 'Shop 1 - Merkato', active: true, createdAt: Date.now() },
+  { id: 'user-shop2', name: 'Shopkeeper 2', phone: '+251933333333', email: 'shop2@click.et', role: 'shopkeeper', shopId: 'shop-2', shopName: 'Shop 2 - Bole', active: true, createdAt: Date.now() },
 ]
 
 const cachedRecords = new Map()
 
 const DEMO_USERS = {
-  'admin@click.et': {
+  '+251911111111': {
     id: 'user-admin',
     name: 'Central Admin',
+    phone: '+251911111111',
     email: 'admin@click.et',
     role: 'admin',
     shop_id: null,
@@ -374,9 +402,10 @@ const DEMO_USERS = {
     active: true,
     password: 'Admin@123',
   },
-  'shop1@click.et': {
+  '+251922222222': {
     id: 'user-shop1',
     name: 'Shopkeeper 1',
+    phone: '+251922222222',
     email: 'shop1@click.et',
     role: 'shopkeeper',
     shop_id: 'shop-1',
@@ -384,9 +413,10 @@ const DEMO_USERS = {
     active: true,
     password: 'Shop@123',
   },
-  'shop2@click.et': {
+  '+251933333333': {
     id: 'user-shop2',
     name: 'Shopkeeper 2',
+    phone: '+251933333333',
     email: 'shop2@click.et',
     role: 'shopkeeper',
     shop_id: 'shop-2',
@@ -412,7 +442,7 @@ async function getAuthUser(req) {
 
   try {
     const rows = await sql`
-      SELECT s.token_hash, s.expires_at, u.id, u.name, u.email, u.role, u.shop_id,
+      SELECT s.token_hash, s.expires_at, u.id, u.name, u.email, u.phone, u.role, u.shop_id,
              u.active, sh.name AS shop_name
       FROM sessions s
       JOIN users u ON u.id = s.user_id
@@ -605,7 +635,8 @@ async function handleApi(req, res, url) {
     checkLoginRate(ip)
 
     const body = await readJson(req)
-    const email = text(body.email, 'Email', { required: true, max: 200 })?.toLowerCase()
+    const phone = normalizePhone(text(body.phone, 'Phone', { required: true, max: 30 }))
+    if (!phone) throw new HttpError(400, 'Enter a valid Ethiopian phone number (e.g. 0911111111)')
     const password = text(body.password, 'Password', { required: true, max: 200 })
 
     let user = null
@@ -614,7 +645,7 @@ async function handleApi(req, res, url) {
         SELECT u.*, sh.name AS shop_name
         FROM users u
         LEFT JOIN shops sh ON sh.id = u.shop_id
-        WHERE u.email = ${email}
+        WHERE u.phone = ${phone}
         LIMIT 1
       `
       user = rows[0]
@@ -625,11 +656,12 @@ async function handleApi(req, res, url) {
     let valid = false
     if (user && user.active && verifyPassword(password, user.password_hash)) {
       valid = true
-    } else if (DEMO_USERS[email] && DEMO_USERS[email].password === password) {
-      const demo = DEMO_USERS[email]
+    } else if (DEMO_USERS[phone] && DEMO_USERS[phone].password === password) {
+      const demo = DEMO_USERS[phone]
       user = {
         id: demo.id,
         name: demo.name,
+        phone: demo.phone,
         email: demo.email,
         role: demo.role,
         shop_id: demo.shop_id,
@@ -640,7 +672,7 @@ async function handleApi(req, res, url) {
     }
 
     if (!valid || !user) {
-      throw new HttpError(401, 'Invalid email or password')
+      throw new HttpError(401, 'Invalid phone number or password')
     }
 
     const token = newToken()
@@ -766,7 +798,7 @@ async function handleApi(req, res, url) {
     requireAdmin(user)
     try {
       const rows = await sql`
-        SELECT u.id, u.name, u.email, u.role, u.shop_id, u.active, u.created_at,
+        SELECT u.id, u.name, u.email, u.phone, u.role, u.shop_id, u.active, u.created_at,
                sh.name AS shop_name
         FROM users u
         LEFT JOIN shops sh ON sh.id = u.shop_id
@@ -777,7 +809,8 @@ async function handleApi(req, res, url) {
         cachedUsers = rows.map((row) => ({
           id: row.id,
           name: row.name,
-          email: row.email,
+          phone: row.phone || '',
+          email: row.email || undefined,
           role: row.role,
           shopId: row.shop_id || null,
           shopName: row.shop_name || null,
@@ -797,18 +830,26 @@ async function handleApi(req, res, url) {
     requireAdmin(user)
     const body = await readJson(req)
     const name = text(body.name, 'Name', { required: true, max: 160 })
-    const email = text(body.email, 'Email', { required: true, max: 200 })?.toLowerCase()
+    const phone = normalizePhone(text(body.phone, 'Phone', { required: true, max: 30 }))
+    if (!phone) throw new HttpError(400, 'Enter a valid Ethiopian phone number (e.g. 0911111111)')
     const password = text(body.password, 'Password', { required: true, max: 200 })
-    if (!email.includes('@')) throw new HttpError(400, 'Enter a valid email')
     if (password.length < 6) throw new HttpError(400, 'Password must be at least 6 characters')
     const shopId = text(body.shopId, 'Shop', { required: true, max: 64 })
+
+    try {
+      const dupe = await sql`SELECT id FROM users WHERE phone = ${phone} LIMIT 1`
+      if (dupe.length > 0) throw new HttpError(409, `A shopkeeper with phone ${phone} already exists`)
+    } catch (err) {
+      if (err instanceof HttpError) throw err
+      console.warn('Neon user duplicate check warning:', err.message || err)
+    }
 
     const shopName = cachedShops.find((s) => s.id === shopId)?.name || 'Assigned Shop'
     const id = makeId('user')
     const newUser = {
       id,
       name,
-      email,
+      phone,
       role: 'shopkeeper',
       shopId,
       shopName,
@@ -818,8 +859,8 @@ async function handleApi(req, res, url) {
     cachedUsers.push(newUser)
 
     sql`
-      INSERT INTO users (id, name, email, password_hash, role, shop_id, active, created_at)
-      VALUES (${id}, ${name}, ${email}, ${hashPassword(password)}, 'shopkeeper', ${shopId}, true, ${now()})
+      INSERT INTO users (id, name, email, phone, password_hash, role, shop_id, active, created_at)
+      VALUES (${id}, ${name}, NULL, ${phone}, ${hashPassword(password)}, 'shopkeeper', ${shopId}, true, ${now()})
     `.catch((err) => console.warn('Non-blocking user insert warning:', err.message || err))
 
     json(res, 201, { user: newUser })
@@ -838,6 +879,21 @@ async function handleApi(req, res, url) {
     if (target.role !== 'shopkeeper') throw new HttpError(400, 'Only shopkeeper accounts can be edited here')
 
     const name = body.name !== undefined ? text(body.name, 'Name', { required: true, max: 160 }) : undefined
+    const phone = body.phone !== undefined && body.phone !== ''
+      ? normalizePhone(text(body.phone, 'Phone', { required: true, max: 30 }))
+      : undefined
+    if (body.phone !== undefined && body.phone !== '' && !phone) {
+      throw new HttpError(400, 'Enter a valid Ethiopian phone number (e.g. 0911111111)')
+    }
+    if (phone) {
+      try {
+        const dupe = await sql`SELECT id FROM users WHERE phone = ${phone} AND id != ${targetId} LIMIT 1`
+        if (dupe.length > 0) throw new HttpError(409, `Another shopkeeper already uses phone ${phone}`)
+      } catch (err) {
+        if (err instanceof HttpError) throw err
+        console.warn('Neon user duplicate check warning:', err.message || err)
+      }
+    }
     const shopId = body.shopId !== undefined ? text(body.shopId, 'Shop', { required: true, max: 64 }) : undefined
     const active = body.active !== undefined ? Boolean(body.active) : undefined
     const password = body.password !== undefined ? text(body.password, 'Password', { required: true, max: 200 }) : undefined
@@ -848,13 +904,14 @@ async function handleApi(req, res, url) {
     }
 
     if (name !== undefined) await sql`UPDATE users SET name = ${name} WHERE id = ${targetId}`
+    if (phone !== undefined) await sql`UPDATE users SET phone = ${phone} WHERE id = ${targetId}`
     if (shopId !== undefined) await sql`UPDATE users SET shop_id = ${shopId} WHERE id = ${targetId}`
     if (active !== undefined) await sql`UPDATE users SET active = ${active} WHERE id = ${targetId}`
     if (password) await sql`UPDATE users SET password_hash = ${hashPassword(password)} WHERE id = ${targetId}`
     if (active === false) await sql`DELETE FROM sessions WHERE user_id = ${targetId}`
 
     const updated = await sql`
-      SELECT u.id, u.name, u.email, u.role, u.shop_id, u.active, u.created_at,
+      SELECT u.id, u.name, u.email, u.phone, u.role, u.shop_id, u.active, u.created_at,
              sh.name AS shop_name
       FROM users u LEFT JOIN shops sh ON sh.id = u.shop_id
       WHERE u.id = ${targetId}
@@ -864,7 +921,8 @@ async function handleApi(req, res, url) {
       user: {
         id: row.id,
         name: row.name,
-        email: row.email,
+        phone: row.phone || '',
+        email: row.email || undefined,
         role: row.role,
         shopId: row.shop_id,
         shopName: row.shop_name,
@@ -1247,9 +1305,9 @@ async function start() {
   }
   server.listen(PORT, HOST, () => {
     console.log(`Click Ledger API listening on http://${HOST}:${PORT}`)
-    console.log('Admin: admin@click.et / Admin@123')
-    console.log('Shop 1: shop1@click.et / Shop@123')
-    console.log('Shop 2: shop2@click.et / Shop@123')
+    console.log('Admin: 0911111111 / Admin@123')
+    console.log('Shop 1: 0922222222 / Shop@123')
+    console.log('Shop 2: 0933333333 / Shop@123')
   })
 }
 

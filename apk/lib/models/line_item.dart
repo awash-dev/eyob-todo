@@ -4,13 +4,16 @@ class LineItem {
   double unitPrice;
   double quantity;
   String sign; // '+' (Debit/Add) or '-' (Credit/Deduct)
-  String? bank;
+  String? bank; // Which bank transfer: CBE, Awash, Dashen, Telebirr, Pawza, etc.
   String? customType;
   String? paymentMethod;
   String? reference;
   double? cartons;
   double? pcsPerCarton;
   double? customs;
+  String? packagingUnit; // 'Carton', 'Pcs', 'Dozen', 'Box', 'Roll', 'Meter', 'Bag', 'Other'
+  String? date;
+  String? notes;
 
   LineItem({
     required this.id,
@@ -25,9 +28,20 @@ class LineItem {
     this.cartons,
     this.pcsPerCarton,
     this.customs,
+    this.packagingUnit,
+    this.date,
+    this.notes,
   });
 
-  double get subtotal => unitPrice * quantity;
+  /// Total calculated price:
+  /// If Cartons and Pieces per Carton are specified, Total = Cartons * Pieces per Carton * Unit Price
+  /// Otherwise, Total = Quantity * Unit Price
+  double get subtotal {
+    if (cartons != null && cartons! > 0 && pcsPerCarton != null && pcsPerCarton! > 0) {
+      return cartons! * pcsPerCarton! * unitPrice;
+    }
+    return unitPrice * quantity;
+  }
 
   double get signedAmount {
     if (sign == '-') {
@@ -50,6 +64,9 @@ class LineItem {
       cartons: (json['cartons'] as num?)?.toDouble(),
       pcsPerCarton: (json['pcsPerCarton'] as num?)?.toDouble(),
       customs: (json['customs'] as num?)?.toDouble(),
+      packagingUnit: json['packagingUnit']?.toString(),
+      date: json['date']?.toString(),
+      notes: json['notes']?.toString(),
     );
   }
 
@@ -68,7 +85,9 @@ class LineItem {
     if (cartons != null && cartons! > 0) map['cartons'] = cartons;
     if (pcsPerCarton != null && pcsPerCarton! > 0) map['pcsPerCarton'] = pcsPerCarton;
     if (customs != null && customs! > 0) map['customs'] = customs;
+    if (packagingUnit != null && packagingUnit!.trim().isNotEmpty) map['packagingUnit'] = packagingUnit!.trim();
+    if (date != null && date!.trim().isNotEmpty) map['date'] = date!.trim();
+    if (notes != null && notes!.trim().isNotEmpty) map['notes'] = notes!.trim();
     return map;
   }
 }
-

@@ -65,7 +65,7 @@ export const Navbar: React.FC = () => {
                   {user?.name}
                 </p>
                 <p className="text-[9px] text-muted-foreground max-w-[120px] truncate">
-                  {user?.email}
+                  {user?.phone}
                 </p>
               </div>
             </div>

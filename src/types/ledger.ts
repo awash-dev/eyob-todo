@@ -21,6 +21,9 @@ export interface LineItem {
   pcsPerCarton?: number
   paymentMethod?: string
   reference?: string
+  packagingUnit?: string
+  date?: string
+  notes?: string
 }
 
 export interface LedgerRecord {
@@ -42,7 +45,8 @@ export type UserRole = 'admin' | 'shopkeeper'
 export interface AuthUser {
   id: string
   name: string
-  email: string
+  phone: string
+  email?: string
   role: UserRole
   shopId: string | null
   shopName: string | null

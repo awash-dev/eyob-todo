@@ -29,6 +29,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   late List<LineItemFormItem> _formItems;
 
   String _stockPackagingUnit = 'Carton';
+  final TextEditingController _otherUnitController = TextEditingController();
   bool _showCustoms = false;
 
   static const List<String> _stockSuggestions = [
@@ -39,7 +40,21 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     '5W Candel3000K',
     '5W Candel8000K',
     '12W Safari300K',
+    '2.5 bmt',
+    '2.5 elusdy',
+    'yebefit keri (የበፊት ቀሪ)',
     'Portland Cement Bags (50kg)',
+  ];
+
+  static const List<String> _packagingUnits = [
+    'Carton',
+    'Pcs',
+    'Dozen',
+    'Box',
+    'Roll',
+    'Meter',
+    'Bag',
+    'Other',
   ];
 
   static const List<String> _stockTypeOptions = [
@@ -51,21 +66,21 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   ];
 
   static const List<String> _bankOptions = [
-    'Cash',
     'CBE',
     'Awash',
     'Dashen',
-    'Abyssinia',
     'Telebirr',
-    'Boa',
-    'Hibret',
+    'Abyssinia',
+    'Pawza',
+    'Cash',
     'Coop',
-    'Zemen',
-    'Berhan',
+    'Hibret',
     'Nib',
-    'Oromia',
+    'Berhan',
+    'Zemen',
     'Wegagen',
     'Enat',
+    'Other Bank',
   ];
 
   @override
@@ -84,6 +99,15 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     if (rec != null && rec.items.isNotEmpty) {
       _formItems = rec.items.map((it) => LineItemFormItem.fromLineItem(it)).toList();
       _showCustoms = rec.items.any((it) => (it.customs ?? 0.0) > 0);
+      if (rec.items.first.packagingUnit != null && rec.items.first.packagingUnit!.isNotEmpty) {
+        final u = rec.items.first.packagingUnit!;
+        if (_packagingUnits.contains(u)) {
+          _stockPackagingUnit = u;
+        } else {
+          _stockPackagingUnit = 'Other';
+          _otherUnitController.text = u;
+        }
+      }
     } else {
       _formItems = [
         LineItemFormItem(
@@ -92,7 +116,8 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
           unitPrice: 0.0,
           quantity: 1.0,
           sign: '+',
-          typeOrBank: 'Stock',
+          typeOrBank: widget.activeTab == 'stock' ? 'Stock' : 'Stock',
+          packagingUnit: 'Carton',
         ),
       ];
     }
@@ -108,6 +133,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   void dispose() {
     _titleController.dispose();
     _notesController.dispose();
+    _otherUnitController.dispose();
     for (final it in _formItems) {
       it.dispose();
     }
@@ -124,6 +150,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
           quantity: 1.0,
           sign: '+',
           typeOrBank: 'Stock',
+          packagingUnit: 'Carton',
         ),
       );
     });
@@ -156,10 +183,19 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   double _calculateGrandTotal() {
     double total = 0;
     for (final item in _formItems) {
-      final q = double.tryParse(item.qtyController.text) ?? item.quantity;
+      final ctns = double.tryParse(item.cartonsController.text);
+      final pcs = double.tryParse(item.pcsController.text);
       final p = double.tryParse(item.priceController.text) ?? item.unitPrice;
       final customs = double.tryParse(item.customsController.text) ?? (item.customs ?? 0.0);
-      final amount = q * p;
+
+      double amount = 0.0;
+      if (item.packagingUnit == 'Carton' && ctns != null && ctns > 0 && pcs != null && pcs > 0) {
+        amount = ctns * pcs * p;
+      } else {
+        final q = double.tryParse(item.qtyController.text) ?? item.quantity;
+        amount = q * p;
+      }
+
       if (item.sign == '+') {
         total += (amount + customs);
       } else {
@@ -197,6 +233,11 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
         item.nameController.text = _titleController.text.trim();
       }
 
+      final unitName = _stockPackagingUnit == 'Other'
+          ? (_otherUnitController.text.trim().isNotEmpty ? _otherUnitController.text.trim() : 'Other')
+          : _stockPackagingUnit;
+      item.packagingUnit = unitName;
+
       // Auto compute total units if packaging is carton
       if (_stockPackagingUnit == 'Carton') {
         final c = double.tryParse(item.cartonsController.text) ?? 0.0;
@@ -228,6 +269,9 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
         cartons: ctns != null && ctns > 0 ? ctns : null,
         pcsPerCarton: pcs != null && pcs > 0 ? pcs : null,
         customs: customs != null && customs > 0 ? customs : null,
+        packagingUnit: f.packagingUnit,
+        date: dateStr,
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       );
     }).toList();
 
@@ -253,12 +297,12 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // When Stock In, render dedicated Google Stitch Stock In form layout
+    // Dedicated Stock In Form Layout (matching Google Stitch reference image)
     if (isStock) {
       return _buildStockInDialog(theme, isDark);
     }
 
-    // Otherwise render Excel Table Ledger Entry Form (Customer, Supplier, Delala)
+    // Ledger Entry Form with Bank Selection & Packaging Breakdown (Customer, Supplier, Delala)
     return _buildLedgerTableDialog(theme, isDark, isCustomer, isDelala);
   }
 
@@ -449,12 +493,9 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                 fontWeight: FontWeight.w600,
                                 color: theme.colorScheme.onSurface,
                               ),
-                              items: const [
-                                DropdownMenuItem(value: 'Carton', child: Text('Carton')),
-                                DropdownMenuItem(value: 'Pcs', child: Text('Pcs')),
-                                DropdownMenuItem(value: 'Dozen', child: Text('Dozen')),
-                                DropdownMenuItem(value: 'Box', child: Text('Box')),
-                              ],
+                              items: _packagingUnits.map((u) {
+                                return DropdownMenuItem(value: u, child: Text(u));
+                              }).toList(),
                               onChanged: (val) {
                                 if (val != null) setState(() => _stockPackagingUnit = val);
                               },
@@ -464,9 +505,28 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                       ),
                     ],
                   ),
+
+                  // If "Other" packaging unit selected, show custom unit name field
+                  if (_stockPackagingUnit == 'Other') ...[
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _otherUnitController,
+                      style: TextStyle(fontSize: 12.5, color: theme.colorScheme.onSurface),
+                      decoration: InputDecoration(
+                        labelText: 'Specify Custom Unit (e.g. Bundle, Kg, Pack)',
+                        labelStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        filled: true,
+                        fillColor: inputFill,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
 
-                  // 3. Pieces per Carton
+                  // 3. Pieces per Carton (visible when Carton is selected)
                   if (_stockPackagingUnit == 'Carton') ...[
                     _buildFieldLabel('Pieces per Carton', isDark),
                     const SizedBox(height: 6),
@@ -702,10 +762,10 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                 : 'Edit Supplier Ledger');
 
     final nameLabel = isCustomer
-        ? 'Customer / Party Name'
+        ? 'Customer / Party Name (የደንበኛ ስም)'
         : isDelala
-            ? 'Delala / Broker Name'
-            : 'Supplier / Vendor Name';
+            ? 'Delala / Broker Name (የደላላ ስም)'
+            : 'Supplier / Vendor Name (የአቅራቢ ስም)';
 
     final nameHint = isCustomer
         ? 'e.g. Apex Construction Ltd. or Kelil Aginbi'
@@ -721,8 +781,8 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 640,
-          maxHeight: MediaQuery.of(context).size.height * 0.92,
+          maxWidth: 680,
+          maxHeight: MediaQuery.of(context).size.height * 0.94,
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -929,18 +989,18 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
                 // Save Action Button
                 SizedBox(
-                  height: 44,
+                  height: 48,
                   child: ElevatedButton(
                     onPressed: _handleSubmit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF006948),
+                      backgroundColor: const Color(0xFF2563EB), // Stitch Primary Blue
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
                     child: Text(
                       widget.editingRecord == null ? 'Save Entry to Neon DB' : 'Update Entry in Neon DB',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                   ),
                 ),
@@ -974,18 +1034,19 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header Row
+                // Header Row matching Image 1 (KELIL AGINBI) & Image 2 (Esmiz)
                 Row(
                   children: [
-                    _gridHeaderCell('+/-', 36),
-                    _gridHeaderCell(isStock ? 'Type' : 'Channel', 85),
-                    _gridHeaderCell('Item / Description', 140),
+                    _gridHeaderCell('+/-', 38),
+                    _gridHeaderCell('Bank / Channel', 95),
+                    _gridHeaderCell('Item (የዕቃው አይነት)', 140),
+                    _gridHeaderCell('Unit', 68),
                     _gridHeaderCell('Ctns', 50),
                     _gridHeaderCell('Pcs/Ctn', 55),
                     _gridHeaderCell('Total Pcs', 55),
-                    _gridHeaderCell('Price (ETB)', 80),
+                    _gridHeaderCell('Price (ዋጋ)', 80),
                     if (isStock && _showCustoms) _gridHeaderCell('Customs', 65),
-                    _gridHeaderCell('Amount', 90),
+                    _gridHeaderCell('Total (ድምር)', 92),
                     _gridHeaderCell('', 32),
                   ],
                 ),
@@ -997,10 +1058,18 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                 ...List.generate(_formItems.length, (idx) {
                   final item = _formItems[idx];
                   final isDebit = item.sign == '+';
-                  final qty = double.tryParse(item.qtyController.text) ?? item.quantity;
+                  final ctns = double.tryParse(item.cartonsController.text);
+                  final pcs = double.tryParse(item.pcsController.text);
                   final price = double.tryParse(item.priceController.text) ?? item.unitPrice;
                   final customs = double.tryParse(item.customsController.text) ?? (item.customs ?? 0.0);
-                  final subtotal = (qty * price) + (isDebit ? customs : 0.0);
+
+                  double subtotal = 0.0;
+                  if (item.packagingUnit == 'Carton' && ctns != null && ctns > 0 && pcs != null && pcs > 0) {
+                    subtotal = (ctns * pcs * price) + (isDebit ? customs : 0.0);
+                  } else {
+                    final qty = double.tryParse(item.qtyController.text) ?? item.quantity;
+                    subtotal = (qty * price) + (isDebit ? customs : 0.0);
+                  }
 
                   final currentOptions = isDebit ? _stockTypeOptions : _bankOptions;
                   final safeOpt = currentOptions.contains(item.typeOrBank)
@@ -1011,9 +1080,9 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     padding: const EdgeInsets.only(bottom: 6.0),
                     child: Row(
                       children: [
-                        // +/- Sign Toggle
+                        // +/- Sign Toggle (Debit Goods vs Credit Payment)
                         SizedBox(
-                          width: 36,
+                          width: 38,
                           height: 32,
                           child: OutlinedButton(
                             onPressed: () => _toggleItemSign(item),
@@ -1039,17 +1108,21 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                         ),
                         const SizedBox(width: 6),
 
-                        // Channel / Type Dropdown
+                        // Bank / Channel Dropdown (Which Bank Transfer: CBE, Awash, Dashen, Pawza, etc.)
                         SizedBox(
-                          width: 85,
+                          width: 95,
                           height: 32,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF27272A) : Colors.white,
+                              color: !isDebit
+                                  ? (isDark ? const Color(0xFF382D05) : const Color(0xFFFEF9C3)) // Yellow highlight like Excel
+                                  : (isDark ? const Color(0xFF27272A) : Colors.white),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: isDark ? const Color(0xFF3F3F46) : Colors.grey.shade300,
+                                color: !isDebit
+                                    ? const Color(0xFFB45309)
+                                    : (isDark ? const Color(0xFF3F3F46) : Colors.grey.shade300),
                               ),
                             ),
                             child: DropdownButtonHideUnderline(
@@ -1059,8 +1132,10 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                 isExpanded: true,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  color: !isDebit
+                                      ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                                      : theme.colorScheme.onSurface,
                                 ),
                                 items: currentOptions.map((opt) {
                                   return DropdownMenuItem(
@@ -1077,7 +1152,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                         ),
                         const SizedBox(width: 6),
 
-                        // Item / Description Field
+                        // Item / Description Field (e.g. 12W Safari, 2.5 bmt, yebefit keri)
                         SizedBox(
                           width: 140,
                           height: 32,
@@ -1093,6 +1168,35 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
                             ),
                             validator: (v) => v == null || v.trim().isEmpty ? 'Req' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Packaging Unit Dropdown (Carton, Pcs, Dozen, Box, Other)
+                        SizedBox(
+                          width: 68,
+                          height: 32,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF27272A) : Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: isDark ? const Color(0xFF3F3F46) : Colors.grey.shade300),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _packagingUnits.contains(item.packagingUnit) ? item.packagingUnit : 'Carton',
+                                isDense: true,
+                                isExpanded: true,
+                                style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+                                items: _packagingUnits.map((u) {
+                                  return DropdownMenuItem(value: u, child: Text(u));
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => item.packagingUnit = val);
+                                },
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -1170,7 +1274,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                         ),
                         const SizedBox(width: 6),
 
-                        // Price
+                        // Price (ዋጋ)
                         SizedBox(
                           width: 80,
                           height: 32,
@@ -1214,9 +1318,9 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           const SizedBox(width: 6),
                         ],
 
-                        // Amount
+                        // Total Amount (ድምር)
                         SizedBox(
-                          width: 90,
+                          width: 92,
                           child: Text(
                             _currencyFormat.format(subtotal),
                             textAlign: TextAlign.right,
@@ -1278,6 +1382,7 @@ class LineItemFormItem {
   late TextEditingController customsController;
   String sign;
   String typeOrBank;
+  String packagingUnit;
   double quantity;
   double unitPrice;
   double? customs;
@@ -1289,6 +1394,7 @@ class LineItemFormItem {
     required this.quantity,
     required this.sign,
     required this.typeOrBank,
+    this.packagingUnit = 'Carton',
     double? cartons,
     double? pcsPerCarton,
     this.customs,
@@ -1334,6 +1440,7 @@ class LineItemFormItem {
       typeOrBank: item.sign == '-'
           ? (item.bank ?? item.paymentMethod ?? 'CBE')
           : (item.customType ?? 'Stock'),
+      packagingUnit: item.packagingUnit ?? (item.cartons != null && item.cartons! > 0 ? 'Carton' : 'Pcs'),
       cartons: item.cartons,
       pcsPerCarton: item.pcsPerCarton,
       customs: item.customs,

@@ -20,16 +20,16 @@ const tokenHash = (token) => crypto.createHash('sha256').update(token).digest('h
 const now = () => Date.now();
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-async function testLogin(email, password) {
+async function testLogin(phone, password) {
   try {
     const rows = await sql`
       SELECT u.*, sh.name AS shop_name
       FROM users u
       LEFT JOIN shops sh ON sh.id = u.shop_id
-      WHERE u.email = ${email}
+      WHERE u.phone = ${phone}
       LIMIT 1
     `;
-    console.log('User found:', rows[0]?.email);
+    console.log('User found:', rows[0]?.phone);
     const user = rows[0];
     const ok = verifyPassword(password, user.password_hash);
     console.log('Password verified:', ok);
@@ -49,5 +49,5 @@ async function testLogin(email, password) {
   }
 }
 
-testLogin('shop1@click.et', 'Shop@123');
+testLogin('+251922222222', 'Shop@123');
 

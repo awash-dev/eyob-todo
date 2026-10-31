@@ -5,6 +5,9 @@ export const ETHIOPIAN_BANKS = [
   'Awash',
   'Dashen',
   'BoA',
+  'Pawza',
+  'Telebirr',
+  'Cash',
   'Coop',
   'Hibret',
   'Zemen',
@@ -17,9 +20,7 @@ export const ETHIOPIAN_BANKS = [
   'Sinqee',
   'Amhara',
   'Oromia',
-  'Telebirr',
   'CBE Birr',
-  'Cash',
   'Check',
 ] as const
 

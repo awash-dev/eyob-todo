@@ -1,4 +1,5 @@
 import { neon, neonConfig } from '@neondatabase/serverless'
+import type { NeonQueryFunction } from '@neondatabase/serverless'
 import type { CurrencyCode, LedgerRecord, RateMode } from '../types/ledger'
 
 // Suppress browser direct SQL warning
@@ -11,9 +12,9 @@ export const getDbUrl = (): string => {
   return import.meta.env.VITE_DATABASE_URL || DEFAULT_DB_URL
 }
 
-let sqlClient: ReturnType<typeof neon> | null = null
+let sqlClient: NeonQueryFunction<false, false> | null = null
 
-export function getSql() {
+export function getSql(): NeonQueryFunction<false, false> {
   if (!sqlClient) {
     const url = getDbUrl()
     sqlClient = neon(url, { disableWarningInBrowsers: true })

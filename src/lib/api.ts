@@ -1,10 +1,12 @@
 import { neon, neonConfig } from '@neondatabase/serverless'
+import type { NeonQueryFunction } from '@neondatabase/serverless'
 import type {
   AccountSummary,
   AuthUser,
   LedgerRecord,
   Shop,
   Statement,
+  StatementEntry,
   TabType,
 } from '../types/ledger'
 
@@ -18,9 +20,9 @@ export const getDbUrl = (): string => {
   return import.meta.env.VITE_DATABASE_URL || DEFAULT_DB_URL
 }
 
-let sqlClient: ReturnType<typeof neon> | null = null
+let sqlClient: NeonQueryFunction<false, false> | null = null
 
-export function getSql() {
+export function getSql(): NeonQueryFunction<false, false> {
   if (!sqlClient) {
     const url = getDbUrl()
     sqlClient = neon(url, { disableWarningInBrowsers: true })
@@ -117,6 +119,20 @@ async function hashPasswordWithSalt(password: string): Promise<string> {
   return `sha256:${salt}:${hash}`
 }
 
+/**
+ * Normalizes an Ethiopian phone number to canonical E.164 form (+2519XXXXXXXX).
+ *
+ * Accepts: 0911111111, 911111111, +251911111111, 251911111111, dashed/spaced forms.
+ * Returns null when the input is not a valid Ethiopian mobile number.
+ */
+export function normalizePhone(input: string): string | null {
+  let digits = input.replace(/[\s\-().]/g, '')
+  if (digits.startsWith('+')) digits = digits.slice(1)
+  if (digits.startsWith('251')) digits = `0${digits.slice(3)}`
+  if (!/^0[79]\d{8}$/.test(digits)) return null
+  return `+251${digits.slice(1)}`
+}
+
 /* ------------------------------- Auth ------------------------------- */
 
 export interface LoginResponse {
@@ -125,18 +141,21 @@ export interface LoginResponse {
   shop: { id: string; name: string } | null
 }
 
-export async function login(email: string, password: string): Promise<LoginResponse> {
-  const cleanEmail = email.trim().toLowerCase()
+export async function login(phone: string, password: string): Promise<LoginResponse> {
+  const cleanPhone = normalizePhone(phone)
+  if (!cleanPhone) {
+    throw new ApiError(400, 'Enter a valid Ethiopian phone number (e.g. 0911111111)')
+  }
   const sql = getSql()
 
   let rows: any[] = []
   try {
     rows = await sql`
-      SELECT u.id, u.name, u.email, u.password_hash, u.role, u.shop_id, u.active,
+      SELECT u.id, u.name, u.email, u.phone, u.password_hash, u.role, u.shop_id, u.active,
              sh.name AS shop_name
       FROM users u
       LEFT JOIN shops sh ON sh.id = u.shop_id
-      WHERE LOWER(u.email) = ${cleanEmail}
+      WHERE u.phone = ${cleanPhone}
       LIMIT 1
     `
   } catch (err) {
@@ -145,7 +164,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
   }
 
   if (rows.length === 0) {
-    throw new ApiError(401, 'Invalid email or password')
+    throw new ApiError(401, 'Invalid phone number or password')
   }
 
   const row = rows[0]
@@ -156,13 +175,14 @@ export async function login(email: string, password: string): Promise<LoginRespo
   const storedHash = String(row.password_hash || '')
   const isValid = await verifyPassword(password, storedHash)
   if (!isValid) {
-    throw new ApiError(401, 'Invalid email or password')
+    throw new ApiError(401, 'Invalid phone number or password')
   }
 
   const user: AuthUser = {
     id: String(row.id),
     name: String(row.name),
-    email: String(row.email),
+    phone: String(row.phone),
+    email: row.email ? String(row.email) : undefined,
     role: row.role === 'admin' ? 'admin' : 'shopkeeper',
     shopId: row.shop_id ? String(row.shop_id) : null,
     shopName: row.shop_name ? String(row.shop_name) : null,
@@ -258,7 +278,8 @@ export async function deleteShop(id: string): Promise<{ ok: boolean; deleted: st
 export interface Shopkeeper {
   id: string
   name: string
-  email: string
+  phone: string
+  email?: string
   role: 'shopkeeper'
   shopId: string | null
   shopName: string | null
@@ -269,7 +290,7 @@ export interface Shopkeeper {
 export async function getUsers(): Promise<{ users: Shopkeeper[] }> {
   const sql = getSql()
   const rows = await sql`
-    SELECT u.id, u.name, u.email, u.role, u.shop_id, u.active, u.created_at,
+    SELECT u.id, u.name, u.email, u.phone, u.role, u.shop_id, u.active, u.created_at,
            sh.name AS shop_name
     FROM users u
     LEFT JOIN shops sh ON sh.id = u.shop_id
@@ -280,7 +301,8 @@ export async function getUsers(): Promise<{ users: Shopkeeper[] }> {
   const users: Shopkeeper[] = rows.map((r: any) => ({
     id: String(r.id),
     name: String(r.name),
-    email: String(r.email),
+    phone: r.phone ? String(r.phone) : '',
+    email: r.email ? String(r.email) : undefined,
     role: 'shopkeeper',
     shopId: r.shop_id ? String(r.shop_id) : null,
     shopName: r.shop_name ? String(r.shop_name) : null,
@@ -293,25 +315,36 @@ export async function getUsers(): Promise<{ users: Shopkeeper[] }> {
 
 export async function createUser(input: {
   name: string
-  email: string
+  phone: string
   password: string
   shopId: string
 }): Promise<{ user: Shopkeeper }> {
+  const cleanPhone = normalizePhone(input.phone)
+  if (!cleanPhone) {
+    throw new ApiError(400, 'Enter a valid Ethiopian phone number (e.g. 0911111111)')
+  }
+
   const sql = getSql()
+
+  const existing = await sql`SELECT id FROM users WHERE phone = ${cleanPhone} LIMIT 1`
+  if (existing.length > 0) {
+    throw new ApiError(409, `A shopkeeper with phone ${cleanPhone} already exists`)
+  }
+
   const id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   const hash = await hashPasswordWithSalt(input.password)
   const now = Date.now()
 
   await sql`
-    INSERT INTO users (id, name, email, password_hash, role, shop_id, active, created_at)
-    VALUES (${id}, ${input.name}, ${input.email.toLowerCase()}, ${hash}, 'shopkeeper', ${input.shopId || null}, true, ${now})
+    INSERT INTO users (id, name, email, phone, password_hash, role, shop_id, active, created_at)
+    VALUES (${id}, ${input.name}, NULL, ${cleanPhone}, ${hash}, 'shopkeeper', ${input.shopId || null}, true, ${now})
   `
 
   return {
     user: {
       id,
       name: input.name,
-      email: input.email.toLowerCase(),
+      phone: cleanPhone,
       role: 'shopkeeper',
       shopId: input.shopId || null,
       shopName: null,
@@ -325,6 +358,7 @@ export async function updateUser(
   id: string,
   input: Partial<{
     name: string
+    phone: string
     password: string
     shopId: string
     active: boolean
@@ -334,6 +368,17 @@ export async function updateUser(
 
   if (input.name !== undefined) {
     await sql`UPDATE users SET name = ${input.name} WHERE id = ${id}`
+  }
+  if (input.phone !== undefined && input.phone !== '') {
+    const cleanPhone = normalizePhone(input.phone)
+    if (!cleanPhone) {
+      throw new ApiError(400, 'Enter a valid Ethiopian phone number (e.g. 0911111111)')
+    }
+    const clash = await sql`SELECT id FROM users WHERE phone = ${cleanPhone} AND id != ${id} LIMIT 1`
+    if (clash.length > 0) {
+      throw new ApiError(409, `Another shopkeeper already uses phone ${cleanPhone}`)
+    }
+    await sql`UPDATE users SET phone = ${cleanPhone} WHERE id = ${id}`
   }
   if (input.shopId !== undefined) {
     await sql`UPDATE users SET shop_id = ${input.shopId} WHERE id = ${id}`
@@ -347,7 +392,7 @@ export async function updateUser(
   }
 
   const rows = await sql`
-    SELECT u.id, u.name, u.email, u.role, u.shop_id, u.active, u.created_at,
+    SELECT u.id, u.name, u.email, u.phone, u.role, u.shop_id, u.active, u.created_at,
            sh.name AS shop_name
     FROM users u
     LEFT JOIN shops sh ON sh.id = u.shop_id
@@ -359,7 +404,8 @@ export async function updateUser(
   const user: Shopkeeper = {
     id: String(r.id),
     name: String(r.name),
-    email: String(r.email),
+    phone: r.phone ? String(r.phone) : '',
+    email: r.email ? String(r.email) : undefined,
     role: 'shopkeeper',
     shopId: r.shop_id ? String(r.shop_id) : null,
     shopName: r.shop_name ? String(r.shop_name) : null,
@@ -515,6 +561,8 @@ export async function getAccounts(
 ): Promise<{ accounts: AccountSummary[] }> {
   const { records } = await getRecords(type, shopId)
   const map = new Map<string, AccountSummary>()
+  const finalShopId = shopId || 'shop-1'
+  const shopName = finalShopId === 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato'
 
   for (const r of records) {
     const key = r.title.trim().toLowerCase()
@@ -522,17 +570,20 @@ export async function getAccounts(
     if (!existing) {
       existing = {
         name: r.title.trim(),
+        type,
+        shopId: finalShopId,
+        shopName,
+        recordCount: 0,
         totalDebit: 0,
         totalCredit: 0,
-        netBalance: 0,
-        entryCount: 0,
-        lastTransactionDate: r.date,
+        outstanding: 0,
+        lastDate: r.date,
       }
       map.set(key, existing)
     }
-    existing.entryCount++
-    if (new Date(r.date) > new Date(existing.lastTransactionDate)) {
-      existing.lastTransactionDate = r.date
+    existing.recordCount++
+    if (new Date(r.date) > new Date(existing.lastDate)) {
+      existing.lastDate = r.date
     }
     for (const it of r.items) {
       const qty = Number(it.quantity) || 0
@@ -541,7 +592,7 @@ export async function getAccounts(
       if (it.sign === '+') existing.totalDebit += subtotal
       else existing.totalCredit += subtotal
     }
-    existing.netBalance = existing.totalDebit - existing.totalCredit
+    existing.outstanding = existing.totalDebit - existing.totalCredit
   }
 
   return { accounts: Array.from(map.values()) }
@@ -556,8 +607,10 @@ export async function getStatement(
   const matching = records.filter(
     (r) => r.title.trim().toLowerCase() === name.trim().toLowerCase(),
   )
-  const lines: any[] = []
+  const entries: StatementEntry[] = []
   let running = 0
+  let totalDebit = 0
+  let totalCredit = 0
 
   for (const r of matching) {
     for (const it of r.items) {
@@ -566,25 +619,54 @@ export async function getStatement(
       const amount = Math.abs(qty * price)
       const debit = it.sign === '+' ? amount : 0
       const credit = it.sign === '-' ? amount : 0
+      totalDebit += debit
+      totalCredit += credit
       running += debit - credit
-      lines.push({
-        id: it.id || `line-${lines.length}`,
+      entries.push({
+        recordId: r.id,
+        itemId: it.id,
         date: r.date,
         description: it.name || r.title,
-        bankOrStock: it.bankOrChannel || it.customType || 'Direct',
+        quantity: qty,
+        unitPrice: price,
         debit,
         credit,
-        runningBalance: running,
+        balance: running,
+        paymentMethod: it.paymentMethod ?? null,
+        reference: it.reference ?? null,
+        notes: r.notes ?? null,
       })
     }
   }
+
+  const finalShopId = shopId || 'shop-1'
+  const outstanding =
+    type === 'customer' ? totalDebit - totalCredit : totalCredit - totalDebit
 
   return {
     statement: {
       accountName: name,
       accountType: type,
-      lines,
-      currentBalance: running,
+      shopId: finalShopId,
+      shopName: finalShopId === 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato',
+      entries,
+      payments: entries
+        .filter((e) => (type === 'customer' ? e.credit > 0 : e.debit > 0))
+        .map((e) => ({
+          date: e.date,
+          amount: type === 'customer' ? e.credit : e.debit,
+          paymentMethod: e.paymentMethod,
+          reference: e.reference,
+          notes: e.notes,
+          description: e.description,
+          recordId: e.recordId,
+        })),
+      totals: {
+        totalDebit,
+        totalCredit,
+        outstanding,
+        entryCount: entries.length,
+      },
     },
   }
 }
@@ -595,6 +677,6 @@ export async function getSettings(): Promise<{ settings: Record<string, unknown>
   return { settings: {} }
 }
 
-export async function saveSetting(key: string, value: unknown): Promise<{ ok: boolean }> {
+export async function saveSetting(_key: string, _value: unknown): Promise<{ ok: boolean }> {
   return { ok: true }
 }
