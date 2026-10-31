@@ -1,4 +1,4 @@
-import { ArrowUpDown, CircleX, FolderOpen, Plus, Search, Store } from 'lucide-react'
+import { CircleX, FolderOpen, Plus, Search, Store } from 'lucide-react'
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { LedgerProvider, useLedger } from '../context/LedgerContext'
@@ -8,7 +8,6 @@ import { Sidebar } from '../components/layout/Sidebar'
 import { MobileBottomNav } from '../components/layout/MobileBottomNav'
 import { RecordCard } from '../components/ledger/RecordCard'
 import { RecordModal } from '../components/ledger/RecordModal'
-import { ExportDialog } from '../components/ledger/ExportDialog'
 import { PrintView } from '../components/ledger/PrintView'
 import { ToastContainer } from '../components/ledger/ToastContainer'
 import { Button } from '../components/ui/button'
@@ -28,7 +27,6 @@ function AppContentWrapper() {
 }
 
 function MainAppView() {
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   const { activeShop } = useAuth()
   const [sortBy, setSortBy] = useState<
     'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
@@ -120,19 +118,8 @@ function MainAppView() {
             )}
           </div>
 
-          {/* Right: Export & Add Entry Buttons */}
+          {/* Right: Add Entry Button */}
           <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsExportDialogOpen(true)}
-              className="text-xs h-8 px-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
-              title="Export (Excel, JSON, PDF) & Import"
-            >
-              <ArrowUpDown size={14} />
-              <span>Export / Import</span>
-            </Button>
-
             <Button
               onClick={() => openCreateModal(activeTab)}
               size="sm"
@@ -225,10 +212,6 @@ function MainAppView() {
 
       {/* Modals & Portals */}
       <RecordModal />
-      <ExportDialog
-        isOpen={isExportDialogOpen}
-        onClose={() => setIsExportDialogOpen(false)}
-      />
       <ToastContainer />
 
         {/* Print View (visible only during browser printing) */}
