@@ -11,3 +11,8 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# Local build artifacts
+apk/
+*.apk
+*.aab
