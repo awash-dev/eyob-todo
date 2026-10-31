@@ -300,12 +300,12 @@ class _StatementScreenState extends State<StatementScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: isCustomer
-                            ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                            ? (isDark ? const Color(0xFF1E1B4B) : const Color(0xFFEEF2FF))
                             : (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF)),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: isCustomer
-                              ? (isDark ? const Color(0xFF059669) : const Color(0xFFA7F3D0))
+                              ? (isDark ? const Color(0xFF4F46E5) : const Color(0xFFC7D2FE))
                               : (isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE)),
                         ),
                       ),
@@ -315,7 +315,7 @@ class _StatementScreenState extends State<StatementScreen> {
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: isCustomer
-                              ? (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669))
+                              ? (isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5))
                               : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
                         ),
                       ),
@@ -657,7 +657,7 @@ class _StatementScreenState extends State<StatementScreen> {
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: entry.balance >= 0
-                                    ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                    ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB))
                                     : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
                               ),
                             ),
@@ -751,7 +751,7 @@ class _StatementScreenState extends State<StatementScreen> {
                             fontWeight: FontWeight.w900,
                             fontSize: 11.5,
                             color: st.totals.outstanding >= 0
-                                ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB))
                                 : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
                           ),
                         ),
@@ -829,7 +829,7 @@ class _StatementScreenState extends State<StatementScreen> {
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
                   color: st.totals.outstanding >= 0
-                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                      ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB))
                       : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
                 ),
               ),

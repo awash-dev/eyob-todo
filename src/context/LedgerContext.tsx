@@ -85,13 +85,26 @@ function writeCache(shopId: string | null, records: LedgerRecord[]) {
 export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { activeShopId } = useAuth()
+  const { activeShopId, user } = useAuth()
 
   const [records, setRecords] = useState<LedgerRecord[]>(() =>
     readCache(activeShopId),
   )
 
-  const [activeTab, setActiveTab] = useState<TabType>('customer')
+  const [activeTab, setActiveTabState] = useState<TabType>(() =>
+    user?.role === 'shopkeeper' ? 'stock' : 'customer',
+  )
+
+  const setActiveTab = useCallback(
+    (tab: TabType) => {
+      if (user?.role === 'shopkeeper') {
+        setActiveTabState('stock')
+        return
+      }
+      setActiveTabState(tab)
+    },
+    [user?.role],
+  )
   const [searchQuery, setSearchQuery] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')

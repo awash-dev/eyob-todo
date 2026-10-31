@@ -2,12 +2,15 @@ import type { LineItem, TabType } from '../types/ledger'
 
 export const ETHIOPIAN_BANKS = [
   'CBE',
+  'CBE Birr',
   'Awash',
   'Dashen',
   'BoA',
+  'Abyssinia',
   'Pawza',
   'Telebirr',
-  'Cash',
+  'Amhara',
+  'Oromia',
   'Coop',
   'Hibret',
   'Zemen',
@@ -18,10 +21,9 @@ export const ETHIOPIAN_BANKS = [
   'Bunna',
   'Enat',
   'Sinqee',
-  'Amhara',
-  'Oromia',
-  'CBE Birr',
+  'Cash',
   'Check',
+  'Other',
 ] as const
 
 export interface ItemTypeInfo {

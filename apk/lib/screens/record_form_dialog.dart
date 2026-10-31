@@ -209,11 +209,18 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
       String itemName = f.nameController.text.trim();
 
+      // Resolved bank/channel name (uses custom text when "Other" is selected)
+      final bankName = isDebit
+          ? null
+          : (f.typeOrBank == 'Other'
+              ? (f.bankCustomController.text.trim().isNotEmpty
+                  ? f.bankCustomController.text.trim()
+                  : 'Other')
+              : f.typeOrBank);
+
       // If credit (payment), ensure item description indicates the bank
       if (!isDebit) {
-        if (itemName.isEmpty) {
-          itemName = 'Payment via ${f.typeOrBank}';
-        }
+        itemName = 'Payment via $bankName';
         qty = 1.0;
       } else {
         if (unitName == 'Carton' && ctns != null && ctns > 0 && pcs != null && pcs > 0) {
@@ -227,8 +234,11 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
         unitPrice: price,
         quantity: qty,
         sign: f.sign,
-        bank: !isDebit ? f.typeOrBank : null,
-        paymentMethod: !isDebit ? f.typeOrBank : null,
+        bank: bankName,
+        paymentMethod: bankName,
+        reference: !isDebit && _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : null,
         customType: isDebit ? 'Goods' : null,
         cartons: isDebit ? ctns : null,
         pcsPerCarton: isDebit ? pcs : null,
@@ -268,14 +278,14 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     // Title label
     final headerTitle = widget.editingRecord == null
         ? (isStock
-            ? 'Stock In (Storekeeper)'
+            ? 'Store In (Storekeeper)'
             : isCustomer
                 ? 'Customer Credit Entry'
                 : isDelala
                     ? 'Delala (Broker) Entry'
                     : 'Supplier Credit Entry')
         : (isStock
-            ? 'Edit Stock Entry'
+            ? 'Edit Store Entry'
             : isCustomer
                 ? 'Edit Customer Entry'
                 : isDelala
@@ -446,11 +456,11 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                               decoration: BoxDecoration(
                                 color: isDebit
-                                    ? const Color(0xFF006948).withValues(alpha: 0.12)
+                                    ? const Color(0xFF2563EB).withValues(alpha: 0.12)
                                     : inputFill,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: isDebit ? const Color(0xFF006948) : inputBorder,
+                                  color: isDebit ? const Color(0xFF2563EB) : inputBorder,
                                   width: isDebit ? 1.8 : 1.0,
                                 ),
                               ),
@@ -460,7 +470,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                   Icon(
                                     Icons.add_shopping_cart,
                                     size: 16,
-                                    color: isDebit ? const Color(0xFF006948) : Colors.grey,
+                                    color: isDebit ? const Color(0xFF2563EB) : Colors.grey,
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
@@ -470,7 +480,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                       fontSize: 10.5,
                                       fontWeight: isDebit ? FontWeight.w900 : FontWeight.w600,
                                       color: isDebit
-                                          ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                                          ? (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB))
                                           : Colors.grey,
                                       height: 1.15,
                                     ),
@@ -540,8 +550,8 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
                   // 4A. If Debit (+) Goods / Delivery / Consignment
                   if (isDebit) ...[
-                    // Item Field
-                    _buildFieldLabel('Item / Description (የዕቃው አይነት)', isDark),
+                    // Item Field (Clean Single Label matching Stitch UI)
+                    _buildFieldLabel('Item (የዕቃ ስም)', isDark),
                     const SizedBox(height: 6),
                     Autocomplete<String>(
                       initialValue: TextEditingValue(text: currentItem.nameController.text),
@@ -568,7 +578,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                             color: theme.colorScheme.onSurface,
                           ),
                           decoration: InputDecoration(
-                            hintText: '12W Safari or 2.5 bmt',
+                            hintText: '12W Safari',
                             hintStyle: TextStyle(
                               fontSize: 13,
                               color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
@@ -749,7 +759,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           fontSize: 14.5,
                           fontWeight: FontWeight.w900,
                           color: calculatedTotal > 0
-                              ? (isDark ? const Color(0xFF68DBA9) : const Color(0xFF006948))
+                              ? (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB))
                               : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                         ),
                       ),
@@ -788,6 +798,32 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                         ),
                       ),
                     ),
+
+                    // Custom bank / channel name field if "Other" selected
+                    if (currentItem.typeOrBank == 'Other') ...[
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: currentItem.bankCustomController,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Specify Bank / Channel (e.g. Amole, POA, M-Pesa)',
+                          labelStyle: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          filled: true,
+                          fillColor: inputFill,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 14),
 
                     // Payment Amount (ETB)
@@ -812,25 +848,6 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                       ),
                       onChanged: (_) => setState(() {}),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Enter payment amount' : null,
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Payment Reference / Slip Note
-                    _buildFieldLabel('Payment Reference / Slip # (የደረሰኝ ቁጥር)', isDark),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: currentItem.nameController,
-                      style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface),
-                      decoration: InputDecoration(
-                        hintText: 'e.g. CBE 22/12/17 or AWASHI 4/2/2018',
-                        hintStyle: TextStyle(fontSize: 12.5, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        filled: true,
-                        fillColor: inputFill,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
-                      ),
                     ),
                     const SizedBox(height: 14),
                   ],
@@ -1019,18 +1036,30 @@ class LineItemFormItem {
                 ? cVal.toInt().toString()
                 : cVal.toString())
             : '');
+    bankCustomController = TextEditingController(text: customBankName);
   }
 
   factory LineItemFormItem.fromLineItem(LineItem item) {
+    final isCredit = item.sign == '-';
+    final rawBank = isCredit
+        ? (item.bank ?? item.paymentMethod ?? 'CBE')
+        : (item.customType ?? 'Store');
+    var typeOrBank = rawBank;
+    var customBankName = '';
+    // A saved bank name that isn't in the dropdown list (custom input or
+    // legacy 'Other Bank') maps to the "Other" option with the name prefilled.
+    if (isCredit && !_RecordFormDialogState._bankOptions.contains(rawBank)) {
+      typeOrBank = 'Other';
+      if (rawBank != 'Other Bank') customBankName = rawBank;
+    }
     return LineItemFormItem(
       id: item.id,
       name: item.name,
       unitPrice: item.unitPrice,
       quantity: item.quantity,
       sign: item.sign,
-      typeOrBank: item.sign == '-'
-          ? (item.bank ?? item.paymentMethod ?? 'CBE')
-          : (item.customType ?? 'Stock'),
+      typeOrBank: typeOrBank,
+      customBankName: customBankName,
       packagingUnit: item.packagingUnit ?? (item.cartons != null && item.cartons! > 0 ? 'Carton' : 'Pcs'),
       cartons: item.cartons,
       pcsPerCarton: item.pcsPerCarton,
@@ -1045,5 +1074,6 @@ class LineItemFormItem {
     cartonsController.dispose();
     pcsController.dispose();
     customsController.dispose();
+    bankCustomController.dispose();
   }
 }

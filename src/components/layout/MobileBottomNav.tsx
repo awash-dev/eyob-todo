@@ -1,11 +1,18 @@
 import { Building2, Handshake, Layers, Plus, Users } from 'lucide-react'
 import React from 'react'
 import { useLedger } from '../../context/LedgerContext'
+import { useAuth } from '../../context/AuthContext'
 import type { TabType } from '../../types/ledger'
 
 export const MobileBottomNav: React.FC = () => {
   const { activeTab, setActiveTab, tabRecordCounts, openCreateModal } =
     useLedger()
+  const { user } = useAuth()
+
+  // Storekeeper handles only stock; bottom navigation is not needed
+  if (user?.role === 'shopkeeper') {
+    return null
+  }
 
   const tabs: {
     id: TabType

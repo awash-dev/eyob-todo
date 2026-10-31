@@ -40,8 +40,8 @@ class MerkatoCreditApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF059669),
-          primary: const Color(0xFF059669),
+          seedColor: const Color(0xFF2563EB),
+          primary: const Color(0xFF2563EB),
           surface: Colors.white,
           onSurface: const Color(0xFF0F172A),
           brightness: Brightness.light,
@@ -70,7 +70,7 @@ class MerkatoCreditApp extends StatelessWidget {
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: Colors.white,
-          selectedItemColor: Color(0xFF059669),
+          selectedItemColor: Color(0xFF2563EB),
           unselectedItemColor: Color(0xFF64748B),
           elevation: 8,
         ),
@@ -79,8 +79,8 @@ class MerkatoCreditApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF059669),
-          primary: const Color(0xFF10B981),
+          seedColor: const Color(0xFF2563EB),
+          primary: const Color(0xFF3B82F6),
           surface: const Color(0xFF1E1E1E),
           onSurface: const Color(0xFFF8FAFC),
           brightness: Brightness.dark,
@@ -108,7 +108,7 @@ class MerkatoCreditApp extends StatelessWidget {
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: Color(0xFF1E1E1E),
-          selectedItemColor: Color(0xFF10B981),
+          selectedItemColor: Color(0xFF3B82F6),
           unselectedItemColor: Color(0xFF94A3B8),
           elevation: 8,
         ),

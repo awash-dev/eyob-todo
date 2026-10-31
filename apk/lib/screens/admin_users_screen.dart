@@ -98,7 +98,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
+                  backgroundColor: const Color(0xFF2563EB),
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
@@ -211,7 +211,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
+                  backgroundColor: const Color(0xFF2563EB),
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
@@ -287,12 +287,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                             leading: CircleAvatar(
                               backgroundColor: u.active
-                                  ? (isShop1 ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF))
+                                  ? (isShop1 ? const Color(0xFFEEF2FF) : const Color(0xFFEFF6FF))
                                   : const Color(0xFFF1F5F9),
                               child: Icon(
                                 Icons.storefront,
                                 color: u.active
-                                    ? (isShop1 ? const Color(0xFF059669) : const Color(0xFF2563EB))
+                                    ? (isShop1 ? const Color(0xFF4F46E5) : const Color(0xFF2563EB))
                                     : Colors.grey,
                               ),
                             ),
@@ -310,10 +310,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: isShop1 ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                                    color: isShop1 ? const Color(0xFFEEF2FF) : const Color(0xFFEFF6FF),
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
-                                      color: isShop1 ? const Color(0xFFA7F3D0) : const Color(0xFFBFDBFE),
+                                      color: isShop1 ? const Color(0xFFC7D2FE) : const Color(0xFFBFDBFE),
                                     ),
                                   ),
                                   child: Text(
@@ -321,7 +321,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
-                                      color: isShop1 ? const Color(0xFF059669) : const Color(0xFF2563EB),
+                                      color: isShop1 ? const Color(0xFF4F46E5) : const Color(0xFF2563EB),
                                     ),
                                   ),
                                 ),
@@ -336,7 +336,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    color: u.active ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                                    color: u.active ? const Color(0xFF2563EB) : const Color(0xFFDC2626),
                                   ),
                                 ),
                               ],

@@ -99,9 +99,12 @@ export const Sidebar: React.FC = () => {
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           <p className="px-2 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Ledger
+            {user?.role === 'shopkeeper' ? 'Store' : 'Ledger'}
           </p>
-          {tabs.map((tab) => {
+          {(user?.role === 'shopkeeper'
+            ? tabs.filter((t) => t.id === 'stock')
+            : tabs
+          ).map((tab) => {
             const isActive = activeTab === tab.id
             return (
               <button
