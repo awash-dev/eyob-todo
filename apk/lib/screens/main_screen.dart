@@ -32,6 +32,17 @@ class _MainScreenState extends State<MainScreen> {
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
+  // Records collapsed by default (tap header to expand) — mobile friendly cards
+  final Set<String> _expandedRecordIds = <String>{};
+
+  void _toggleRecordExpanded(String id) {
+    setState(() {
+      if (!_expandedRecordIds.remove(id)) {
+        _expandedRecordIds.add(id);
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -450,57 +461,65 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.table_view_outlined,
-                    size: 16,
-                    color: Color(0xFF2563EB),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Statement Summary',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13.5,
-                      color: theme.colorScheme.onSurface,
+              Flexible(
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.table_view_outlined,
+                      size: 16,
+                      color: Color(0xFF2563EB),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Statement Summary',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    balanceTitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  children: [
+                    Text(
+                      balanceTitle,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'ETB ${_currencyFormat.format(netBalance)}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.2,
-                      color: netBalance >= 0
-                          ? (isDark
-                                ? const Color(0xFF93C5FD)
-                                : const Color(0xFF2563EB))
-                          : (isDark
-                                ? const Color(0xFFFFB4AB)
-                                : const Color(0xFFBA1A1A)),
+                    Text(
+                      'ETB ${_currencyFormat.format(netBalance)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.2,
+                        color: netBalance >= 0
+                            ? (isDark
+                                  ? const Color(0xFF93C5FD)
+                                  : const Color(0xFF2563EB))
+                            : (isDark
+                                  ? const Color(0xFFFFB4AB)
+                                  : const Color(0xFFBA1A1A)),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -584,6 +603,48 @@ class _MainScreenState extends State<MainScreen> {
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
         ),
       ],
+    );
+  }
+
+  /// Small label/value chip used inside mobile store item cards
+  Widget _buildInfoChip(
+    String label,
+    String value,
+    bool isDark, {
+    Color? valueColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E2638) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 11,
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w900,
+              color: valueColor ?? (isDark ? Colors.white : Colors.black87),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -862,289 +923,135 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
 
-                  // Excel Spreadsheet Table (fits width — no horizontal scroll)
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.topLeft,
-                    child: DataTable(
-                      horizontalMargin: 10,
-                      columnSpacing: 10,
-                      headingRowHeight: 36,
-                      dataRowMinHeight: 34,
-                      dataRowMaxHeight: 52,
-                      border: TableBorder(
-                        horizontalInside: BorderSide(
-                          color: gridBorderColor,
-                          width: 0.8,
-                        ),
-                        verticalInside: BorderSide(
-                          color: gridBorderColor,
-                          width: 0.8,
-                        ),
-                      ),
-                      headingRowColor: WidgetStateProperty.all(
-                        isDark
-                            ? const Color(0xFF1E2638)
-                            : const Color(0xFFE2E8F0),
-                      ),
-                      columns: const [
-                        DataColumn(
-                          label: Text(
-                            '#',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                        DataColumn(
-                          label: Text(
-                            'Item (የዕቃ ስም)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                        DataColumn(
-                          numeric: true,
-                          label: Text(
-                            'Cartons (ካርቶን)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                        DataColumn(
-                          numeric: true,
-                          label: Text(
-                            'Pcs/Ctn (በካርቶን)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                        DataColumn(
-                          numeric: true,
-                          label: Text(
-                            'Available Qty (አጠቃላይ ብዛት)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                              color: Color(0xFF2563EB),
-                            ),
-                          ),
-                        ),
-                        DataColumn(
-                          numeric: true,
-                          label: Text(
-                            'Unit Price (ዋጋ ETB)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                        DataColumn(
-                          numeric: true,
-                          label: Text(
-                            'Total Value (ጠቅላላ ዋጋ)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                              color: Color(0xFF2563EB),
-                            ),
-                          ),
-                        ),
-                        DataColumn(
-                          label: Text(
-                            'Date Added',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                        DataColumn(
-                          label: Text(
-                            'Actions',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                      rows: items.asMap().entries.map((entry) {
+                  // Mobile-friendly item cards (clear display on phones — no squeeze)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    child: Column(
+                      children: items.asMap().entries.map((entry) {
                         final idx = entry.key + 1;
                         final it = entry.value;
+                        final qtyColor = it.isOut
+                            ? const Color(0xFFBA1A1A)
+                            : const Color(0xFF2563EB);
 
-                        return DataRow(
-                          cells: [
-                            // # (Index)
-                            DataCell(
-                              Text(
-                                '$idx',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF161D2E)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF2E384D)
+                                  : const Color(0xFFE2E8F0),
                             ),
-
-                            // Item Name
-                            DataCell(
-                              Column(
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Row 1: index + name + IN/OUT chip + notes + actions
+                              Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          it.itemName,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 11.5,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 4,
-                                          vertical: 1,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: it.isOut
-                                              ? const Color(0xFFFEF2F2)
-                                              : const Color(0xFFEFF6FF),
-                                          borderRadius: BorderRadius.circular(4),
-                                          border: Border.all(
-                                            color: it.isOut
-                                                ? const Color(0xFFFCA5A5)
-                                                : const Color(0xFFBFDBFE),
-                                            width: 0.8,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          it.isOut ? 'OUT' : 'IN',
-                                          style: TextStyle(
-                                            fontSize: 8,
-                                            fontWeight: FontWeight.w900,
-                                            color: it.isOut
-                                                ? const Color(0xFFBA1A1A)
-                                                : const Color(0xFF2563EB),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (it.notes != null && it.notes!.isNotEmpty)
-                                    Text(
-                                      it.notes!,
-                                      overflow: TextOverflow.ellipsis,
+                                  Container(
+                                    width: 22,
+                                    height: 22,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: qtyColor.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      '$idx',
                                       style: TextStyle(
-                                        fontSize: 9.5,
-                                        color: isDark
-                                            ? const Color(0xFF94A3B8)
-                                            : const Color(0xFF64748B),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: qtyColor,
                                       ),
                                     ),
-                                ],
-                              ),
-                            ),
-
-                            // Cartons
-                            DataCell(
-                              Text(
-                                it.cartons > 0
-                                    ? it.cartons.toInt().toString()
-                                    : '-',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-
-                            // Pcs / Carton
-                            DataCell(
-                              Text(
-                                it.pcsPerCarton > 0
-                                    ? it.pcsPerCarton.toInt().toString()
-                                    : '-',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-
-                            // Total Qty (signed: negative for Stock Out)
-                            DataCell(
-                              Text(
-                                '${it.signedQty.toInt()} ${it.packagingUnit == "Carton" ? "pcs" : it.packagingUnit}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
-                                  fontWeight: FontWeight.bold,
-                                  color: it.isOut
-                                      ? const Color(0xFFBA1A1A)
-                                      : const Color(0xFF2563EB),
-                                ),
-                              ),
-                            ),
-
-                            // Unit Price
-                            DataCell(
-                              Text(
-                                _currencyFormat.format(it.unitPrice),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-
-                            // Total Value (signed: negative for Stock Out)
-                            DataCell(
-                              Text(
-                                _currencyFormat.format(it.signedValue),
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontFamily: 'monospace',
-                                  fontWeight: FontWeight.w900,
-                                  color: it.isOut
-                                      ? const Color(0xFFBA1A1A)
-                                      : const Color(0xFF2563EB),
-                                ),
-                              ),
-                            ),
-
-                            // Date Added
-                            DataCell(
-                              Text(
-                                it.date,
-                                style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-
-                            // Actions
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
+                                  ),
+                                  const SizedBox(width: 7),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                it.itemName,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 13.5,
+                                                  color:
+                                                      theme
+                                                          .colorScheme
+                                                          .onSurface,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 5,
+                                                    vertical: 1.5,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: it.isOut
+                                                    ? const Color(0xFFFEF2F2)
+                                                    : const Color(0xFFEFF6FF),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color: it.isOut
+                                                      ? const Color(0xFFFCA5A5)
+                                                      : const Color(0xFFBFDBFE),
+                                                  width: 0.7,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                it.isOut ? 'OUT −' : 'IN +',
+                                                style: TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: qtyColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (it.notes != null &&
+                                            it.notes!.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 2,
+                                            ),
+                                            child: Text(
+                                              it.notes!,
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                color: isDark
+                                                    ? const Color(0xFF94A3B8)
+                                                    : const Color(0xFF64748B),
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
                                   IconButton(
                                     icon: const Icon(
                                       Icons.edit_outlined,
-                                      size: 16,
+                                      size: 17,
                                       color: Color(0xFF2563EB),
                                     ),
                                     padding: EdgeInsets.zero,
@@ -1153,11 +1060,11 @@ class _MainScreenState extends State<MainScreen> {
                                     onPressed: () =>
                                         _openEditRecordDialog(it.record),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 12),
                                   IconButton(
                                     icon: const Icon(
                                       Icons.delete_outline,
-                                      size: 16,
+                                      size: 17,
                                       color: Color(0xFFBA1A1A),
                                     ),
                                     padding: EdgeInsets.zero,
@@ -1167,8 +1074,86 @@ class _MainScreenState extends State<MainScreen> {
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 7),
+
+                              // Row 2: packaging / qty / unit price chips
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  _buildInfoChip(
+                                    'Cartons',
+                                    it.cartons > 0
+                                        ? it.cartons.toInt().toString()
+                                        : '-',
+                                    isDark,
+                                  ),
+                                  _buildInfoChip(
+                                    'Pcs/Ctn',
+                                    it.pcsPerCarton > 0
+                                        ? it.pcsPerCarton.toInt().toString()
+                                        : '-',
+                                    isDark,
+                                  ),
+                                  _buildInfoChip(
+                                    'Available Qty',
+                                    '${it.signedQty.toInt()} ${it.packagingUnit == "Carton" ? "pcs" : it.packagingUnit}',
+                                    isDark,
+                                    valueColor: qtyColor,
+                                  ),
+                                  _buildInfoChip(
+                                    'Unit Price',
+                                    'ETB ${_currencyFormat.format(it.unitPrice)}',
+                                    isDark,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 7),
+
+                              // Row 3: date + total value
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    it.date,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontFamily: 'monospace',
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.end,
+                                    children: [
+                                      const Text(
+                                        'TOTAL VALUE',
+                                        style: TextStyle(
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.6,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                      Text(
+                                        'ETB ${_currencyFormat.format(it.signedValue)}',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w900,
+                                          fontFamily: 'monospace',
+                                          color: qtyColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         );
                       }).toList(),
                     ),
@@ -1240,11 +1225,25 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildRecordTable(LedgerRecord rec, ThemeData theme, bool isDark) {
     double runningBalance = 0;
     final isCustomerOrDelala = rec.type == 'customer' || rec.type == 'delala';
+    final isExpanded = _expandedRecordIds.contains(rec.id);
 
-    // Yellow highlight color for Credit/Payment column matching Column G in reference Excel
-    final paymentBgColor = isDark
-        ? const Color(0xFF382D05)
-        : const Color(0xFFFEF9C3);
+    // Type badge label (mirrors the web record card)
+    final String typeLabel = rec.type == 'customer'
+        ? 'Customer'
+        : rec.type == 'supplier'
+            ? 'Supplier'
+            : rec.type == 'delala'
+                ? 'Delala'
+                : 'Store';
+    final IconData typeIcon = rec.type == 'customer'
+        ? Icons.people_outline
+        : rec.type == 'supplier'
+            ? Icons.local_shipping_outlined
+            : rec.type == 'delala'
+                ? Icons.handshake_outlined
+                : Icons.inventory_2_outlined;
+
+    // Grid border color for card separators
     final gridBorderColor = isDark
         ? const Color(0xFF2E384D)
         : const Color(0xFFCBD5E1);
@@ -1266,335 +1265,348 @@ class _MainScreenState extends State<MainScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Account Name Bar with Balance & Quick Actions
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF242C40) : const Color(0xFFF1F5F9),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(7),
+          // Card Header (mobile friendly): chevron + type badge + name + date | Net Balance + actions
+          InkWell(
+            onTap: () => _toggleRecordExpanded(rec.id),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF242C40) : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
               ),
-              border: Border(
-                bottom: BorderSide(color: gridBorderColor, width: 1.2),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _openStatement(rec),
-                    child: Row(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Expand / Collapse chevron
+                  Icon(
+                    isExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    size: 22,
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 4),
+
+                  // Name, badge, date / notes
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Text(
-                            rec.title,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
-                              color: theme.colorScheme.onSurface,
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(
+                                  color: const Color(0xFFBFDBFE),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    typeIcon,
+                                    size: 11,
+                                    color: const Color(0xFF2563EB),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    typeLabel,
+                                    style: const TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _openStatement(rec),
+                                child: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        rec.title,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 14,
+                                          color: theme.colorScheme.onSurface,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.open_in_new,
+                                      size: 12,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF94A3B8),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          Icons.open_in_new,
-                          size: 13,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF4059AA),
+                        const SizedBox(height: 3),
+                        Text(
+                          rec.notes != null && rec.notes!.isNotEmpty
+                              ? '${rec.date} · ${rec.notes}'
+                              : '${rec.items.length} ${rec.items.length == 1 ? "item" : "items"} · ${rec.date}',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Balance: ',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF64748B),
+                  const SizedBox(width: 6),
+
+                  // Right: Net Balance + actions
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        rec.type == 'stock' ? 'STOCK TOTAL' : 'NET BALANCE',
+                        style: TextStyle(
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
+                        ),
                       ),
-                    ),
-                    Text(
-                      'ETB ${_currencyFormat.format(rec.balance)}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        color: rec.balance >= 0
-                            ? (isDark
-                                  ? const Color(0xFF93C5FD)
-                                  : const Color(0xFF2563EB))
-                            : (isDark
-                                  ? const Color(0xFFFFB4AB)
-                                  : const Color(0xFFBA1A1A)),
+                      const SizedBox(height: 1),
+                      Text(
+                        'ETB ${_currencyFormat.format(rec.balance)}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: rec.balance >= 0
+                              ? (isDark
+                                    ? const Color(0xFF93C5FD)
+                                    : const Color(0xFF2563EB))
+                              : (isDark
+                                    ? const Color(0xFFFFB4AB)
+                                    : const Color(0xFFBA1A1A)),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.more_vert, size: 18),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      tooltip: 'Actions',
-                      onPressed: () => _showRecordActions(rec),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(height: 2),
+                      IconButton(
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        tooltip: 'Actions',
+                        onPressed: () => _showRecordActions(rec),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
 
-          // Excel Spreadsheet Table (fits width — no horizontal scroll)
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.topLeft,
-            child: DataTable(
-              horizontalMargin: 10,
-              columnSpacing: 10,
-              headingRowHeight: 34,
-              dataRowMinHeight: 32,
-              dataRowMaxHeight: 52,
-              border: TableBorder(
-                horizontalInside: BorderSide(
-                  color: gridBorderColor,
-                  width: 0.8,
-                ),
-                verticalInside: BorderSide(color: gridBorderColor, width: 0.8),
-              ),
-              headingRowColor: WidgetStateProperty.all(
-                isDark ? const Color(0xFF1E2638) : const Color(0xFFE2E8F0),
-              ),
-              columns: const [
-                DataColumn(
-                  label: Text(
-                    'Date',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'Item (የዕቃው አይነት)',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
-                  ),
-                ),
-                DataColumn(
-                  numeric: true,
-                  label: Text(
-                    'Ctns',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
-                  ),
-                ),
-                DataColumn(
-                  numeric: true,
-                  label: Text(
-                    'Pcs/Ctn',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
-                  ),
-                ),
-                DataColumn(
-                  numeric: true,
-                  label: Text(
-                    'Price (ዋጋ)',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
-                  ),
-                ),
-                DataColumn(
-                  numeric: true,
-                  label: Text(
-                    'Debit (+) (ዕቃ)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 11,
-                      color: Color(0xFF2563EB),
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  numeric: true,
-                  label: Text(
-                    'Credit (-) (ክፍያ)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 11,
-                      color: Color(0xFFB45309),
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  numeric: true,
-                  label: Text(
-                    'Balance (ቀሪ)',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11),
-                  ),
-                ),
-              ],
-              rows: rec.items.map((item) {
-                final isDebit = item.sign == '+';
-                final subtotal = item.subtotal;
-                if (isCustomerOrDelala) {
-                  if (isDebit) {
-                    runningBalance += subtotal;
+          // Expanded body: vertical item rows (fits phone width, no squeeze)
+          if (isExpanded) ...[
+            Container(height: 1, color: gridBorderColor),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Column(
+                children: rec.items.map((item) {
+                  final isDebit = item.sign == '+';
+                  final subtotal = item.subtotal;
+                  if (isCustomerOrDelala) {
+                    if (isDebit) {
+                      runningBalance += subtotal;
+                    } else {
+                      runningBalance -= subtotal;
+                    }
                   } else {
-                    runningBalance -= subtotal;
+                    if (isDebit) {
+                      runningBalance -= subtotal;
+                    } else {
+                      runningBalance += subtotal;
+                    }
                   }
-                } else {
-                  if (isDebit) {
-                    runningBalance -= subtotal;
-                  } else {
-                    runningBalance += subtotal;
-                  }
-                }
 
-                return DataRow(
-                  cells: [
-                    // Date
-                    DataCell(
-                      Text(
-                        rec.date,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontFamily: 'monospace',
-                        ),
+                  final bank = (item.paymentMethod != null &&
+                          item.paymentMethod!.isNotEmpty)
+                      ? item.paymentMethod
+                      : item.bank;
+                  final ctns = item.cartons ?? 0;
+                  final pcs = item.pcsPerCarton ?? 0;
+                  final hasPack = ctns > 0 && pcs > 0;
+                  final qtyLabel = hasPack
+                      ? '${ctns.toInt()} cartons × ${pcs.toInt()} pcs = ${item.quantity.toInt()} pcs'
+                      : 'Qty: ${item.quantity.toInt()}';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF161D2E) : Colors.white,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF2E384D)
+                            : const Color(0xFFE2E8F0),
                       ),
                     ),
-
-                    // Item / Description
-                    DataCell(
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            item.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11,
-                            ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Sign circle (+/-)
+                        Container(
+                          width: 24,
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isDebit
+                                ? const Color(0xFF2563EB)
+                                : const Color(0xFFBA1A1A),
+                            shape: BoxShape.circle,
                           ),
-                          if ((item.paymentMethod != null &&
-                                  item.paymentMethod!.isNotEmpty) ||
-                              (item.bank != null && item.bank!.isNotEmpty))
+                          child: Icon(
+                            isDebit ? Icons.add : Icons.remove,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Item details
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      item.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                        color: theme.colorScheme.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                  if (bank != null && bank.isNotEmpty) ...[
+                                    const SizedBox(width: 5),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: const Color(0xFFBFDBFE),
+                                          width: 0.7,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        bank,
+                                        style: const TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF2563EB),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                qtyLabel,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                              Text(
+                                'Unit: ETB ${_currencyFormat.format(item.unitPrice)} · ${item.date ?? rec.date}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Amount + running balance
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
                             Text(
-                              'via ${item.paymentMethod ?? item.bank}${item.reference != null ? " (${item.reference})" : ""}',
+                              isDebit
+                                  ? '+ ETB ${_currencyFormat.format(subtotal)}'
+                                  : '− ETB ${_currencyFormat.format(subtotal)}',
                               style: TextStyle(
-                                fontSize: 9.5,
-                                color: isDark
-                                    ? const Color(0xFFFBBF24)
-                                    : const Color(0xFFB45309),
-                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                fontFamily: 'monospace',
+                                color: isDebit
+                                    ? const Color(0xFF2563EB)
+                                    : const Color(0xFFBA1A1A),
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-
-                    // Cartons
-                    DataCell(
-                      Text(
-                        item.cartons != null && item.cartons! > 0
-                            ? item.cartons!.toInt().toString()
-                            : '-',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontFamily: 'monospace',
+                            const SizedBox(height: 2),
+                            Text(
+                              'Bal ${_currencyFormat.format(runningBalance)}',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'monospace',
+                                color: runningBalance >= 0
+                                    ? (isDark
+                                          ? const Color(0xFF93C5FD)
+                                          : const Color(0xFF2563EB))
+                                    : (isDark
+                                          ? const Color(0xFFFFB4AB)
+                                          : const Color(0xFFBA1A1A)),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+                      ],
                     ),
-
-                    // Pcs / Carton
-                    DataCell(
-                      Text(
-                        item.pcsPerCarton != null && item.pcsPerCarton! > 0
-                            ? item.pcsPerCarton!.toInt().toString()
-                            : '-',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-
-                    // Unit Price
-                    DataCell(
-                      Text(
-                        item.unitPrice > 0
-                            ? _currencyFormat.format(item.unitPrice)
-                            : '-',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-
-                    // Debit (+) [Goods Invoiced / Consignment]
-                    DataCell(
-                      Text(
-                        isDebit ? _currencyFormat.format(subtotal) : '-',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontFamily: 'monospace',
-                          color: isDebit
-                              ? const Color(0xFF2563EB)
-                              : Colors.grey,
-                          fontWeight: isDebit
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-
-                    // Credit (-) [Payment via CBE/Awash/Telebirr highlighted in yellow like Excel Column G]
-                    DataCell(
-                      Container(
-                        color: !isDebit ? paymentBgColor : Colors.transparent,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          !isDebit ? _currencyFormat.format(subtotal) : '-',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontFamily: 'monospace',
-                            color: !isDebit
-                                ? (isDark
-                                      ? const Color(0xFFFDE68A)
-                                      : const Color(0xFFB45309))
-                                : Colors.grey,
-                            fontWeight: !isDebit
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Running Balance
-                    DataCell(
-                      Text(
-                        _currencyFormat.format(runningBalance),
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.w900,
-                          color: runningBalance >= 0
-                              ? const Color(0xFF2563EB)
-                              : const Color(0xFFBA1A1A),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
 
-          // Excel Subtotal Footer Summary
+          // Subtotal Footer Summary
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -1606,33 +1618,74 @@ class _MainScreenState extends State<MainScreen> {
                 top: BorderSide(color: gridBorderColor, width: 1.2),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                Text(
-                  '${rec.title} Total',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 11.5,
-                  ),
-                ),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Goods: ${_currencyFormat.format(rec.totalDebit)}  |  Paid: ${_currencyFormat.format(rec.totalCredit)}  |  Due: ',
+                      'Goods (Debit +)',
                       style: TextStyle(
                         fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: isDark
                             ? const Color(0xFF94A3B8)
                             : const Color(0xFF334155),
                       ),
                     ),
                     Text(
+                      'ETB ${_currencyFormat.format(rec.totalDebit)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11.5,
+                        fontFamily: 'monospace',
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Paid (Credit −)',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF334155),
+                      ),
+                    ),
+                    Text(
+                      'ETB ${_currencyFormat.format(rec.totalCredit)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11.5,
+                        fontFamily: 'monospace',
+                        color: Color(0xFFBA1A1A),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Outstanding Balance (ቀሪ)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                    Text(
                       'ETB ${_currencyFormat.format(rec.balance)}',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
-                        fontSize: 12,
+                        fontSize: 13,
+                        fontFamily: 'monospace',
                         color: rec.balance >= 0
                             ? const Color(0xFF2563EB)
                             : const Color(0xFFBA1A1A),
@@ -1643,6 +1696,7 @@ class _MainScreenState extends State<MainScreen> {
               ],
             ),
           ),
+          ],
         ],
       ),
     );
