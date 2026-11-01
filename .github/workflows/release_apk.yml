@@ -57,8 +57,8 @@ jobs:
         run: |
           if [ ! -f .env ]; then
             echo "NEON_CONNECTION_STRING=\"postgresql://neondb_owner:npg_OtyTj7F9Aqnz@ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require\"" > .env
-            echo "NEON_REGION_ENDPOINT=\"https://api.c-7.us-east-2.aws.neon.tech/sql\"" >> .env
-            echo "NEON_DIRECT_ENDPOINT=\"https://ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/sql\"" >> .env
+            echo "NEON_REGION_ENDPOINT=\"https://ep-red-sea-b5yphk96.c-7.us-east-2.aws.neon.tech/sql\"" >> .env
+            echo "NEON_DIRECT_ENDPOINT=\"https://ep-red-sea-b5yphk96.c-7.us-east-2.aws.neon.tech/sql\"" >> .env
           fi
 
       - name: Check Flutter Installation

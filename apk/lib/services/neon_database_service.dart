@@ -27,27 +27,35 @@ class NeonDatabaseService {
     return 'postgresql://neondb_owner:npg_OtyTj7F9Aqnz@ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require';
   }
 
-  static String get neonRegionEndpoint {
-    try {
-      if (dotenv.isInitialized) {
-        final val = dotenv.env['NEON_REGION_ENDPOINT'];
-        if (val != null && val.isNotEmpty) return val;
-      }
-    } catch (_) {}
-    return 'https://api.c-7.us-east-2.aws.neon.tech/sql';
-  }
-
   static String get neonDirectEndpoint {
     try {
       if (dotenv.isInitialized) {
         final val = dotenv.env['NEON_DIRECT_ENDPOINT'];
-        if (val != null && val.isNotEmpty) return val;
+        if (val != null && val.isNotEmpty) {
+          return val.replaceAll('-pooler', '');
+        }
       }
     } catch (_) {}
-    return 'https://ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/sql';
+
+    // Automatically derive clean HTTP endpoint from connection string
+    try {
+      final uri = Uri.parse(
+        connectionString
+            .replaceFirst('postgresql://', 'http://')
+            .replaceFirst('postgres://', 'http://'),
+      );
+      if (uri.host.isNotEmpty) {
+        final cleanHost = uri.host.replaceAll('-pooler', '');
+        return 'https://$cleanHost/sql';
+      }
+    } catch (_) {}
+
+    return 'https://ep-red-sea-b5yphk96.c-7.us-east-2.aws.neon.tech/sql';
   }
 
-  static const Duration requestTimeout = Duration(seconds: 7);
+  static String get neonRegionEndpoint => neonDirectEndpoint;
+
+  static const Duration requestTimeout = Duration(seconds: 15);
 
   /// Verify password against stored hash (supporting sha256:salt:hash, plain sha256, plaintext, or demo credentials)
   static bool verifyPassword(String password, String storedHash) {

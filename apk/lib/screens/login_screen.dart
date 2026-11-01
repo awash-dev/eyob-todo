@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/api_service.dart';
 import '../services/neon_database_service.dart';
 import 'main_screen.dart';
@@ -13,29 +14,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _phoneController = TextEditingController(text: '0922222222');
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedPhone();
-  }
-
-  Future<void> _loadSavedPhone() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedPhone = prefs.getString('last_login_phone');
-      if (savedPhone != null && savedPhone.isNotEmpty && mounted) {
-        setState(() {
-          _phoneController.text = savedPhone;
-        });
-      }
-    } catch (_) {}
-  }
 
   @override
   void dispose() {
@@ -57,7 +40,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (NeonDatabaseService.normalizePhone(phone) == null) {
       setState(() {
-        _errorMessage = 'Enter a valid Ethiopian phone number (e.g. 0911111111)';
+        _errorMessage =
+            'Enter a valid Ethiopian phone number (e.g. 0911111111)';
       });
       return;
     }
@@ -115,7 +99,10 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 16.0,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
@@ -132,7 +119,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+                            color: const Color(0xFF2563EB)
+                                .withValues(alpha: 0.25),
                             blurRadius: 14,
                             offset: const Offset(0, 5),
                           ),
@@ -164,12 +152,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                       side: BorderSide(
-                        color: isDark ? const Color(0xFF27272A) : Colors.grey.shade300,
+                        color: isDark
+                            ? const Color(0xFF27272A)
+                            : Colors.grey.shade300,
                       ),
                     ),
                     color: theme.colorScheme.surface,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 22.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20.0,
+                        vertical: 22.0,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -192,7 +185,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   Expanded(
                                     child: Text(
                                       _errorMessage!,
-                                      style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B)),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF991B1B),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -206,14 +202,24 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _phoneController,
                             keyboardType: TextInputType.phone,
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-() ]')),
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9+\-() ]'),
+                              ),
                             ],
                             decoration: InputDecoration(
                               labelText: 'Phone Number (ስልክ ቁጥር)',
-                              hintText: '0911111111',
-                              prefixIcon: const Icon(Icons.phone_outlined, size: 20),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              hintText: 'e.g. 0911223344 or +251...',
+                              prefixIcon: const Icon(
+                                Icons.phone_outlined,
+                                size: 20,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -225,19 +231,33 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: InputDecoration(
                               labelText: 'Password (የይለፍ ቃል)',
                               hintText: '••••••••',
-                              prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                size: 20,
+                              ),
                               suffixIcon: IconButton(
                                 icon: Icon(
-                                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
                                   size: 20,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
                                 ),
                                 onPressed: () {
-                                  setState(() => _obscurePassword = !_obscurePassword);
+                                  setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  );
                                 },
                               ),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -250,18 +270,26 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF2563EB),
                                 foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                                 elevation: 0,
                               ),
                               child: _isLoading
                                   ? const SizedBox(
                                       width: 20,
                                       height: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
                                     )
                                   : const Text(
                                       'Sign In',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
                                     ),
                             ),
                           ),
