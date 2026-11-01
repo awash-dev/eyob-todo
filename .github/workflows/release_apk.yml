@@ -27,11 +27,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Java 17
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -43,6 +43,22 @@ jobs:
         run: |
           if [ -f apk/android/gradlew ]; then
             chmod +x apk/android/gradlew
+          fi
+
+      - name: Ensure Debug Keystore Exists
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" || true
+          fi
+
+      - name: Ensure .env Asset Exists
+        working-directory: ./apk
+        run: |
+          if [ ! -f .env ]; then
+            echo "NEON_CONNECTION_STRING=\"postgresql://neondb_owner:npg_OtyTj7F9Aqnz@ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require\"" > .env
+            echo "NEON_REGION_ENDPOINT=\"https://api.c-7.us-east-2.aws.neon.tech/sql\"" >> .env
+            echo "NEON_DIRECT_ENDPOINT=\"https://ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/sql\"" >> .env
           fi
 
       - name: Check Flutter Installation

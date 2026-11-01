@@ -11,5 +11,6 @@
   },
   "files.readonlyInclude": {
     "**/routeTree.gen.ts": true
-  }
+  },
+  "cmake.sourceDirectory": "D:/project/eyoba-project/New folder/apk/linux"
 }
