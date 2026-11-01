@@ -81,12 +81,12 @@ function MainAppView() {
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-5 pb-24 md:pb-12 no-print">
 
         {activeTab === 'stock' && activeShop && (
-          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 ring-1 ring-purple-200/60 dark:ring-purple-900/40 text-[11px]">
-            <Store size={14} className="text-purple-600 dark:text-purple-300" />
-            <span className="text-purple-800 dark:text-purple-200">
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 ring-1 ring-blue-200/60 dark:ring-blue-900/40 text-[11px]">
+            <Store size={14} className="text-blue-600 dark:text-blue-300" />
+            <span className="text-blue-800 dark:text-blue-200">
               Store: <strong>{activeShop.name}</strong>
             </span>
-            <span className="text-purple-600/70 dark:text-purple-300/70 ml-auto hidden sm:inline">
+            <span className="text-blue-600/70 dark:text-blue-300/70 ml-auto hidden sm:inline">
               Stock products are saved to this shop only
             </span>
           </div>
@@ -122,7 +122,7 @@ function MainAppView() {
             <Button
               onClick={() => openCreateModal(activeTab)}
               size="sm"
-              className="text-xs font-semibold shadow-xs flex items-center gap-1.5 h-8 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+              className="text-xs font-semibold shadow-xs flex items-center gap-1.5 h-8 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
             >
               <Plus size={16} />
               <span>Add Entry</span>

@@ -55,7 +55,7 @@ export const StatsOverview: React.FC = () => {
             <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
               Total Credit Due
             </span>
-            <div className="p-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 flex items-center justify-center">
+            <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
               <Wallet size={14} />
             </div>
           </div>
@@ -95,7 +95,7 @@ export const StatsOverview: React.FC = () => {
             <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
               Payments In
             </span>
-            <div className="p-1 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 shrink-0 flex items-center justify-center">
+            <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
               <CircleArrowDown size={14} />
             </div>
           </div>
@@ -115,7 +115,7 @@ export const StatsOverview: React.FC = () => {
             <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
               Accounts
             </span>
-            <div className="p-1 rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400 shrink-0 flex items-center justify-center">
+            <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
               <Users size={14} />
             </div>
           </div>
@@ -161,7 +161,7 @@ export const StatsOverview: React.FC = () => {
             <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
               Total Purchases
             </span>
-            <div className="p-1 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 shrink-0 flex items-center justify-center">
+            <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
               <Receipt size={14} />
             </div>
           </div>
@@ -181,7 +181,7 @@ export const StatsOverview: React.FC = () => {
             <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
               Payments Disbursed
             </span>
-            <div className="p-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 flex items-center justify-center">
+            <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
               <CheckCircle2 size={14} />
             </div>
           </div>
@@ -201,7 +201,7 @@ export const StatsOverview: React.FC = () => {
             <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
               Active Suppliers
             </span>
-            <div className="p-1 rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400 shrink-0 flex items-center justify-center">
+            <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
               <Building2 size={14} />
             </div>
           </div>
@@ -227,7 +227,7 @@ export const StatsOverview: React.FC = () => {
           <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
             Net Balance
           </span>
-          <div className="p-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0 flex items-center justify-center">
+          <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
             <Wallet size={14} />
           </div>
         </div>
@@ -235,7 +235,7 @@ export const StatsOverview: React.FC = () => {
           <div
             className={`text-base sm:text-lg font-bold tracking-tight ${
               grandTotal >= 0
-                ? 'text-emerald-600 dark:text-emerald-400'
+                ? 'text-blue-600 dark:text-blue-400'
                 : 'text-rose-600 dark:text-rose-400'
             }`}
           >
@@ -273,7 +273,7 @@ export const StatsOverview: React.FC = () => {
           <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
             Payments Out
           </span>
-          <div className="p-1 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 shrink-0 flex items-center justify-center">
+          <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
             <Building2 size={14} />
           </div>
         </div>
@@ -293,7 +293,7 @@ export const StatsOverview: React.FC = () => {
           <span className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
             Total Units
           </span>
-          <div className="p-1 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 shrink-0 flex items-center justify-center">
+          <div className="p-1 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 shrink-0 flex items-center justify-center">
             <Box size={14} />
           </div>
         </div>

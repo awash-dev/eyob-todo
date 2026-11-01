@@ -20,7 +20,7 @@ export const Navbar: React.FC = () => {
         {/* Account / shop bar */}
         <div className="flex items-center justify-between gap-2 h-11 border-b border-zinc-100/70 dark:border-zinc-800/60">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
               <BookOpen size={16} />
             </div>
             <span className="text-sm font-black tracking-tight text-foreground">

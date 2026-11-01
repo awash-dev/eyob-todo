@@ -187,7 +187,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               {/* Option 1: Export to Excel */}
               <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 shrink-0 flex items-center justify-center">
+                  <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 shrink-0 flex items-center justify-center">
                     <FileText size={20} />
                   </div>
                   <div className="min-w-0">
@@ -203,7 +203,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={handleExportExcel}
-                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-emerald-500 hover:text-emerald-600"
+                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-blue-500 hover:text-blue-600"
                 >
                   <Download size={14} />
                   <span>Export</span>
@@ -213,7 +213,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               {/* Option 2: Export to JSON */}
               <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 shrink-0 flex items-center justify-center">
+                  <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 shrink-0 flex items-center justify-center">
                     <Code size={20} />
                   </div>
                   <div className="min-w-0">
@@ -229,7 +229,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={handleExportJson}
-                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-indigo-500 hover:text-indigo-600"
+                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-blue-500 hover:text-blue-600"
                 >
                   <Download size={14} />
                   <span>Export</span>
@@ -277,7 +277,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               {/* Option 4: Import from Excel */}
               <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2.5 rounded-lg bg-teal-50 text-teal-600 dark:bg-teal-950/60 dark:text-teal-400 shrink-0 flex items-center justify-center">
+                  <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 shrink-0 flex items-center justify-center">
                     <CloudUpload size={20} />
                   </div>
                   <div className="min-w-0">
@@ -294,7 +294,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   variant="outline"
                   disabled={isProcessingExcel}
                   onClick={() => excelFileInputRef.current?.click()}
-                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-teal-500 hover:text-teal-600"
+                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-blue-500 hover:text-blue-600"
                 >
                   {isProcessingExcel ? (
                     <>
@@ -313,7 +313,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               {/* Option 5: Import from JSON */}
               <div className="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-muted/30 transition-colors flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2.5 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 shrink-0 flex items-center justify-center">
+                  <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 shrink-0 flex items-center justify-center">
                     <Inbox size={20} />
                   </div>
                   <div className="min-w-0">
@@ -329,7 +329,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={() => jsonFileInputRef.current?.click()}
-                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-amber-500 hover:text-amber-600"
+                  className="shrink-0 text-xs flex items-center gap-1.5 cursor-pointer font-medium hover:border-blue-500 hover:text-blue-600"
                 >
                   <CloudUpload size={14} />
                   <span>Import</span>

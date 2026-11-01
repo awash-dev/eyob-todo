@@ -50,21 +50,21 @@ export const MobileBottomNav: React.FC = () => {
 
           const activeColorClass =
             tab.id === 'customer'
-              ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+              ? 'text-blue-600 dark:text-blue-400 font-semibold'
               : tab.id === 'supplier'
                 ? 'text-blue-600 dark:text-blue-400 font-semibold'
                 : tab.id === 'delala'
-                  ? 'text-amber-600 dark:text-amber-400 font-semibold'
-                  : 'text-purple-600 dark:text-purple-400 font-semibold'
+                  ? 'text-blue-600 dark:text-blue-400 font-semibold'
+                  : 'text-blue-600 dark:text-blue-400 font-semibold'
 
           const activeBadgeClass =
             tab.id === 'customer'
-              ? 'bg-emerald-600 text-white'
+              ? 'bg-blue-600 text-white'
               : tab.id === 'supplier'
                 ? 'bg-blue-600 text-white'
                 : tab.id === 'delala'
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-purple-600 text-white'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-blue-600 text-white'
 
           return (
             <button
@@ -107,10 +107,10 @@ export const MobileBottomNav: React.FC = () => {
         <button
           type="button"
           onClick={() => openCreateModal(activeTab)}
-          className="flex flex-col items-center justify-center min-h-[48px] py-1 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 transition-colors"
+          className="flex flex-col items-center justify-center min-h-[48px] py-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
           title="Add New Entry"
         >
-          <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md active:scale-95 transition-transform">
+          <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md active:scale-95 transition-transform">
             <Plus size={24} className="stroke-2" />
           </div>
           <span className="text-[10px] font-semibold mt-0.5">New</span>

@@ -198,6 +198,8 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
     final lineItems = _formItems.map((f) {
       final isDebit = f.sign == '+';
+      // Stock records (In or Out) always use the inventory path — never the bank-payment path.
+      final bool useInventory = widget.activeTab == 'stock' || isDebit;
       final unitName = f.packagingUnit == 'Other'
           ? (_otherUnitController.text.trim().isNotEmpty ? _otherUnitController.text.trim() : 'Other')
           : f.packagingUnit;
@@ -210,7 +212,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
       String itemName = f.nameController.text.trim();
 
       // Resolved bank/channel name (uses custom text when "Other" is selected)
-      final bankName = isDebit
+      final bankName = useInventory
           ? null
           : (f.typeOrBank == 'Other'
               ? (f.bankCustomController.text.trim().isNotEmpty
@@ -218,8 +220,8 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                   : 'Other')
               : f.typeOrBank);
 
-      // If credit (payment), ensure item description indicates the bank
-      if (!isDebit) {
+      if (!useInventory) {
+        // Credit (payment) for customer/supplier/delala only
         itemName = 'Payment via $bankName';
         qty = 1.0;
       } else {
@@ -236,13 +238,13 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
         sign: f.sign,
         bank: bankName,
         paymentMethod: bankName,
-        reference: !isDebit && _notesController.text.trim().isNotEmpty
+        reference: !useInventory && _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
-        customType: isDebit ? 'Goods' : null,
-        cartons: isDebit ? ctns : null,
-        pcsPerCarton: isDebit ? pcs : null,
-        packagingUnit: isDebit ? unitName : null,
+        customType: useInventory ? (isDebit ? 'Goods' : 'Stock Out') : null,
+        cartons: useInventory ? ctns : null,
+        pcsPerCarton: useInventory ? pcs : null,
+        packagingUnit: useInventory ? unitName : null,
         date: dateStr,
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       );
@@ -278,7 +280,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     // Title label
     final headerTitle = widget.editingRecord == null
         ? (isStock
-            ? 'Store In (Storekeeper)'
+            ? 'Store Entry (Storekeeper)'
             : isCustomer
                 ? 'Customer Credit Entry'
                 : isDelala
@@ -320,7 +322,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     final price = double.tryParse(currentItem.priceController.text) ?? 0.0;
 
     double calculatedTotal = 0.0;
-    if (isDebit) {
+    if (isDebit || isStock) {
       if (currentItem.packagingUnit == 'Carton' && cartons > 0 && pcs > 0 && price > 0) {
         calculatedTotal = cartons * pcs * price;
       } else {
@@ -548,8 +550,110 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     const SizedBox(height: 14),
                   ],
 
-                  // 4A. If Debit (+) Goods / Delivery / Consignment
-                  if (isDebit) ...[
+                  // 3B. Stock-only toggle: Stock In (+) / Stock Out (-)
+                  if (isStock) ...[
+                    _buildFieldLabel('Stock Movement (የዕቃ አቅርቦት አይነት)', isDark),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        // Stock In (+)
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setState(() => currentItem.sign = '+'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: isDebit
+                                    ? const Color(0xFF2563EB).withValues(alpha: 0.12)
+                                    : inputFill,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isDebit ? const Color(0xFF2563EB) : inputBorder,
+                                  width: isDebit ? 1.8 : 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_circle_outline,
+                                    size: 16,
+                                    color: isDebit ? const Color(0xFF2563EB) : Colors.grey,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Stock In (+)\n(ማገዝ / መግቢያ)',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: isDebit ? FontWeight.w900 : FontWeight.w600,
+                                      color: isDebit
+                                          ? (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB))
+                                          : Colors.grey,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Stock Out (-)
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setState(() => currentItem.sign = '-'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: !isDebit
+                                    ? const Color(0xFFBA1A1A).withValues(alpha: 0.12)
+                                    : inputFill,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: !isDebit ? const Color(0xFFBA1A1A) : inputBorder,
+                                  width: !isDebit ? 1.8 : 1.0,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.remove_circle_outline,
+                                    size: 16,
+                                    color: !isDebit ? const Color(0xFFBA1A1A) : Colors.grey,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Stock Out (-)\n(መቆጣጠር / መውጫ)',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: !isDebit ? FontWeight.w900 : FontWeight.w600,
+                                      color: !isDebit
+                                          ? (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A))
+                                          : Colors.grey,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // 4A. Inventory fields (Goods). Shown for all debit records AND all stock records
+                  //     (stock-out keeps these fields so the shopkeeper records what left the store).
+                  if (isDebit || isStock) ...[
                     // Item Field (Clean Single Label matching Stitch UI)
                     _buildFieldLabel('Item (የዕቃ ስም)', isDark),
                     const SizedBox(height: 6),

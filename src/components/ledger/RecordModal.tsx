@@ -243,7 +243,7 @@ export const RecordModal: React.FC = () => {
           placeholder: 'Customer / Store name (e.g. Alex Johnson, Kelil Aginbi)',
           badge: 'Customer Credit',
           badgeColor:
-            'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+            'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
           Icon: Users,
         }
       case 'supplier':
@@ -267,7 +267,7 @@ export const RecordModal: React.FC = () => {
           placeholder: 'Delala / Broker name (e.g. Abebe Delala, Merkato Agent)',
           badge: 'Delala Credit',
           badgeColor:
-            'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+            'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
           Icon: Handshake,
         }
       case 'stock':
@@ -277,7 +277,7 @@ export const RecordModal: React.FC = () => {
           placeholder: 'Stock Lot / Account (e.g. KELIL AGINBI - Electrical & LED Lighting)',
           badge: 'Stock & Inventory',
           badgeColor:
-            'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+            'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
           Icon: Layers,
         }
     }
@@ -375,7 +375,7 @@ export const RecordModal: React.FC = () => {
                   onClick={() => setShowCustoms(!showCustoms)}
                   className={`text-[11px] font-medium flex items-center gap-1 cursor-pointer shrink-0 transition-colors ${
                     showCustoms
-                      ? 'text-amber-600 dark:text-amber-400 font-semibold underline'
+                      ? 'text-blue-600 dark:text-blue-400 font-semibold underline'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                   title="Toggle optional Customs duty / tariff column for imported items"
@@ -511,7 +511,7 @@ export const RecordModal: React.FC = () => {
                           onClick={() => toggleSign(index)}
                           className={`w-8 h-8 shrink-0 rounded-md flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
                             isAdd
-                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 hover:bg-emerald-100'
+                              ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 hover:bg-blue-100'
                               : 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-100'
                           }`}
                           title="Toggle (+) Add or (-) Deduct"
@@ -728,7 +728,7 @@ export const RecordModal: React.FC = () => {
                           <span
                             className={
                               isAdd
-                                ? 'text-emerald-600 dark:text-emerald-400'
+                                ? 'text-blue-600 dark:text-blue-400'
                                 : 'text-rose-600 dark:text-rose-400'
                             }
                           >
@@ -773,7 +773,7 @@ export const RecordModal: React.FC = () => {
                 <span
                   className={`text-base sm:text-lg font-mono font-bold ${
                     calculatedGrandTotal >= 0
-                      ? 'text-emerald-600 dark:text-emerald-400'
+                      ? 'text-blue-600 dark:text-blue-400'
                       : 'text-rose-600 dark:text-rose-400'
                   }`}
                 >

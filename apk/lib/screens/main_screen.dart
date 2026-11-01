@@ -630,6 +630,7 @@ class _MainScreenState extends State<MainScreen> {
             packagingUnit: 'Pcs',
             date: rec.date,
             notes: rec.notes,
+            sign: '+',
           ),
         );
       } else {
@@ -662,19 +663,27 @@ class _MainScreenState extends State<MainScreen> {
               packagingUnit: unit,
               date: item.date ?? rec.date,
               notes: item.notes ?? rec.notes,
+              sign: item.sign,
             ),
           );
         }
       }
     }
 
-    // Store Inventory Totals
+    // Store Inventory Totals — signed so Stock Out (-) decrements on-hand
     final distinctNames = items
         .map((i) => i.itemName.toLowerCase().trim())
         .toSet();
-    final double totalCartons = items.fold(0.0, (s, i) => s + i.cartons);
-    final double totalPieces = items.fold(0.0, (s, i) => s + i.totalQty);
-    final double totalValuation = items.fold(0.0, (s, i) => s + i.totalValue);
+    final double totalCartons = items.fold(0.0, (s, i) => s + i.signedCartons);
+    final double totalPieces = items.fold(0.0, (s, i) => s + i.signedQty);
+    final double totalValuation = items.fold(0.0, (s, i) => s + i.signedValue);
+    // Gross movement (for the footer summary)
+    final double grossInValue = items
+        .where((i) => !i.isOut)
+        .fold(0.0, (s, i) => s + i.totalValue);
+    final double grossOutValue = items
+        .where((i) => i.isOut)
+        .fold(0.0, (s, i) => s + i.totalValue);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 85),
@@ -991,16 +1000,53 @@ class _MainScreenState extends State<MainScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    it.itemName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 11.5,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          it.itemName,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11.5,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: it.isOut
+                                              ? const Color(0xFFFEF2F2)
+                                              : const Color(0xFFEFF6FF),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: it.isOut
+                                                ? const Color(0xFFFCA5A5)
+                                                : const Color(0xFFBFDBFE),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          it.isOut ? 'OUT' : 'IN',
+                                          style: TextStyle(
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w900,
+                                            color: it.isOut
+                                                ? const Color(0xFFBA1A1A)
+                                                : const Color(0xFF2563EB),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   if (it.notes != null && it.notes!.isNotEmpty)
                                     Text(
                                       it.notes!,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 9.5,
                                         color: isDark
@@ -1038,15 +1084,17 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
 
-                            // Total Qty
+                            // Total Qty (signed: negative for Stock Out)
                             DataCell(
                               Text(
-                                '${it.totalQty.toInt()} ${it.packagingUnit == "Carton" ? "pcs" : it.packagingUnit}',
-                                style: const TextStyle(
+                                '${it.signedQty.toInt()} ${it.packagingUnit == "Carton" ? "pcs" : it.packagingUnit}',
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontFamily: 'monospace',
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2563EB),
+                                  color: it.isOut
+                                      ? const Color(0xFFBA1A1A)
+                                      : const Color(0xFF2563EB),
                                 ),
                               ),
                             ),
@@ -1062,15 +1110,17 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
 
-                            // Total Value
+                            // Total Value (signed: negative for Stock Out)
                             DataCell(
                               Text(
-                                _currencyFormat.format(it.totalValue),
-                                style: const TextStyle(
+                                _currencyFormat.format(it.signedValue),
+                                style: TextStyle(
                                   fontSize: 11.5,
                                   fontFamily: 'monospace',
                                   fontWeight: FontWeight.w900,
-                                  color: Color(0xFF2563EB),
+                                  color: it.isOut
+                                      ? const Color(0xFFBA1A1A)
+                                      : const Color(0xFF2563EB),
                                 ),
                               ),
                             ),
@@ -1145,19 +1195,35 @@ class _MainScreenState extends State<MainScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Store Inventory Total (ጠቅላላ ድምር)',
+                          'Store Net Value (ጠቅላላ ድምር)',
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 11.5,
                           ),
                         ),
-                        Text(
-                          'Cartons: ${totalCartons.toInt()}  |  Pieces: ${totalPieces.toInt()}  |  Value: ETB ${_currencyFormat.format(totalValuation)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 11.5,
-                            color: Color(0xFF2563EB),
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Net: ETB ${_currencyFormat.format(totalValuation)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11.5,
+                                color: totalValuation >= 0
+                                    ? const Color(0xFF2563EB)
+                                    : const Color(0xFFBA1A1A),
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              'In: ${_currencyFormat.format(grossInValue)}  ·  Out: ${_currencyFormat.format(grossOutValue)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 9.5,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -2030,6 +2096,7 @@ class _StockInventoryItem {
   final String packagingUnit;
   final String date;
   final String? notes;
+  final String sign; // '+' = Stock In (increment), '-' = Stock Out (decrement)
 
   _StockInventoryItem({
     required this.record,
@@ -2043,5 +2110,15 @@ class _StockInventoryItem {
     required this.packagingUnit,
     required this.date,
     this.notes,
+    this.sign = '+',
   });
+
+  bool get isOut => sign == '-';
+
+  /// Signed contribution to on-hand quantity (negative when stock out)
+  double get signedQty => isOut ? -totalQty : totalQty;
+  /// Signed contribution to on-hand cartons (negative when stock out)
+  double get signedCartons => isOut ? -cartons : cartons;
+  /// Signed contribution to total valuation (negative when stock out)
+  double get signedValue => isOut ? -totalValue : totalValue;
 }

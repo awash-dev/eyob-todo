@@ -30,7 +30,7 @@ export const Sidebar: React.FC = () => {
       label: 'Customer Credit',
       Icon: Users,
       activeClass:
-        'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
+        'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
     },
     {
       id: 'supplier',
@@ -44,14 +44,14 @@ export const Sidebar: React.FC = () => {
       label: 'Delala Credit',
       Icon: Handshake,
       activeClass:
-        'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
+        'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
     },
     {
       id: 'stock',
       label: 'Stock & Inventory',
       Icon: Layers,
       activeClass:
-        'bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300',
+        'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
     },
   ]
 
@@ -60,7 +60,7 @@ export const Sidebar: React.FC = () => {
       <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-zinc-200/80 dark:border-zinc-800/80 bg-card min-h-screen sticky top-0 h-screen no-print">
         <div className="p-4 border-b border-zinc-100 dark:border-zinc-800/70">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
               <BookOpen size={18} />
             </div>
             <div className="min-w-0">

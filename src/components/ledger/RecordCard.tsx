@@ -34,7 +34,7 @@ interface RecordCardProps {
 }
 
 export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(false)
   const {
     openEditModal,
     deleteRecord,
@@ -115,12 +115,12 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
               <span
                 className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md ${
                   record.type === 'customer'
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                     : record.type === 'supplier'
                       ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                       : record.type === 'delala'
-                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                        : 'bg-purple-50 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                        : 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                 }`}
               >
                 {record.type === 'customer' ? (
@@ -178,7 +178,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
             <div
               className={`text-base sm:text-lg font-bold ${
                 isPositive
-                  ? 'text-emerald-600 dark:text-emerald-400'
+                  ? 'text-blue-600 dark:text-blue-400'
                   : 'text-rose-600 dark:text-rose-400'
               }`}
             >
@@ -263,7 +263,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                         <td className="py-2 px-3 font-semibold text-foreground border-r border-zinc-200 dark:border-zinc-800">
                           {item.name}
                           {customType && (
-                            <span className="ml-2 text-[10px] font-normal text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">
+                            <span className="ml-2 text-[10px] font-normal text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
                               {customType}
                             </span>
                           )}
@@ -285,7 +285,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                         <td className="py-2 px-3 text-right text-foreground border-r border-zinc-200 dark:border-zinc-800">
                           {formatCurrency(item.unitPrice)}
                         </td>
-                        <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                        <td className="py-2 px-3 text-right font-bold text-blue-600 dark:text-blue-400">
                           {formatCurrency(itemTotal)}
                         </td>
                       </tr>
@@ -306,7 +306,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                     <td className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-700 text-muted-foreground uppercase text-[10px]">
                       Stock Valuation:
                     </td>
-                    <td className="py-2.5 px-3 text-right text-sm text-emerald-600 dark:text-emerald-400 font-extrabold">
+                    <td className="py-2.5 px-3 text-right text-sm text-blue-600 dark:text-blue-400 font-extrabold">
                       {formatCurrency(total)}
                     </td>
                   </tr>
@@ -323,7 +323,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                     <th className="py-2.5 px-3 w-32 border-r border-zinc-200 dark:border-zinc-700">Payment / Bank</th>
                     <th className="py-2.5 px-3 w-20 text-right border-r border-zinc-200 dark:border-zinc-700">Qty</th>
                     <th className="py-2.5 px-3 w-28 text-right border-r border-zinc-200 dark:border-zinc-700">Unit Price</th>
-                    <th className="py-2.5 px-3 w-36 text-right border-r border-zinc-200 dark:border-zinc-700 text-emerald-700 dark:text-emerald-400">
+                    <th className="py-2.5 px-3 w-36 text-right border-r border-zinc-200 dark:border-zinc-700 text-blue-700 dark:text-blue-400">
                       Debit (+)
                     </th>
                     <th className="py-2.5 px-3 w-36 text-right text-rose-700 dark:text-rose-400">
@@ -360,7 +360,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                         <td className="py-2 px-3 text-right text-muted-foreground border-r border-zinc-200 dark:border-zinc-800">
                           {formatCurrency(item.unitPrice)}
                         </td>
-                        <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400 border-r border-zinc-200 dark:border-zinc-800">
+                        <td className="py-2 px-3 text-right font-bold text-blue-600 dark:text-blue-400 border-r border-zinc-200 dark:border-zinc-800">
                           {isAdd ? formatCurrency(itemTotal) : '—'}
                         </td>
                         <td className="py-2 px-3 text-right font-bold text-rose-600 dark:text-rose-400">
@@ -378,7 +378,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                     <td colSpan={2} className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-700 text-muted-foreground">
                       Subtotals:
                     </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-600 dark:text-emerald-400 font-bold border-r border-zinc-200 dark:border-zinc-700">
+                    <td className="py-2.5 px-3 text-right text-blue-600 dark:text-blue-400 font-bold border-r border-zinc-200 dark:border-zinc-700">
                       {formatCurrency(totalDebit)}
                     </td>
                     <td className="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400 font-bold">
@@ -390,7 +390,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                       Outstanding Net Balance:
                     </td>
                     <td colSpan={2} className={`py-2 px-3 text-right font-extrabold text-sm ${
-                      total >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                      total >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-rose-600 dark:text-rose-400'
                     }`}>
                       {formatCurrency(total)}
                     </td>

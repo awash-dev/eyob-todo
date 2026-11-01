@@ -27,7 +27,7 @@ export const LoginScreen: React.FC = () => {
     <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 flex items-center justify-center px-4 py-10 font-sans">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-emerald-600/20">
+          <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-blue-600/20">
             <BookOpen size={30} />
           </div>
           <h1 className="mt-4 text-2xl font-black tracking-tight text-foreground">

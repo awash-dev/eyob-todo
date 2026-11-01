@@ -204,7 +204,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
           </div>
         )}
         {message && (
-          <div className="mt-2 p-2.5 text-xs text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300 rounded-lg">
+          <div className="mt-2 p-2.5 text-xs text-blue-700 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300 rounded-lg">
             {message}
           </div>
         )}
@@ -218,7 +218,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
             <button
               type="button"
               onClick={() => setShowNewShop(!showNewShop)}
-              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
               {showNewShop ? (
                 <CircleX size={14} />
@@ -235,7 +235,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                 key={s.id}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-muted/60 text-foreground border border-zinc-200/80 dark:border-zinc-800"
               >
-                <Store size={12} className="text-emerald-600" />
+                <Store size={12} className="text-blue-600" />
                 <span>{s.name}</span>
                 {shops.length > 1 && (
                   <button
@@ -266,7 +266,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                 type="submit"
                 size="sm"
                 disabled={savingShop}
-                className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white shrink-0"
               >
                 {savingShop ? 'Adding...' : 'Add Site'}
               </Button>
@@ -337,7 +337,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
               type="submit"
               size="sm"
               disabled={saving}
-              className="text-xs h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="text-xs h-8 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
             >
               {saving ? 'Creating...' : 'Create Account'}
             </Button>
@@ -407,8 +407,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                       onClick={() => void handleActiveToggle(u)}
                       className={`h-8 px-2.5 rounded-md text-[11px] font-semibold cursor-pointer ${
                         u.active
-                          ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
-                          : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+                          ? 'bg-blue-50 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300'
+                          : 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
                       }`}
                     >
                       {u.active ? 'Disable' : 'Enable'}
