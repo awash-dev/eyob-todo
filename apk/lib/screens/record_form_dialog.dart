@@ -183,6 +183,74 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     }
   }
 
+  List<String> get _dynamicStockSuggestions {
+    final Set<String> items = {..._stockSuggestions};
+    if (widget.existingRecords != null) {
+      for (final r in widget.existingRecords!) {
+        if (r.type == 'stock' && r.title.trim().isNotEmpty) {
+          items.add(r.title.trim());
+        }
+        for (final it in r.items) {
+          if (it.name.trim().isNotEmpty) items.add(it.name.trim());
+        }
+      }
+    }
+    return items.toList();
+  }
+
+  double _getCurrentStockCartons(String itemName) {
+    if (widget.existingRecords == null || itemName.trim().isEmpty) return 0.0;
+    final target = itemName.trim().toLowerCase();
+    double total = 0.0;
+    for (final rec in widget.existingRecords!) {
+      if (rec.type != 'stock') continue;
+      if (widget.shopId != null && rec.shopId != null && rec.shopId != widget.shopId) continue;
+      for (final it in rec.items) {
+        final name = (it.name.isNotEmpty ? it.name : rec.title).trim().toLowerCase();
+        final matches = name == target ||
+            (target.length >= 4 && (name.contains(target) || target.contains(name)));
+        if (matches) {
+          final c = it.cartons ?? (it.packagingUnit == 'Carton' ? it.quantity : 0.0);
+          if (it.sign == '-') {
+            total -= c;
+          } else {
+            total += c;
+          }
+        }
+      }
+    }
+    return total;
+  }
+
+  double _getCurrentStockPieces(String itemName) {
+    if (widget.existingRecords == null || itemName.trim().isEmpty) return 0.0;
+    final target = itemName.trim().toLowerCase();
+    double total = 0.0;
+    for (final rec in widget.existingRecords!) {
+      if (rec.type != 'stock') continue;
+      if (widget.shopId != null && rec.shopId != null && rec.shopId != widget.shopId) continue;
+      for (final it in rec.items) {
+        final name = (it.name.isNotEmpty ? it.name : rec.title).trim().toLowerCase();
+        final matches = name == target ||
+            (target.length >= 4 && (name.contains(target) || target.contains(name)));
+        if (matches) {
+          final ctns = it.cartons ?? 0.0;
+          final pcs = it.pcsPerCarton ?? 0.0;
+          double q = it.quantity;
+          if (it.packagingUnit == 'Carton' && ctns > 0 && pcs > 0) {
+            q = ctns * pcs;
+          }
+          if (it.sign == '-') {
+            total -= q;
+          } else {
+            total += q;
+          }
+        }
+      }
+    }
+    return total;
+  }
+
   void _handleSubmit() {
     if (!_formKey.currentState!.validate()) return;
 
@@ -205,7 +273,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
           : f.packagingUnit;
 
       double price = double.tryParse(f.priceController.text) ?? f.unitPrice;
-      double qty = double.tryParse(f.qtyController.text) ?? f.quantity;
+      double qty = 1.0;
       final ctns = double.tryParse(f.cartonsController.text);
       final pcs = double.tryParse(f.pcsController.text);
 
@@ -225,8 +293,16 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
         itemName = 'Payment via $bankName';
         qty = 1.0;
       } else {
-        if (unitName == 'Carton' && ctns != null && ctns > 0 && pcs != null && pcs > 0) {
-          qty = ctns * pcs;
+        if (unitName == 'Carton') {
+          if (ctns != null && ctns > 0 && pcs != null && pcs > 0) {
+            qty = ctns * pcs;
+          } else if (ctns != null && ctns > 0) {
+            qty = ctns;
+          } else {
+            qty = double.tryParse(f.qtyController.text) ?? 1.0;
+          }
+        } else {
+          qty = ctns != null && ctns > 0 ? ctns : (double.tryParse(f.qtyController.text) ?? 1.0);
         }
       }
 
@@ -243,7 +319,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
             : null,
         customType: useInventory ? (isDebit ? 'Goods' : 'Stock Out') : null,
         cartons: useInventory ? ctns : null,
-        pcsPerCarton: useInventory ? pcs : null,
+        pcsPerCarton: useInventory ? (unitName == 'Carton' ? (pcs != null && pcs > 0 ? pcs : 1.0) : 1.0) : null,
         packagingUnit: useInventory ? unitName : null,
         date: dateStr,
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
@@ -280,7 +356,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     // Title label
     final headerTitle = widget.editingRecord == null
         ? (isStock
-            ? 'Store Entry (Storekeeper)'
+            ? 'Store Entry'
             : isCustomer
                 ? 'Customer Credit Entry'
                 : isDelala
@@ -323,11 +399,11 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
     double calculatedTotal = 0.0;
     if (isDebit || isStock) {
-      if (currentItem.packagingUnit == 'Carton' && cartons > 0 && pcs > 0 && price > 0) {
-        calculatedTotal = cartons * pcs * price;
+      if (currentItem.packagingUnit == 'Carton') {
+        final effectivePcs = pcs > 0 ? pcs : 1.0;
+        calculatedTotal = cartons * effectivePcs * price;
       } else {
-        final q = double.tryParse(currentItem.qtyController.text) ?? cartons;
-        calculatedTotal = q * price;
+        calculatedTotal = cartons * price;
       }
     } else {
       calculatedTotal = price;
@@ -344,12 +420,12 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
     return Dialog(
       backgroundColor: theme.colorScheme.surface,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 460),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           child: Form(
             key: _formKey,
             child: SingleChildScrollView(
@@ -475,16 +551,20 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                     color: isDebit ? const Color(0xFF2563EB) : Colors.grey,
                                   ),
                                   const SizedBox(width: 5),
-                                  Text(
-                                    'Debit (+) Goods / Loan\n(ዕቃ / ብድር)',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: isDebit ? FontWeight.w900 : FontWeight.w600,
-                                      color: isDebit
-                                          ? (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB))
-                                          : Colors.grey,
-                                      height: 1.15,
+                                  Flexible(
+                                    child: Text(
+                                      'Debit (+) Goods / Loan\n(ዕቃ / ብድር)',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: isDebit ? FontWeight.w900 : FontWeight.w600,
+                                        color: isDebit
+                                            ? (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB))
+                                            : Colors.grey,
+                                        height: 1.15,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -528,16 +608,20 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                     color: !isDebit ? const Color(0xFFB45309) : Colors.grey,
                                   ),
                                   const SizedBox(width: 5),
-                                  Text(
-                                    'Credit (-) Payment\n(ክፍያ / ባንክ)',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: !isDebit ? FontWeight.w900 : FontWeight.w600,
-                                      color: !isDebit
-                                          ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
-                                          : Colors.grey,
-                                      height: 1.15,
+                                  Flexible(
+                                    child: Text(
+                                      'Credit (-) Payment\n(ክፍያ / ባንክ)',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: !isDebit ? FontWeight.w900 : FontWeight.w600,
+                                        color: !isDebit
+                                            ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309))
+                                            : Colors.grey,
+                                        height: 1.15,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -583,16 +667,20 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                     color: isDebit ? const Color(0xFF2563EB) : Colors.grey,
                                   ),
                                   const SizedBox(width: 5),
-                                  Text(
-                                    'Stock In (+)\n(ማገዝ / መግቢያ)',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: isDebit ? FontWeight.w900 : FontWeight.w600,
-                                      color: isDebit
-                                          ? (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB))
-                                          : Colors.grey,
-                                      height: 1.15,
+                                  Flexible(
+                                    child: Text(
+                                      'Stock In (+)\n(ማገዝ / መግቢያ)',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: isDebit ? FontWeight.w900 : FontWeight.w600,
+                                        color: isDebit
+                                            ? (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB))
+                                            : Colors.grey,
+                                        height: 1.15,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -629,16 +717,20 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                     color: !isDebit ? const Color(0xFFBA1A1A) : Colors.grey,
                                   ),
                                   const SizedBox(width: 5),
-                                  Text(
-                                    'Stock Out (-)\n(መቆጣጠር / መውጫ)',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: !isDebit ? FontWeight.w900 : FontWeight.w600,
-                                      color: !isDebit
-                                          ? (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A))
-                                          : Colors.grey,
-                                      height: 1.15,
+                                  Flexible(
+                                    child: Text(
+                                      'Stock Out (-)\n(መቆጣጠር / መውጫ)',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: !isDebit ? FontWeight.w900 : FontWeight.w600,
+                                        color: !isDebit
+                                            ? (isDark ? const Color(0xFFFFB4AB) : const Color(0xFFBA1A1A))
+                                            : Colors.grey,
+                                        height: 1.15,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -660,10 +752,11 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     Autocomplete<String>(
                       initialValue: TextEditingValue(text: currentItem.nameController.text),
                       optionsBuilder: (textEditingValue) {
+                        final list = _dynamicStockSuggestions;
                         if (textEditingValue.text.isEmpty) {
-                          return _stockSuggestions;
+                          return list;
                         }
-                        return _stockSuggestions.where((s) => s
+                        return list.where((s) => s
                             .toLowerCase()
                             .contains(textEditingValue.text.toLowerCase()));
                       },
@@ -698,12 +791,73 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           onChanged: (val) {
                             currentItem.nameController.text = val;
                             if (isStock) _titleController.text = val;
+                            setState(() {});
                           },
                           validator: (v) =>
                               v == null || v.trim().isEmpty ? 'Please enter item name' : null,
                         );
                       },
                     ),
+
+                    // Current Stock Counter in Store (Dynamic Counter)
+                    if (isStock) ...[
+                      Builder(
+                        builder: (context) {
+                          final name = currentItem.nameController.text.trim();
+                          final hasName = name.isNotEmpty;
+                          final curCtns = hasName ? _getCurrentStockCartons(name) : 0.0;
+                          final curPcs = hasName ? _getCurrentStockPieces(name) : 0.0;
+
+                          return Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.inventory_2_outlined,
+                                  size: 15,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'In Store (በመጋዘን ያለው):',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  !hasName
+                                      ? '0 in store'
+                                      : curCtns > 0
+                                          ? '${curCtns.toInt()} Ctns (${curPcs.toInt()} pcs)'
+                                          : '0 in store',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: curCtns > 0
+                                        ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                        : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 14),
 
                     // Quantity (Cartons / Units) + Unit Selector
@@ -728,8 +882,8 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                             ),
                             onChanged: (val) {
                               final c = double.tryParse(val) ?? 0.0;
-                              final p = double.tryParse(currentItem.pcsController.text) ?? 0.0;
-                              if (c > 0 && p > 0) {
+                              final p = double.tryParse(currentItem.pcsController.text) ?? 1.0;
+                              if (currentItem.packagingUnit == 'Carton' && c > 0 && p > 0) {
                                 currentItem.qtyController.text = (c * p).toStringAsFixed(0);
                               } else {
                                 currentItem.qtyController.text = val;
@@ -763,7 +917,16 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                 }).toList(),
                                 onChanged: (val) {
                                   if (val != null) {
-                                    setState(() => currentItem.packagingUnit = val);
+                                    setState(() {
+                                      currentItem.packagingUnit = val;
+                                      final c = double.tryParse(currentItem.cartonsController.text) ?? 0.0;
+                                      final p = double.tryParse(currentItem.pcsController.text) ?? 1.0;
+                                      if (val == 'Carton' && c > 0 && p > 0) {
+                                        currentItem.qtyController.text = (c * p).toStringAsFixed(0);
+                                      } else {
+                                        currentItem.qtyController.text = currentItem.cartonsController.text;
+                                      }
+                                    });
                                   }
                                 },
                               ),
@@ -811,7 +974,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: inputBorder)),
                         ),
                         onChanged: (val) {
-                          final p = double.tryParse(val) ?? 0.0;
+                          final p = double.tryParse(val) ?? 1.0;
                           final c = double.tryParse(currentItem.cartonsController.text) ?? 0.0;
                           if (c > 0 && p > 0) {
                             currentItem.qtyController.text = (c * p).toStringAsFixed(0);
@@ -856,9 +1019,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                         border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                       ),
                       child: Text(
-                        calculatedTotal > 0
-                            ? _currencyFormat.format(calculatedTotal)
-                            : '65,000.00',
+                        _currencyFormat.format(calculatedTotal),
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w900,
@@ -1117,22 +1278,24 @@ class LineItemFormItem {
             ? quantity.toInt().toString()
             : quantity.toString());
     priceController = TextEditingController(
-        text: unitPrice.truncateToDouble() == unitPrice
-            ? unitPrice.toInt().toString()
-            : unitPrice.toString());
-    cartonsController = TextEditingController(
-        text: cartons != null && cartons > 0
-            ? (cartons.truncateToDouble() == cartons
-                ? cartons.toInt().toString()
-                : cartons.toString())
+        text: unitPrice > 0
+            ? (unitPrice.truncateToDouble() == unitPrice
+                ? unitPrice.toInt().toString()
+                : unitPrice.toString())
             : '');
+    final initialCartons = cartons != null && cartons > 0
+        ? (cartons.truncateToDouble() == cartons ? cartons.toInt().toString() : cartons.toString())
+        : (quantity > 0
+            ? (quantity.truncateToDouble() == quantity ? quantity.toInt().toString() : quantity.toString())
+            : '');
+    cartonsController = TextEditingController(text: initialCartons);
     final pcsVal = pcsPerCarton;
     pcsController = TextEditingController(
         text: pcsVal != null && pcsVal > 0
             ? (pcsVal.truncateToDouble() == pcsVal
                 ? pcsVal.toInt().toString()
                 : pcsVal.toString())
-            : '');
+            : (packagingUnit == 'Carton' ? '1' : ''));
     final cVal = customs;
     customsController = TextEditingController(
         text: cVal != null && cVal > 0

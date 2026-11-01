@@ -1,4 +1,4 @@
-import { AlertCircle, BookOpen, LogIn, RefreshCw, ShieldCheck } from 'lucide-react'
+import { AlertCircle, LogIn, RefreshCw } from 'lucide-react'
 import React, { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { Button } from '../ui/button'
@@ -27,10 +27,7 @@ export const LoginScreen: React.FC = () => {
     <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 flex items-center justify-center px-4 py-10 font-sans">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-blue-600/20">
-            <BookOpen size={30} />
-          </div>
-          <h1 className="mt-4 text-2xl font-black tracking-tight text-foreground">
+          <h1 className="mt-2 text-2xl font-black tracking-tight text-foreground">
             Merkato Credit Record
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
@@ -45,13 +42,12 @@ export const LoginScreen: React.FC = () => {
           <div>
             <h2 className="text-base font-bold text-foreground">Sign in</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Use the account provided by your admin.
+              Enter your phone number.
             </p>
           </div>
 
           {error && (
             <div className="flex items-start gap-2 p-2.5 text-xs text-rose-700 bg-rose-50 dark:bg-rose-950/50 dark:text-rose-300 rounded-lg">
-              <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -119,25 +115,7 @@ export const LoginScreen: React.FC = () => {
               </>
             )}
           </Button>
-
-          <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground pt-1">
-            <ShieldCheck size={12} />
-            <span>Shop data is protected on the server</span>
-          </div>
         </form>
-
-        {import.meta.env.DEV && (
-          <details className="mt-4 text-[11px] text-muted-foreground bg-card/60 rounded-xl p-3 ring-1 ring-zinc-950/5 dark:ring-white/10">
-            <summary className="cursor-pointer font-semibold">
-              Test accounts (development only)
-            </summary>
-            <div className="mt-2 space-y-1 font-mono">
-              <p>Admin: 0911111111 / Admin@123</p>
-              <p>Shop 1: 0922222222 / Shop@123</p>
-              <p>Shop 2: 0933333333 / Shop@123</p>
-            </div>
-          </details>
-        )}
 
         <p className="text-center text-[10px] text-muted-foreground mt-5">
           Click Ledger · ETB · Existing database preserved

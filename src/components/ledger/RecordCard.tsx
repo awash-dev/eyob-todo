@@ -250,6 +250,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                     const itemTotal = calculateItemTotal(item)
                     const ctns = Number(item.cartons) || 0
                     const pcs = Number(item.pcsPerCarton) || 0
+                    const unit = item.packagingUnit || (ctns > 0 ? 'Carton' : 'Pcs')
                     const customType = getItemCustomType(item)
 
                     return (
@@ -261,26 +262,36 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                           {idx + 1}
                         </td>
                         <td className="py-2 px-3 font-semibold text-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          {item.name}
-                          {customType && (
-                            <span className="ml-2 text-[10px] font-normal text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
-                              {customType}
-                            </span>
+                          <div className="flex items-center gap-1.5">
+                            <span>{item.name}</span>
+                            {customType && (
+                              <span className="text-[10px] font-normal text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                                {customType}
+                              </span>
+                            )}
+                          </div>
+                          {(item.date || item.notes || item.reference) && (
+                            <div className="text-[10px] text-muted-foreground font-normal mt-0.5 space-x-1">
+                              {item.date && <span>{formatDate(item.date)}</span>}
+                              {(item.notes || item.reference) && (
+                                <span className="italic">• {item.notes || item.reference}</span>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="py-2 px-3 text-muted-foreground border-r border-zinc-200 dark:border-zinc-800 font-medium">
-                          {ctns > 0 && pcs > 0 ? (
+                          {ctns > 0 && pcs > 0 && unit === 'Carton' ? (
                             <span>
                               <strong>{ctns}</strong> ctns × <strong>{pcs}</strong> pcs
                             </span>
                           ) : ctns > 0 ? (
-                            <span>{ctns} cartons</span>
+                            <span><strong>{ctns}</strong> {unit}</span>
                           ) : (
-                            <span>Direct units</span>
+                            <span>Direct units ({unit})</span>
                           )}
                         </td>
                         <td className="py-2 px-3 text-right font-bold text-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          {Number(item.quantity).toLocaleString()} pcs
+                          {Number(item.quantity).toLocaleString()} {unit === 'Carton' ? 'pcs' : unit.toLowerCase()}
                         </td>
                         <td className="py-2 px-3 text-right text-foreground border-r border-zinc-200 dark:border-zinc-800">
                           {formatCurrency(item.unitPrice)}
@@ -336,6 +347,14 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                     const isAdd = item.sign === '+'
                     const itemTotal = calculateItemTotal(item)
                     const bank = getItemBank(item, record.type)
+                    const ctns = Number(item.cartons) || 0
+                    const pcs = Number(item.pcsPerCarton) || 0
+                    const unit = item.packagingUnit || (ctns > 0 ? 'Carton' : 'Pcs')
+                    const packDetail = (ctns > 0 && pcs > 0 && unit === 'Carton')
+                      ? `${ctns} ctn × ${pcs} pcs`
+                      : (ctns > 0 && unit !== 'Carton')
+                        ? `${ctns} ${unit}`
+                        : null
 
                     return (
                       <tr
@@ -343,7 +362,16 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                         className={idx % 2 === 0 ? 'bg-background' : 'bg-zinc-50/60 dark:bg-zinc-900/30'}
                       >
                         <td className="py-2 px-3 font-semibold text-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          {item.name}
+                          <div>{item.name}</div>
+                          {(packDetail || item.date || item.notes || item.reference) && (
+                            <div className="text-[10px] text-muted-foreground font-normal mt-0.5 space-x-1">
+                              {packDetail && <span className="font-medium text-foreground">{packDetail}</span>}
+                              {item.date && <span>• {formatDate(item.date)}</span>}
+                              {(item.notes || item.reference) && (
+                                <span className="italic">• {item.notes || item.reference}</span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="py-2 px-3 border-r border-zinc-200 dark:border-zinc-800">
                           {bank ? (
@@ -355,7 +383,7 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                           )}
                         </td>
                         <td className="py-2 px-3 text-right font-medium text-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          {item.quantity}
+                          {!isAdd ? '—' : `${Number(item.quantity).toLocaleString()} ${unit === 'Carton' ? 'pcs' : unit.toLowerCase()}`}
                         </td>
                         <td className="py-2 px-3 text-right text-muted-foreground border-r border-zinc-200 dark:border-zinc-800">
                           {formatCurrency(item.unitPrice)}

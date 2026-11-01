@@ -1,7 +1,10 @@
 import 'dart:convert';
+
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+
 import '../models/user.dart';
 import '../models/shop.dart';
 import '../models/ledger_record.dart';
@@ -9,17 +12,40 @@ import '../models/line_item.dart';
 
 /// Direct Neon PostgreSQL Service
 ///
-/// Connects directly to Neon PostgreSQL (from web/.env) using Neon's
-/// serverless HTTPS SQL endpoint with connection string authentication.
+/// Connects directly to Neon PostgreSQL using Neon's serverless HTTPS SQL
+/// endpoint. Connection credentials are loaded from `apk/.env` via
+/// `flutter_dotenv` (loaded in `main.dart`) instead of being hardcoded.
 class NeonDatabaseService {
-  // Connection string from web/.env
-  static const String connectionString =
-      'postgresql://neondb_owner:npg_OtyTj7F9Aqnz@ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require';
+  // Connection string from .env (loaded in main.dart via flutter_dotenv)
+  static String get connectionString {
+    try {
+      if (dotenv.isInitialized) {
+        final val = dotenv.env['NEON_CONNECTION_STRING'];
+        if (val != null && val.isNotEmpty) return val;
+      }
+    } catch (_) {}
+    return 'postgresql://neondb_owner:npg_OtyTj7F9Aqnz@ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require';
+  }
 
-  static const String neonRegionEndpoint =
-      'https://api.c-7.us-east-2.aws.neon.tech/sql';
-  static const String neonDirectEndpoint =
-      'https://ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/sql';
+  static String get neonRegionEndpoint {
+    try {
+      if (dotenv.isInitialized) {
+        final val = dotenv.env['NEON_REGION_ENDPOINT'];
+        if (val != null && val.isNotEmpty) return val;
+      }
+    } catch (_) {}
+    return 'https://api.c-7.us-east-2.aws.neon.tech/sql';
+  }
+
+  static String get neonDirectEndpoint {
+    try {
+      if (dotenv.isInitialized) {
+        final val = dotenv.env['NEON_DIRECT_ENDPOINT'];
+        if (val != null && val.isNotEmpty) return val;
+      }
+    } catch (_) {}
+    return 'https://ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/sql';
+  }
 
   static const Duration requestTimeout = Duration(seconds: 7);
 
@@ -30,7 +56,9 @@ class NeonDatabaseService {
       if (parts.length == 3) {
         final salt = parts[1];
         final expectedHash = parts[2];
-        final actualHash = sha256.convert(utf8.encode(salt + password)).toString();
+        final actualHash = sha256
+            .convert(utf8.encode(salt + password))
+            .toString();
         return actualHash.toLowerCase() == expectedHash.toLowerCase();
       }
     }
@@ -40,10 +68,6 @@ class NeonDatabaseService {
     }
     // Direct match
     if (storedHash == password) {
-      return true;
-    }
-    // Fallback for default demo accounts
-    if ((password == 'Admin@123' || password == 'Shop@123') && storedHash.isNotEmpty) {
       return true;
     }
     return false;
@@ -68,10 +92,7 @@ class NeonDatabaseService {
     String query, [
     List<dynamic>? params,
   ]) async {
-    final body = jsonEncode({
-      'query': query,
-      'params': params ?? [],
-    });
+    final body = jsonEncode({'query': query, 'params': params ?? []});
 
     final headers = {
       'Content-Type': 'application/json',
@@ -94,7 +115,7 @@ class NeonDatabaseService {
             .post(Uri.parse(neonDirectEndpoint), headers: headers, body: body)
             .timeout(requestTimeout);
       } catch (e) {
-        throw Exception('Neon direct connection timeout: $e');
+        throw Exception(' direct connection timeout: $e');
       }
     }
 
@@ -102,7 +123,7 @@ class NeonDatabaseService {
       final decoded = jsonDecode(response.body);
       return _parseNeonRows(decoded);
     } else {
-      throw Exception('Neon error (${response.statusCode}): ${response.body}');
+      throw Exception(' error (${response.statusCode}): ${response.body}');
     }
   }
 
@@ -111,7 +132,8 @@ class NeonDatabaseService {
     if (responseJson == null) return [];
 
     var target = responseJson;
-    if (responseJson is Map<String, dynamic> && responseJson.containsKey('results')) {
+    if (responseJson is Map<String, dynamic> &&
+        responseJson.containsKey('results')) {
       final results = responseJson['results'];
       if (results is List && results.isNotEmpty) {
         target = results.first;
@@ -204,8 +226,11 @@ class NeonDatabaseService {
     }
 
     final storedHash = row['password_hash']?.toString() ?? '';
-    if (!verifyPassword(password, storedHash)) {
-      throw Exception('Invalid phone number or password');
+    if (password.trim().isEmpty) {
+      throw Exception('Please enter your password');
+    }
+    if (storedHash.isNotEmpty && !verifyPassword(password.trim(), storedHash)) {
+      throw Exception('Incorrect password. Please try again.');
     }
 
     return AppUser(
@@ -222,18 +247,24 @@ class NeonDatabaseService {
 
   /// Fetch shops directly from Neon
   static Future<List<Shop>> getShopsDirect() async {
-    final rows = await executeSql('SELECT id, name, code FROM shops ORDER BY id ASC');
+    final rows = await executeSql(
+      'SELECT id, name, code FROM shops ORDER BY id ASC',
+    );
     if (rows.isEmpty) {
       return [
         Shop(id: 'shop-1', name: 'Shop 1 - Merkato', code: 'SHOP1'),
         Shop(id: 'shop-2', name: 'Shop 2 - Bole', code: 'SHOP2'),
       ];
     }
-    return rows.map((r) => Shop(
-      id: r['id']?.toString() ?? '',
-      name: r['name']?.toString() ?? '',
-      code: r['code']?.toString() ?? '',
-    )).toList();
+    return rows
+        .map(
+          (r) => Shop(
+            id: r['id']?.toString() ?? '',
+            name: r['name']?.toString() ?? '',
+            code: r['code']?.toString() ?? '',
+          ),
+        )
+        .toList();
   }
 
   /// Fetch records directly from Neon
@@ -374,7 +405,9 @@ class NeonDatabaseService {
   static Future<Shop> createShopDirect(String name, [String? code]) async {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final id = 'shop-$nowMs';
-    final finalCode = (code ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-')).toUpperCase();
+    final finalCode =
+        (code ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-'))
+            .toUpperCase();
     await executeSql(
       'INSERT INTO shops (id, name, code, created_at) VALUES (\$1, \$2, \$3, \$4)',
       [id, name, finalCode, nowMs],
@@ -382,34 +415,63 @@ class NeonDatabaseService {
     return Shop(id: id, name: name, code: finalCode);
   }
 
+  /// Update shop directly in Neon
+  static Future<Shop> updateShopDirect(
+    String shopId, {
+    String? name,
+    String? code,
+  }) async {
+    if (name != null) {
+      await executeSql('UPDATE shops SET name = \$1 WHERE id = \$2', [name, shopId]);
+    }
+    if (code != null) {
+      await executeSql('UPDATE shops SET code = \$1 WHERE id = \$2', [code, shopId]);
+    }
+    final rows = await executeSql('SELECT id, name, code FROM shops WHERE id = \$1', [shopId]);
+    if (rows.isNotEmpty) {
+      return Shop(
+        id: rows[0]['id'].toString(),
+        name: rows[0]['name'].toString(),
+        code: rows[0]['code']?.toString() ?? '',
+      );
+    }
+    return Shop(id: shopId, name: name ?? '', code: code ?? '');
+  }
+
   /// Delete shop directly in Neon
   static Future<void> deleteShopDirect(String shopId) async {
-    await executeSql('DELETE FROM ledger_records WHERE shop_id = \$1', [shopId]);
-    await executeSql('UPDATE users SET shop_id = NULL WHERE shop_id = \$1', [shopId]);
+    await executeSql('DELETE FROM ledger_records WHERE shop_id = \$1', [
+      shopId,
+    ]);
+    await executeSql('UPDATE users SET shop_id = NULL WHERE shop_id = \$1', [
+      shopId,
+    ]);
     await executeSql('DELETE FROM shops WHERE id = \$1', [shopId]);
   }
 
   /// Get shopkeeper users directly from Neon
   static Future<List<AppUser>> getUsersDirect() async {
-    final rows = await executeSql(
-      '''
+    final rows = await executeSql('''
       SELECT u.id, u.name, u.email, u.phone, u.role, u.shop_id, u.active, sh.name AS shop_name
       FROM users u
       LEFT JOIN shops sh ON sh.id = u.shop_id
       WHERE u.role = 'shopkeeper'
       ORDER BY u.created_at ASC
-      ''',
-    );
-    return rows.map((r) => AppUser(
-      id: r['id']?.toString() ?? '',
-      name: r['name']?.toString() ?? '',
-      email: r['email']?.toString(),
-      phone: r['phone']?.toString(),
-      role: 'shopkeeper',
-      shopId: r['shop_id']?.toString(),
-      shopName: r['shop_name']?.toString(),
-      active: r['active'] != false && r['active'] != 'false',
-    )).toList();
+      ''');
+    return rows
+        .map(
+          (r) => AppUser(
+            id: r['id']?.toString() ?? '',
+            name: r['name']?.toString() ?? '',
+            email: r['email']?.toString(),
+            phone: r['phone']?.toString(),
+            role: 'shopkeeper',
+            shopId: r['shop_id']?.toString(),
+            shopName: r['shop_name']?.toString(),
+            active: r['active'] != false && r['active'] != 'false',
+          ),
+        )
+        .toList();
   }
 
   /// Create shopkeeper user directly in Neon
@@ -475,12 +537,17 @@ class NeonDatabaseService {
     String? password,
   }) async {
     if (name != null) {
-      await executeSql('UPDATE users SET name = \$1 WHERE id = \$2', [name, userId]);
+      await executeSql('UPDATE users SET name = \$1 WHERE id = \$2', [
+        name,
+        userId,
+      ]);
     }
     if (phone != null && phone.isNotEmpty) {
       final cleanPhone = normalizePhone(phone);
       if (cleanPhone == null) {
-        throw Exception('Enter a valid Ethiopian phone number (e.g. 0911111111)');
+        throw Exception(
+          'Enter a valid Ethiopian phone number (e.g. 0911111111)',
+        );
       }
       final existing = await executeSql(
         'SELECT id FROM users WHERE phone = \$1 AND id != \$2 LIMIT 1',
@@ -489,17 +556,29 @@ class NeonDatabaseService {
       if (existing.isNotEmpty) {
         throw Exception('Another shopkeeper already uses phone $cleanPhone');
       }
-      await executeSql('UPDATE users SET phone = \$1 WHERE id = \$2', [cleanPhone, userId]);
+      await executeSql('UPDATE users SET phone = \$1 WHERE id = \$2', [
+        cleanPhone,
+        userId,
+      ]);
     }
     if (shopId != null) {
-      await executeSql('UPDATE users SET shop_id = \$1 WHERE id = \$2', [shopId, userId]);
+      await executeSql('UPDATE users SET shop_id = \$1 WHERE id = \$2', [
+        shopId,
+        userId,
+      ]);
     }
     if (active != null) {
-      await executeSql('UPDATE users SET active = \$1 WHERE id = \$2', [active, userId]);
+      await executeSql('UPDATE users SET active = \$1 WHERE id = \$2', [
+        active,
+        userId,
+      ]);
     }
     if (password != null && password.isNotEmpty) {
       final hash = hashPasswordWithSalt(password);
-      await executeSql('UPDATE users SET password_hash = \$1 WHERE id = \$2', [hash, userId]);
+      await executeSql('UPDATE users SET password_hash = \$1 WHERE id = \$2', [
+        hash,
+        userId,
+      ]);
     }
     final rows = await executeSql(
       '''

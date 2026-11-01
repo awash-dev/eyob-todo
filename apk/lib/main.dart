@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'models/user.dart';
 import 'services/api_service.dart';
@@ -8,7 +9,60 @@ import 'screens/main_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final storedUser = await ApiService.getStoredUser();
+
+  // Protect against blank white screen: register custom error widget
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: Colors.white,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Color(0xFFBA1A1A), size: 48),
+              const SizedBox(height: 14),
+              const Text(
+                'Application Display Error',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                details.exceptionAsString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter Error: ${details.exceptionAsString()}');
+  };
+
+  // Safe dotenv load
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Notice: could not load .env asset: $e");
+  }
+
+  // Safe user session load
+  AppUser? storedUser;
+  try {
+    storedUser = await ApiService.getStoredUser();
+  } catch (e) {
+    debugPrint("Notice: could not load stored user: $e");
+  }
+
   runApp(MerkatoCreditApp(initialUser: storedUser));
 }
 

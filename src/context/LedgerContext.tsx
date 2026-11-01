@@ -224,10 +224,11 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
   const addRecord = useCallback(
     (data: Omit<LedgerRecord, 'id' | 'createdAt' | 'updatedAt'>) => {
       const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      const resolvedShopId = (activeShopId && activeShopId !== 'all') ? activeShopId : 'shop-1'
       const optimistic: LedgerRecord = {
         ...data,
         id: tempId,
-        shopId: activeShopId || undefined,
+        shopId: resolvedShopId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }
@@ -239,7 +240,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       showToast(`Added: "${data.title}"`, 'success')
 
       setSyncStatus('syncing')
-      apiCreateRecord(data, activeShopId)
+      apiCreateRecord(data, resolvedShopId)
         .then(({ record }) => {
           setRecords((prev) => {
             const next = prev.map((item) =>

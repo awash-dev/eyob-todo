@@ -29,6 +29,7 @@ class _MainScreenState extends State<MainScreen> {
   String? _selectedShopId;
   List<LedgerRecord> _records = [];
   bool _isLoading = true;
+  String? _errorMessage;
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
@@ -95,7 +96,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _loadShopsAndRecords() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
       final shops = await ApiService.getShops();
       final records = await ApiService.getRecords(shopId: _selectedShopId);
@@ -106,8 +110,13 @@ class _MainScreenState extends State<MainScreen> {
           _isLoading = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+        });
+      }
     }
   }
 
@@ -117,9 +126,19 @@ class _MainScreenState extends State<MainScreen> {
       if (mounted) {
         setState(() {
           _records = records;
+          _errorMessage = null;
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception:', '').trim()),
+            backgroundColor: const Color(0xFFBA1A1A),
+          ),
+        );
+      }
+    }
   }
 
   void _onShopChanged(String? newShopId) {
@@ -286,7 +305,7 @@ class _MainScreenState extends State<MainScreen> {
       MaterialPageRoute(
         builder: (_) => StatementScreen(
           accountName: record.title,
-          accountType: record.type == 'stock' ? 'customer' : record.type,
+          accountType: record.type,
           shopId: record.shopId,
         ),
       ),
@@ -606,47 +625,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Small label/value chip used inside mobile store item cards
-  Widget _buildInfoChip(
-    String label,
-    String value,
-    bool isDark, {
-    Color? valueColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E2638) : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 11,
-              fontFamily: 'monospace',
-              fontWeight: FontWeight.w900,
-              color: valueColor ?? (isDark ? Colors.white : Colors.black87),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   /// Store Inventory on Hand View (Showing how much store items have, matching Storekeeper requirement)
   Widget _buildStockInventorySheet(ThemeData theme, bool isDark) {
@@ -836,32 +815,71 @@ class _MainScreenState extends State<MainScreen> {
               margin: const EdgeInsets.all(24),
               padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
               alignment: Alignment.center,
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.inventory_2_outlined,
-                    size: 48,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No items in store inventory',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
+              child: _errorMessage != null
+                  ? Column(
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_rounded,
+                          size: 42,
+                          color: Color(0xFFBA1A1A),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Online Connection Required',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _loadShopsAndRecords,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Retry Connection'),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 48,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No items in store inventory',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Tap "+ Store" below to record items in store',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Tap "+ Store In (Storekeeper)" below to record items in store',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  ),
-                ],
-              ),
             )
           else
             Container(
@@ -933,224 +951,256 @@ class _MainScreenState extends State<MainScreen> {
                       children: items.asMap().entries.map((entry) {
                         final idx = entry.key + 1;
                         final it = entry.value;
-                        final qtyColor = it.isOut
-                            ? const Color(0xFFBA1A1A)
-                            : const Color(0xFF2563EB);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF161D2E)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(9),
+                            color: isDark ? const Color(0xFF161D2E) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF2E384D)
-                                  : const Color(0xFFE2E8F0),
+                              color: isDark ? const Color(0xFF2E384D) : const Color(0xFFCBD5E1),
+                              width: 1.0,
                             ),
                           ),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // Row 1: index + name + IN/OUT chip + notes + actions
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    width: 22,
-                                    height: 22,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: qtyColor.withValues(alpha: 0.12),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Text(
-                                      '$idx',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        color: qtyColor,
-                                      ),
+                              // Header: Index + Item Name + Subtitle + Action buttons
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0),
+                                      width: 0.8,
                                     ),
                                   ),
-                                  const SizedBox(width: 7),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Flexible(
-                                              child: Text(
-                                                it.itemName,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w800,
-                                                  fontSize: 13.5,
-                                                  color:
-                                                      theme
-                                                          .colorScheme
-                                                          .onSurface,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 5),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 5,
-                                                    vertical: 1.5,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      '#$idx',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  it.itemName,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w800,
+                                                    fontSize: 13.5,
+                                                    color: theme.colorScheme.onSurface,
                                                   ),
-                                              decoration: BoxDecoration(
-                                                color: it.isOut
-                                                    ? const Color(0xFFFEF2F2)
-                                                    : const Color(0xFFEFF6FF),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                                border: Border.all(
-                                                  color: it.isOut
-                                                      ? const Color(0xFFFCA5A5)
-                                                      : const Color(0xFFBFDBFE),
-                                                  width: 0.7,
                                                 ),
                                               ),
+                                              if (it.isOut) ...[
+                                                const SizedBox(width: 6),
+                                                const Text(
+                                                  '(Stock Out)',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFFBA1A1A),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          if (it.notes != null && it.notes!.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 2),
                                               child: Text(
-                                                it.isOut ? 'OUT −' : 'IN +',
+                                                it.notes!,
                                                 style: TextStyle(
-                                                  fontSize: 9.5,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: qtyColor,
+                                                  fontSize: 10.5,
+                                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                                 ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                        if (it.notes != null &&
-                                            it.notes!.isNotEmpty)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 2,
-                                            ),
-                                            child: Text(
-                                              it.notes!,
-                                              style: TextStyle(
-                                                fontSize: 10.5,
-                                                color: isDark
-                                                    ? const Color(0xFF94A3B8)
-                                                    : const Color(0xFF64748B),
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.edit_outlined,
+                                        size: 16,
+                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      tooltip: 'Edit Store',
+                                      onPressed: () => _openEditRecordDialog(it.record),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.delete_outline,
+                                        size: 16,
+                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      tooltip: 'Delete Store',
+                                      onPressed: () => _deleteRecord(it.record),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Metric Cells (Cartons | Pcs/Ctn | Qty | Unit Price)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'ካርቶን (Cartons)',
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                             ),
                                           ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            it.cartons > 0 ? '${it.cartons.toInt()}' : '-',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'በካርቶን (Pcs/Ctn)',
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            it.pcsPerCarton > 0 ? '${it.pcsPerCarton.toInt()}' : '-',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'ብዛት (Qty)',
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${it.signedQty.toInt()} ${it.packagingUnit == "Carton" ? "pcs" : it.packagingUnit}',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            'ዋጋ (Unit)',
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            _currencyFormat.format(it.unitPrice),
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              fontFamily: 'monospace',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Bottom Bar: Date & Total Value
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E2638) : const Color(0xFFF8FAFC),
+                                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(7)),
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      it.date,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontFamily: 'monospace',
+                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'ድምር ዋጋ: ',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                          ),
+                                        ),
+                                        Text(
+                                          'ETB ${_currencyFormat.format(it.signedValue)}',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w900,
+                                            fontFamily: 'monospace',
+                                            color: it.isOut ? const Color(0xFFBA1A1A) : const Color(0xFF1D4ED8),
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.edit_outlined,
-                                      size: 17,
-                                      color: Color(0xFF2563EB),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    tooltip: 'Edit Store',
-                                    onPressed: () =>
-                                        _openEditRecordDialog(it.record),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete_outline,
-                                      size: 17,
-                                      color: Color(0xFFBA1A1A),
-                                    ),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    tooltip: 'Delete Store',
-                                    onPressed: () => _deleteRecord(it.record),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 7),
-
-                              // Row 2: packaging / qty / unit price chips
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: [
-                                  _buildInfoChip(
-                                    'Cartons',
-                                    it.cartons > 0
-                                        ? it.cartons.toInt().toString()
-                                        : '-',
-                                    isDark,
-                                  ),
-                                  _buildInfoChip(
-                                    'Pcs/Ctn',
-                                    it.pcsPerCarton > 0
-                                        ? it.pcsPerCarton.toInt().toString()
-                                        : '-',
-                                    isDark,
-                                  ),
-                                  _buildInfoChip(
-                                    'Available Qty',
-                                    '${it.signedQty.toInt()} ${it.packagingUnit == "Carton" ? "pcs" : it.packagingUnit}',
-                                    isDark,
-                                    valueColor: qtyColor,
-                                  ),
-                                  _buildInfoChip(
-                                    'Unit Price',
-                                    'ETB ${_currencyFormat.format(it.unitPrice)}',
-                                    isDark,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 7),
-
-                              // Row 3: date + total value
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    it.date,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontFamily: 'monospace',
-                                      color: isDark
-                                          ? const Color(0xFF94A3B8)
-                                          : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.end,
-                                    children: [
-                                      const Text(
-                                        'TOTAL VALUE',
-                                        style: TextStyle(
-                                          fontSize: 8.5,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.6,
-                                          color: Color(0xFF64748B),
-                                        ),
-                                      ),
-                                      Text(
-                                        'ETB ${_currencyFormat.format(it.signedValue)}',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w900,
-                                          fontFamily: 'monospace',
-                                          color: qtyColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -1223,8 +1273,6 @@ class _MainScreenState extends State<MainScreen> {
 
   /// Authentic Excel Spreadsheet Table View matching the User's Excel Ledger
   Widget _buildRecordTable(LedgerRecord rec, ThemeData theme, bool isDark) {
-    double runningBalance = 0;
-    final isCustomerOrDelala = rec.type == 'customer' || rec.type == 'delala';
     final isExpanded = _expandedRecordIds.contains(rec.id);
 
     // Type badge label (mirrors the web record card)
@@ -1334,28 +1382,14 @@ class _MainScreenState extends State<MainScreen> {
                             Expanded(
                               child: InkWell(
                                 onTap: () => _openStatement(rec),
-                                child: Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        rec.title,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 14,
-                                          color: theme.colorScheme.onSurface,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.open_in_new,
-                                      size: 12,
-                                      color: isDark
-                                          ? const Color(0xFF94A3B8)
-                                          : const Color(0xFF94A3B8),
-                                    ),
-                                  ],
+                                child: Text(
+                                  rec.title,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ),
@@ -1380,7 +1414,7 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                   const SizedBox(width: 6),
 
-                  // Right: Net Balance + actions
+                  // Right: Net Balance + eye icon + actions
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -1411,12 +1445,31 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      IconButton(
-                        icon: const Icon(Icons.more_vert, size: 18),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        tooltip: 'Actions',
-                        onPressed: () => _showRecordActions(rec),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (rec.type == 'customer' || rec.type == 'supplier' || rec.type == 'delala') ...[
+                            IconButton(
+                              icon: const Icon(
+                                Icons.visibility_outlined,
+                                size: 19,
+                                color: Color(0xFF2563EB),
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              tooltip: 'View Statement Details',
+                              onPressed: () => _openStatement(rec),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          IconButton(
+                            icon: const Icon(Icons.more_vert, size: 18),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                            tooltip: 'Actions',
+                            onPressed: () => _showRecordActions(rec),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1425,184 +1478,310 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
 
-          // Expanded body: vertical item rows (fits phone width, no squeeze)
+          // Expanded body: Authentic Table View matching Image 5
           if (isExpanded) ...[
-            Container(height: 1, color: gridBorderColor),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Column(
-                children: rec.items.map((item) {
-                  final isDebit = item.sign == '+';
-                  final subtotal = item.subtotal;
-                  if (isCustomerOrDelala) {
-                    if (isDebit) {
-                      runningBalance += subtotal;
-                    } else {
-                      runningBalance -= subtotal;
-                    }
-                  } else {
-                    if (isDebit) {
-                      runningBalance -= subtotal;
-                    } else {
-                      runningBalance += subtotal;
-                    }
-                  }
-
-                  final bank = (item.paymentMethod != null &&
-                          item.paymentMethod!.isNotEmpty)
-                      ? item.paymentMethod
-                      : item.bank;
-                  final ctns = item.cartons ?? 0;
-                  final pcs = item.pcsPerCarton ?? 0;
-                  final hasPack = ctns > 0 && pcs > 0;
-                  final qtyLabel = hasPack
-                      ? '${ctns.toInt()} cartons × ${pcs.toInt()} pcs = ${item.quantity.toInt()} pcs'
-                      : 'Qty: ${item.quantity.toInt()}';
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 9,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF161D2E) : Colors.white,
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(
-                        color: isDark
-                            ? const Color(0xFF2E384D)
-                            : const Color(0xFFE2E8F0),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF161D2E) : Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: gridBorderColor, width: 1.0),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Table Header Row matching Image 5
+                    // # | የዕቃው አይነት | ዋጋ | ብዛት | ድምር
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        border: Border(bottom: BorderSide(color: gridBorderColor, width: 1.0)),
                       ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Sign circle (+/-)
-                        Container(
-                          width: 24,
-                          height: 24,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: isDebit
-                                ? const Color(0xFF2563EB)
-                                : const Color(0xFFBA1A1A),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            isDebit ? Icons.add : Icons.remove,
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-
-                        // Item details
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      item.name,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 13,
-                                        color: theme.colorScheme.onSurface,
-                                      ),
-                                    ),
-                                  ),
-                                  if (bank != null && bank.isNotEmpty) ...[
-                                    const SizedBox(width: 5),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 5,
-                                        vertical: 1.5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEFF6FF),
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(
-                                          color: const Color(0xFFBFDBFE),
-                                          width: 0.7,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        bank,
-                                        style: const TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color(0xFF2563EB),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                qtyLabel,
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: isDark
-                                      ? const Color(0xFF94A3B8)
-                                      : const Color(0xFF64748B),
-                                ),
-                              ),
-                              Text(
-                                'Unit: ETB ${_currencyFormat.format(item.unitPrice)} · ${item.date ?? rec.date}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: isDark
-                                      ? const Color(0xFF94A3B8)
-                                      : const Color(0xFF94A3B8),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Amount + running balance
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              isDebit
-                                  ? '+ ETB ${_currencyFormat.format(subtotal)}'
-                                  : '− ETB ${_currencyFormat.format(subtotal)}',
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            child: Text(
+                              '#',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                                fontFamily: 'monospace',
-                                color: isDebit
-                                    ? const Color(0xFF2563EB)
-                                    : const Color(0xFFBA1A1A),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Bal ${_currencyFormat.format(runningBalance)}',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'monospace',
-                                color: runningBalance >= 0
-                                    ? (isDark
-                                          ? const Color(0xFF93C5FD)
-                                          : const Color(0xFF2563EB))
-                                    : (isDark
-                                          ? const Color(0xFFFFB4AB)
-                                          : const Color(0xFFBA1A1A)),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 12,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: Text(
+                                'የዕቃው አይነት',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 7,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                'ዋጋ',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 5,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                'ብዛት',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 8,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: Text(
+                                'ድምር',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Table Data Rows
+                    ...rec.items.asMap().entries.map((entry) {
+                      final itemIdx = entry.key + 1;
+                      final item = entry.value;
+                      final subtotal = item.subtotal;
+
+                      final bank = (item.paymentMethod != null && item.paymentMethod!.isNotEmpty)
+                          ? item.paymentMethod
+                          : item.bank;
+                      final ctns = item.cartons ?? 0;
+                      final pcs = item.pcsPerCarton ?? 0;
+                      final unit = item.packagingUnit ?? (ctns > 0 ? 'Carton' : 'Pcs');
+                      final isPayment = item.sign == '-';
+                      final packDetail = isPayment
+                          ? (bank != null && bank.isNotEmpty ? 'Bank: $bank' : null)
+                          : (unit == 'Carton' && ctns > 0 && pcs > 0
+                              ? '${ctns.toInt()} ctn × ${pcs.toInt()} pcs'
+                              : (ctns > 0
+                                  ? '${ctns.toInt()} $unit'
+                                  : (item.quantity > 0 && unit != 'Pcs' ? '${item.quantity.toInt()} $unit' : null)));
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: (itemIdx % 2 == 0)
+                              ? (isDark ? const Color(0xFF1E2638) : const Color(0xFFFAFAFA))
+                              : (isDark ? const Color(0xFF161D2E) : Colors.white),
+                          border: Border(bottom: BorderSide(color: gridBorderColor, width: 0.8)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // #
+                            SizedBox(
+                              width: 24,
+                              child: Text(
+                                '$itemIdx',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ),
+                            Container(width: 1, height: 28, color: gridBorderColor),
+
+                            // የዕቃው አይነት (Item)
+                            Expanded(
+                              flex: 12,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      item.name,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: theme.colorScheme.onSurface,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Builder(
+                                      builder: (context) {
+                                        final subDetails = <String>[];
+                                        if (packDetail != null && packDetail.isNotEmpty) {
+                                          subDetails.add(packDetail);
+                                        }
+                                        if (item.date != null && item.date!.isNotEmpty) {
+                                          subDetails.add(item.date!);
+                                        }
+                                        if (item.notes != null && item.notes!.isNotEmpty) {
+                                          subDetails.add(item.notes!);
+                                        } else if (item.reference != null && item.reference!.isNotEmpty) {
+                                          subDetails.add(item.reference!);
+                                        }
+                                        if (subDetails.isEmpty) return const SizedBox.shrink();
+
+                                        return Text(
+                                          subDetails.join(' · '),
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Container(width: 1, height: 28, color: gridBorderColor),
+
+                            // ዋጋ (Price)
+                            Expanded(
+                              flex: 7,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Text(
+                                  _currencyFormat.format(item.unitPrice),
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'monospace',
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Container(width: 1, height: 28, color: gridBorderColor),
+
+                            // ብዛት (Qty)
+                            Expanded(
+                              flex: 5,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Text(
+                                  item.sign == '-'
+                                      ? '-${item.quantity.toInt()}'
+                                      : '${item.quantity.toInt()}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: 'monospace',
+                                    color: item.sign == '-'
+                                        ? const Color(0xFFBA1A1A)
+                                        : theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Container(width: 1, height: 28, color: gridBorderColor),
+
+                            // ድምር (Total)
+                            Expanded(
+                              flex: 8,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                child: Text(
+                                  item.sign == '-'
+                                      ? '-${_currencyFormat.format(subtotal)}'
+                                      : _currencyFormat.format(subtotal),
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'monospace',
+                                    color: item.sign == '-'
+                                        ? const Color(0xFFBA1A1A)
+                                        : const Color(0xFF1D4ED8),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ],
+                      );
+                    }),
+
+                    // ጠቅላላ ድምር Footer Row (exactly like Image 5)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'ጠቅላላ ድምር',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            rec.balance < 0
+                                ? '-${_currencyFormat.format(rec.balance.abs())}'
+                                : _currencyFormat.format(rec.balance),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'monospace',
+                              color: rec.balance < 0
+                                  ? const Color(0xFFBA1A1A)
+                                  : const Color(0xFF1D4ED8),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  );
-                }).toList(),
+                  ],
+                ),
               ),
             ),
 
@@ -1889,7 +2068,10 @@ class _MainScreenState extends State<MainScreen> {
                                 const SizedBox(width: 6),
                                 Flexible(
                                   child: DropdownButton<String>(
-                                    value: _selectedShopId,
+                                    value: (_selectedShopId == 'all' ||
+                                            _shops.any((s) => s.id == _selectedShopId))
+                                        ? _selectedShopId
+                                        : 'all',
                                     underline: const SizedBox(),
                                     isDense: true,
                                     isExpanded: true,
@@ -2068,38 +2250,83 @@ class _MainScreenState extends State<MainScreen> {
                     child: _currentTabIndex == 3
                         ? _buildStockInventorySheet(theme, isDark)
                         : (records.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.table_chart_outlined,
-                                        size: 38,
-                                        color: Colors.grey.shade400,
+                            ? (_errorMessage != null
+                                ? Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(24.0),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(
+                                            Icons.cloud_off_rounded,
+                                            size: 42,
+                                            color: Color(0xFFBA1A1A),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          const Text(
+                                            'Online Connection Required',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            _errorMessage!,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              color: isDark
+                                                  ? const Color(0xFF94A3B8)
+                                                  : const Color(0xFF64748B),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          ElevatedButton.icon(
+                                            onPressed: _loadShopsAndRecords,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF2563EB),
+                                              foregroundColor: Colors.white,
+                                            ),
+                                            icon: const Icon(Icons.refresh, size: 16),
+                                            label: const Text('Retry Connection'),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'No $_currentTabLabel entries found',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13.5,
-                                          color: isDark
-                                              ? const Color(0xFF94A3B8)
-                                              : const Color(0xFF64748B),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.table_chart_outlined,
+                                          size: 38,
+                                          color: Colors.grey.shade400,
                                         ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      const Text(
-                                        'Tap "+" to add a new transaction entry',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          color: Color(0xFF94A3B8),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'No $_currentTabLabel entries found',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13.5,
+                                            color: isDark
+                                                ? const Color(0xFF94A3B8)
+                                                : const Color(0xFF64748B),
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : ListView.builder(
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          'Tap "+" to add a new transaction entry',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            color: Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ))
+                            : ListView.builder(
                                   padding: const EdgeInsets.only(bottom: 75),
                                   itemCount: records.length,
                                   itemBuilder: (ctx, index) {
@@ -2119,17 +2346,17 @@ class _MainScreenState extends State<MainScreen> {
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF2563EB), // Primary Blue
         foregroundColor: Colors.white,
-        elevation: 4,
-        icon: const Icon(Icons.add, size: 20),
+        elevation: 3,
+        icon: const Icon(Icons.add, size: 18),
         label: Text(
           _currentTabIndex == 3
-              ? '+ Store In (Storekeeper)'
-              : 'Add ${_currentTabIndex == 2
-                    ? "Delala"
-                    : _currentTabIndex == 1
-                    ? "Supplier"
-                    : "Customer"}',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ? 'Store Entry'
+              : _currentTabIndex == 2
+                  ? 'Delala Entry'
+                  : _currentTabIndex == 1
+                      ? 'Supplier Entry'
+                      : 'Customer Entry',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
         onPressed: _openCreateRecordDialog,
       ),

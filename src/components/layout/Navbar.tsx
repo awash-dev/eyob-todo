@@ -33,11 +33,12 @@ export const Navbar: React.FC = () => {
               <div className="flex items-center gap-1 min-w-0">
                 <Store size={14} className="text-muted-foreground hidden sm:inline" />
                 <select
-                  value={activeShopId || ''}
+                  value={activeShopId || 'all'}
                   onChange={(event) => setActiveShopId(event.target.value)}
-                  className="h-7 max-w-[130px] sm:max-w-[210px] rounded-lg border border-input bg-background px-2 text-[11px] font-semibold text-foreground"
-                  title="Select shop"
+                  className="h-7 max-w-[150px] sm:max-w-[230px] rounded-lg border border-input bg-background px-2 text-[11px] font-semibold text-foreground"
+                  title="Select shop or combined view"
                 >
+                  <option value="all">🌐 All Shops (Combined)</option>
                   {shops.map((shop) => (
                     <option key={shop.id} value={shop.id}>
                       {shop.name}

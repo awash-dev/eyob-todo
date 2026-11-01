@@ -261,9 +261,24 @@ class _StatementScreenState extends State<StatementScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final isCustomer = st.accountType == 'customer';
-    final formulaText = isCustomer
-        ? 'Customer Balance = Total Debit - Total Credit'
-        : 'Supplier Balance = Total Credit - Total Debit';
+    final isDelala = st.accountType == 'delala';
+    final isStock = st.accountType == 'stock';
+
+    final String typeTitle = isStock
+        ? 'Store Inventory'
+        : isCustomer
+            ? 'Customer Credit'
+            : isDelala
+                ? 'Delala (Broker)'
+                : 'Supplier Credit';
+
+    final formulaText = isStock
+        ? 'Store On Hand = Stock In (+) - Stock Out (-)'
+        : isCustomer
+            ? 'Customer Balance = Total Debit - Total Credit'
+            : isDelala
+                ? 'Delala Balance = Commission Earned - Paid'
+                : 'Supplier Balance = Total Credit - Total Debit';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(10.0),
@@ -310,7 +325,7 @@ class _StatementScreenState extends State<StatementScreen> {
                         ),
                       ),
                       child: Text(
-                        isCustomer ? 'Customer Credit' : 'Supplier Credit',
+                        typeTitle,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -372,6 +387,7 @@ class _StatementScreenState extends State<StatementScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final gridColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    final isStock = st.accountType == 'stock';
 
     return Container(
       decoration: BoxDecoration(
@@ -435,7 +451,7 @@ class _StatementScreenState extends State<StatementScreen> {
                         border: Border(right: BorderSide(color: gridColor, width: 0.8)),
                       ),
                       child: Text(
-                        'Debit (+)',
+                        isStock ? 'Stock In (+)' : 'Debit (+)',
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           color: isDark ? Colors.white : const Color(0xFF1E293B),
@@ -453,7 +469,7 @@ class _StatementScreenState extends State<StatementScreen> {
                         border: Border(right: BorderSide(color: gridColor, width: 0.8)),
                       ),
                       child: Text(
-                        'Credit (-)',
+                        isStock ? 'Stock Out (-)' : 'Credit (-)',
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           color: isDark ? const Color(0xFFFEF08A) : const Color(0xFF854D0E),
@@ -468,7 +484,7 @@ class _StatementScreenState extends State<StatementScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Text(
-                        'Balance',
+                        isStock ? 'On Hand' : 'Balance',
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           color: isDark ? Colors.white : const Color(0xFF1E293B),
@@ -771,6 +787,7 @@ class _StatementScreenState extends State<StatementScreen> {
   Widget _buildExcelTotalsCard(AccountStatement st) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isStock = st.accountType == 'stock';
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -785,7 +802,7 @@ class _StatementScreenState extends State<StatementScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total Debit:',
+                isStock ? 'Total Stock In:' : 'Total Debit:',
                 style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
               ),
               Text(
@@ -799,7 +816,7 @@ class _StatementScreenState extends State<StatementScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total Credit (Payments):',
+                isStock ? 'Total Stock Out:' : 'Total Credit (Payments):',
                 style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFDE047) : const Color(0xFF854D0E)),
               ),
               Container(
@@ -820,7 +837,7 @@ class _StatementScreenState extends State<StatementScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'OUTSTANDING BALANCE:',
+                isStock ? 'INVENTORY ON HAND VALUE:' : 'OUTSTANDING BALANCE:',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
               ),
               Text(

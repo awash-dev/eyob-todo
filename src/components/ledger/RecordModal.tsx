@@ -80,6 +80,7 @@ export const RecordModal: React.FC = () => {
           quantity: 1,
           sign: '+',
           customType: 'Stock',
+          pcsPrice: 0,
         },
       ])
     }
@@ -95,6 +96,7 @@ export const RecordModal: React.FC = () => {
       quantity: 1,
       sign: '+',
       customType: 'Stock',
+      pcsPrice: 0,
     }
 
     setItems((prev) => [...prev, newItem])
@@ -124,6 +126,7 @@ export const RecordModal: React.FC = () => {
           quantity: 1,
           sign: '+',
           customType: 'Stock',
+          pcsPrice: 0,
         },
       ])
       return
@@ -329,6 +332,7 @@ export const RecordModal: React.FC = () => {
         pcsPerCarton: it.pcsPerCarton
           ? Math.max(0, Number(it.pcsPerCarton))
           : undefined,
+        pcsPrice: it.pcsPrice ? Math.max(0, Number(it.pcsPrice)) : undefined,
         customs: it.customs ? Math.max(0, Number(it.customs)) : undefined,
         bank: bank || undefined,
         customType: customType || undefined,
@@ -434,7 +438,7 @@ export const RecordModal: React.FC = () => {
           {/* Line Items - Clean, spacious layout with Bank and Custom Type support */}
           <div className="pt-1 w-full min-w-0 max-w-full">
             <div className="w-full min-w-0 max-w-full overflow-x-auto pb-1.5 scrollbar-thin rounded-xl border border-zinc-100 dark:border-zinc-800/80 p-2 sm:p-3 bg-muted/10">
-              <div className={isStockTab ? (showCustoms ? 'min-w-[890px]' : 'min-w-[820px]') : 'min-w-[660px]'}>
+              <div className={isStockTab ? (showCustoms ? 'min-w-[890px]' : 'min-w-[820px]') : 'min-w-[780px]'}>
                 <div className="flex items-center gap-2 text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-1 border-b border-zinc-100 dark:border-zinc-800/80 pb-1.5">
                   <span className="w-8 text-center shrink-0">+/-</span>
                   <span className="w-32 sm:w-36 text-left shrink-0">
@@ -462,6 +466,9 @@ export const RecordModal: React.FC = () => {
                     <>
                       <span className="w-20 sm:w-24 text-right shrink-0">
                         {lineLabels.unitPrice}
+                      </span>
+                      <span className="w-20 sm:w-24 text-right shrink-0">
+                        Pcs Price
                       </span>
                       <span className="w-20 sm:w-24 text-center shrink-0">
                         {lineLabels.quantity}
@@ -630,6 +637,24 @@ export const RecordModal: React.FC = () => {
                                 }
                                 className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
+
+                              {/* Pieces Price in ETB */}
+                              <input
+                                type="number"
+                                placeholder="Pcs Price"
+                                step="any"
+                                min="0"
+                                value={item.pcsPrice === 0 ? '' : item.pcsPrice}
+                                onChange={(e) =>
+                                  handleItemChange(
+                                    index,
+                                    'pcsPrice',
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                title="Price per single piece"
+                              />
                             </>
                           ) : (
                             <>
@@ -678,6 +703,22 @@ export const RecordModal: React.FC = () => {
                                 )
                               }
                               className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <input
+                              type="number"
+                              placeholder="Pcs Price"
+                              step="any"
+                              min="0"
+                              value={item.pcsPrice === 0 ? '' : item.pcsPrice}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  'pcsPrice',
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
+                              className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              title="Price per single piece"
                             />
                             <input
                               type="number"

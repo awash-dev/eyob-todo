@@ -38,7 +38,14 @@ export function formatDate(dateString: string): string {
 }
 
 export function calculateItemTotal(item: LineItem): number {
-  const base = (item.unitPrice || 0) * (item.quantity || 0)
+  // If pieces price (pcsPrice) is set, calculate per-piece total
+  // Otherwise fall back to unitPrice × quantity
+  let base: number
+  if (item.pcsPrice != null && item.pcsPrice > 0) {
+    base = item.pcsPrice * (item.quantity || 0)
+  } else {
+    base = (item.unitPrice || 0) * (item.quantity || 0)
+  }
   if (item.sign === '-') {
     return -base
   }
@@ -86,10 +93,14 @@ export function generateRecordShareText(
     if (item.cartons && item.pcsPerCarton) {
       text += `     📦 Packing: ${item.cartons} ctns × ${item.pcsPerCarton} pcs/ctn (${item.quantity} units)\n`
     }
+    if (item.pcsPrice != null && item.pcsPrice > 0) {
+      text += `     💎 Pcs Price: ${formatCurrency(item.pcsPrice, currency)}\n`
+    }
     if (item.customs) {
       text += `     🛃 Customs: ${formatCurrency(item.customs, currency)}\n`
     }
-    text += `     ${item.quantity} × ${formatCurrency(item.unitPrice, currency)} = ${formatCurrency(itemTotal, currency)} ${sign}\n`
+    const displayPrice = item.pcsPrice != null && item.pcsPrice > 0 ? item.pcsPrice : item.unitPrice
+    text += `     ${item.quantity} × ${formatCurrency(displayPrice, currency)} = ${formatCurrency(itemTotal, currency)} ${sign}\n`
   })
 
   text += `━━━━━━━━━━━━━━━━━━━━━━━━━\n`

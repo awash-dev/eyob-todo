@@ -19,6 +19,7 @@ export interface LineItem {
   customs?: number
   cartons?: number
   pcsPerCarton?: number
+  pcsPrice?: number // Price per individual piece
   paymentMethod?: string
   reference?: string
   packagingUnit?: string

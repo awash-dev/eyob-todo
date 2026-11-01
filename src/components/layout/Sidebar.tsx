@@ -25,35 +25,35 @@ export const Sidebar: React.FC = () => {
     Icon: React.ComponentType<{ size?: number; className?: string }>
     activeClass: string
   }[] = [
-    {
-      id: 'customer',
-      label: 'Customer Credit',
-      Icon: Users,
-      activeClass:
-        'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-    },
-    {
-      id: 'supplier',
-      label: 'Supplier Credit',
-      Icon: Building2,
-      activeClass:
-        'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-    },
-    {
-      id: 'delala',
-      label: 'Delala Credit',
-      Icon: Handshake,
-      activeClass:
-        'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-    },
-    {
-      id: 'stock',
-      label: 'Stock & Inventory',
-      Icon: Layers,
-      activeClass:
-        'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-    },
-  ]
+      {
+        id: 'customer',
+        label: 'Customer Credit',
+        Icon: Users,
+        activeClass:
+          'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+      },
+      {
+        id: 'supplier',
+        label: 'Supplier Credit',
+        Icon: Building2,
+        activeClass:
+          'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+      },
+      {
+        id: 'delala',
+        label: 'Delala Credit',
+        Icon: Handshake,
+        activeClass:
+          'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+      },
+      {
+        id: 'stock',
+        label: 'Stock & Inventory',
+        Icon: Layers,
+        activeClass:
+          'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+      },
+    ]
 
   return (
     <>
@@ -83,10 +83,11 @@ export const Sidebar: React.FC = () => {
               </label>
               <select
                 id="sidebar-shop"
-                value={activeShopId || ''}
+                value={activeShopId || 'all'}
                 onChange={(event) => setActiveShopId(event.target.value)}
                 className="mt-1 w-full h-8 rounded-lg border border-input bg-background px-2 text-[11px] font-semibold text-foreground"
               >
+                <option value="all">🌐 All Shops (Combined)</option>
                 {shops.map((shop) => (
                   <option key={shop.id} value={shop.id}>
                     {shop.name}
@@ -111,11 +112,10 @@ export const Sidebar: React.FC = () => {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${
-                  isActive
-                    ? `${tab.activeClass} font-semibold`
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-                }`}
+                className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${isActive
+                  ? `${tab.activeClass} font-semibold`
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                  }`}
               >
                 <span className="flex items-center gap-2 min-w-0">
                   <tab.Icon size={16} className="shrink-0" />

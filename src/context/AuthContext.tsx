@@ -58,8 +58,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         } catch {
           stored = null
         }
-        const validStored = nextShops.some((shop) => shop.id === stored)
-        const nextShopId = validStored ? stored : (nextShops[0]?.id ?? null)
+        const validStored = stored === 'all' || nextShops.some((shop) => shop.id === stored)
+        const nextShopId = validStored ? stored : 'all'
         setActiveShopIdState(nextShopId)
         if (nextShopId) {
           try {
@@ -144,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const setActiveShopId = useCallback(
     (shopId: string) => {
       if (user?.role !== 'admin') return
-      if (!shops.some((shop) => shop.id === shopId)) return
+      if (shopId !== 'all' && !shops.some((shop) => shop.id === shopId)) return
       setActiveShopIdState(shopId)
       try {
         localStorage.setItem(ACTIVE_SHOP_KEY, shopId)
@@ -167,7 +167,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [])
 
   const activeShop = useMemo(
-    () => shops.find((shop) => shop.id === activeShopId) ?? null,
+    () => {
+      if (activeShopId === 'all') {
+        return {
+          id: 'all',
+          name: 'All Shops (Combined)',
+          code: 'ALL',
+        } as Shop
+      }
+      return shops.find((shop) => shop.id === activeShopId) ?? null
+    },
     [shops, activeShopId],
   )
 

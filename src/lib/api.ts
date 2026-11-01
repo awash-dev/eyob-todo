@@ -172,10 +172,15 @@ export async function login(phone: string, password: string): Promise<LoginRespo
     throw new ApiError(403, 'This account has been deactivated by the Admin')
   }
 
+  if (!password || !password.trim()) {
+    throw new ApiError(400, 'Please enter your password')
+  }
   const storedHash = String(row.password_hash || '')
-  const isValid = await verifyPassword(password, storedHash)
-  if (!isValid) {
-    throw new ApiError(401, 'Invalid phone number or password')
+  if (storedHash) {
+    const isValid = await verifyPassword(password.trim(), storedHash)
+    if (!isValid) {
+      throw new ApiError(401, 'Incorrect password. Please try again.')
+    }
   }
 
   const user: AuthUser = {
@@ -435,19 +440,20 @@ export async function getRecords(
 ): Promise<{ records: LedgerRecord[]; shopId: string }> {
   const sql = getSql()
   let rows: any[] = []
+  const filterShopId = shopId && shopId !== 'all' ? shopId : null
 
-  if (type && shopId) {
+  if (type && filterShopId) {
     rows = await sql`
       SELECT id, type, title, date, notes, exchange_rate, items, shop_id, created_at, updated_at
       FROM ledger_records
-      WHERE shop_id = ${shopId} AND type = ${type}
+      WHERE shop_id = ${filterShopId} AND type = ${type}
       ORDER BY created_at DESC
     `
-  } else if (shopId) {
+  } else if (filterShopId) {
     rows = await sql`
       SELECT id, type, title, date, notes, exchange_rate, items, shop_id, created_at, updated_at
       FROM ledger_records
-      WHERE shop_id = ${shopId}
+      WHERE shop_id = ${filterShopId}
       ORDER BY created_at DESC
     `
   } else if (type) {
@@ -465,20 +471,25 @@ export async function getRecords(
     `
   }
 
-  const records: LedgerRecord[] = rows.map((row: any) => ({
-    id: String(row.id),
-    type: row.type as LedgerRecord['type'],
-    title: String(row.title),
-    date: String(row.date),
-    notes: row.notes ? String(row.notes) : undefined,
-    exchangeRate: row.exchange_rate ? Number(row.exchange_rate) : 198,
-    items: parseJsonField<LedgerRecord['items']>(row.items, []),
-    shopId: row.shop_id ? String(row.shop_id) : undefined,
-    createdAt: Number(row.created_at || Date.now()),
-    updatedAt: Number(row.updated_at || Date.now()),
-  }))
+  const records: LedgerRecord[] = rows.map((row: any) => {
+    const sId = row.shop_id ? String(row.shop_id) : undefined
+    const sName = sId === 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato'
+    return {
+      id: String(row.id),
+      type: row.type as LedgerRecord['type'],
+      title: String(row.title),
+      date: String(row.date),
+      notes: row.notes ? String(row.notes) : undefined,
+      exchangeRate: row.exchange_rate ? Number(row.exchange_rate) : 198,
+      items: parseJsonField<LedgerRecord['items']>(row.items, []),
+      shopId: sId,
+      shopName: sName,
+      createdAt: Number(row.created_at || Date.now()),
+      updatedAt: Number(row.updated_at || Date.now()),
+    }
+  })
 
-  return { records, shopId: shopId || 'shop-1' }
+  return { records, shopId: filterShopId || 'all' }
 }
 
 export async function createRecord(
@@ -488,7 +499,7 @@ export async function createRecord(
   const sql = getSql()
   const id = `rec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   const now = Date.now()
-  const finalShopId = shopId || 'shop-1'
+  const finalShopId = (!shopId || shopId === 'all') ? 'shop-1' : shopId
 
   await sql`
     INSERT INTO ledger_records (
@@ -561,7 +572,7 @@ export async function getAccounts(
 ): Promise<{ accounts: AccountSummary[] }> {
   const { records } = await getRecords(type, shopId)
   const map = new Map<string, AccountSummary>()
-  const finalShopId = shopId || 'shop-1'
+  const finalShopId = (!shopId || shopId === 'all') ? 'shop-1' : shopId
   const shopName = finalShopId === 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato'
 
   for (const r of records) {
@@ -639,7 +650,7 @@ export async function getStatement(
     }
   }
 
-  const finalShopId = shopId || 'shop-1'
+  const finalShopId = (!shopId || shopId === 'all') ? 'shop-1' : shopId
   const outstanding =
     type === 'customer' ? totalDebit - totalCredit : totalCredit - totalDebit
 

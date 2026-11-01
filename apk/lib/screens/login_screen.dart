@@ -14,9 +14,9 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController(text: '0922222222');
-  final _passwordController = TextEditingController(text: 'Shop@123');
-  bool _isLoading = false;
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
   String? _errorMessage;
 
   @override
@@ -48,9 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final phone = _phoneController.text.trim();
     final password = _passwordController.text;
 
-    if (phone.isEmpty || password.isEmpty) {
+    if (phone.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter both phone number and password';
+        _errorMessage = 'Please enter your phone number';
       });
       return;
     }
@@ -58,6 +58,13 @@ class _LoginScreenState extends State<LoginScreen> {
     if (NeonDatabaseService.normalizePhone(phone) == null) {
       setState(() {
         _errorMessage = 'Enter a valid Ethiopian phone number (e.g. 0911111111)';
+      });
+      return;
+    }
+
+    if (password.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter your password (የይለፍ ቃል ያስገቡ)';
       });
       return;
     }
@@ -89,60 +96,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _fillCredentials(String phone, String password) {
-    setState(() {
-      _phoneController.text = phone;
-      _passwordController.text = password;
-      _errorMessage = null;
-    });
-  }
-
-  Future<void> _showDemoAccounts() async {
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Demo Accounts'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Admin: 0911111111 / Admin@123', style: TextStyle(fontSize: 13)),
-            const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: () {
-                _fillCredentials('0922222222', 'Shop@123');
-                Navigator.pop(ctx);
-              },
-              child: const Text('Shop 1 (Merkato)', style: TextStyle(fontSize: 11)),
-            ),
-            const SizedBox(height: 6),
-            OutlinedButton(
-              onPressed: () {
-                _fillCredentials('0933333333', 'Shop@123');
-                Navigator.pop(ctx);
-              },
-              child: const Text('Shop 2 (Bole)', style: TextStyle(fontSize: 11)),
-            ),
-            const SizedBox(height: 6),
-            OutlinedButton(
-              onPressed: () {
-                _fillCredentials('0911111111', 'Admin@123');
-                Navigator.pop(ctx);
-              },
-              child: const Text('Admin', style: TextStyle(fontSize: 11)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -158,16 +111,6 @@ class _LoginScreenState extends State<LoginScreen> {
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.info_outline,
-              color: isDark ? const Color(0xFF94A3B8) : Colors.blueGrey,
-            ),
-            tooltip: 'Demo Accounts',
-            onPressed: _showDemoAccounts,
-          ),
-        ],
       ),
       body: SafeArea(
         child: Center(
@@ -243,14 +186,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (_errorMessage != null) ...[
                             Container(
                               padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEF2F2),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFFCA5A5)),
-                              ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 18),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
@@ -272,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-() ]')),
                             ],
                             decoration: InputDecoration(
-                              labelText: 'Phone Number',
+                              labelText: 'Phone Number (ስልክ ቁጥር)',
                               hintText: '0911111111',
                               prefixIcon: const Icon(Icons.phone_outlined, size: 20),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -281,16 +218,23 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 14),
 
-                          // Password
+                          // Password Field
                           TextField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
-                              labelText: 'Password',
+                              labelText: 'Password (የይለፍ ቃል)',
+                              hintText: '••••••••',
                               prefixIcon: const Icon(Icons.lock_outline, size: 20),
                               suffixIcon: IconButton(
-                                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, size: 20),
-                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  size: 20,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                                onPressed: () {
+                                  setState(() => _obscurePassword = !_obscurePassword);
+                                },
                               ),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
