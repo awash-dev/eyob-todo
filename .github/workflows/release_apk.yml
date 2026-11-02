@@ -101,11 +101,12 @@ jobs:
             Android application release for multi-shop credit and stock ledger.
 
             ### ✨ Highlights in this release:
-            - **Modern Accounting Schema**: Customer Credit, Supplier Credit, and Stock & Inventory.
-            - **Web-Aligned Form Dialog**: Dynamic Debit (+ Goods) and Credit (- Payment via CBE, Cash, Awash, Telebirr) channel selector.
+            - **DELALA External Broker Ledger**: Complete spreadsheet-style broker ledger with positive (+) and negative (-) signed totals and real-time balance.
+            - **Ethiopian Calendar Integration**: Dual support for Ethiopian and Gregorian dates across forms, tables, and filters.
+            - **Bilingual Support**: Instant 1-click toggle between Amharic (አማርኛ) and English.
+            - **Modern Accounting Schema**: Customer Credit, Supplier Credit, and Stock & Inventory tracking.
             - **Cartons & Packaging Breakdown**: Auto-calculates `Ctns × Pcs/Ctn = Total Units` in real-time.
-            - **Dual Layout Options**: Toggle between Compact Card view and horizontal-scrolling Excel Grid view.
-            - **Offline-First & Neon DB**: Cloud database sync with local offline fallback.
+            - **Offline-First & Neon PostgreSQL**: Real-time cloud sync with offline fallback resilience.
 
             ### 📥 Download
             Download **`merkato-credit-record-release.apk`** below and open on your Android device to install.
