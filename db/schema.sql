@@ -77,3 +77,28 @@ CREATE TABLE IF NOT EXISTS esmiz_entries (
 
 CREATE INDEX IF NOT EXISTS esmiz_entries_esmiz_id_idx ON esmiz_entries (esmiz_id);
 CREATE INDEX IF NOT EXISTS esmiz_entries_position_idx ON esmiz_entries (esmiz_id, position);
+
+-- Esmiz Schema (Delala commission ledger)
+CREATE TABLE IF NOT EXISTS esmiz_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255) NOT NULL,
+  reference_id UUID,
+  created_by VARCHAR(64),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS esmiz_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  esmiz_id UUID NOT NULL REFERENCES esmiz_records(id) ON DELETE CASCADE,
+  description VARCHAR(255) NOT NULL,
+  amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  sign SMALLINT NOT NULL CHECK (sign IN (-1, 1)),
+  position INTEGER NOT NULL DEFAULT 0,
+  transaction_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS esmiz_entries_esmiz_id_idx ON esmiz_entries (esmiz_id);
+CREATE INDEX IF NOT EXISTS esmiz_entries_position_idx ON esmiz_entries (esmiz_id, position);

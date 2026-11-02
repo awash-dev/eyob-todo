@@ -121,7 +121,7 @@ class AccountStatement {
       accountName: json['accountName']?.toString() ?? '',
       accountType: json['accountType']?.toString() ?? 'customer',
       shopId: json['shopId']?.toString(),
-      shopName: json['shopName']?.toString() ?? 'Merkato Store',
+      shopName: json['shopName']?.toString() ?? '',
       entries: rawEntries
           .map((e) => StatementEntry.fromJson(e as Map<String, dynamic>))
           .toList(),

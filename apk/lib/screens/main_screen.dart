@@ -80,7 +80,9 @@ class _MainScreenState extends State<MainScreen> {
     // All roles see the 4 tabs: Customer, Supplier, Delala, Store (opens on Customer)
     _currentTabIndex = 0;
     if (widget.currentUser.isShopkeeper) {
-      _selectedShopId = widget.currentUser.shopId ?? 'shop-1';
+      // The shop comes from the signed-in user row in the database; when it
+      // is missing we keep null instead of inventing a shop id.
+      _selectedShopId = widget.currentUser.shopId;
     } else {
       _selectedShopId = 'all';
     }
@@ -123,6 +125,22 @@ class _MainScreenState extends State<MainScreen> {
       default:
         return 'Customer Credit';
     }
+  }
+
+  /// Shop name shown in the header. Resolved from the signed-in user row and
+  /// the `shops` table — never from a hardcoded shop list.
+  String get _activeShopLabel {
+    if (widget.currentUser.isAdmin) {
+      if (_selectedShopId == 'all') return 'All Shops (Central)';
+      final match = _shops.where((s) => s.id == _selectedShopId);
+      return match.isNotEmpty ? match.first.name : 'All Shops';
+    }
+
+    final ownName = widget.currentUser.shopName;
+    if (ownName != null && ownName.isNotEmpty) return ownName;
+
+    final match = _shops.where((s) => s.id == widget.currentUser.shopId);
+    return match.isNotEmpty ? match.first.name : 'No shop assigned';
   }
 
   Future<void> _loadShopsAndRecords() async {
@@ -210,7 +228,9 @@ class _MainScreenState extends State<MainScreen> {
         existingRecords: _records,
         shopId: widget.currentUser.isShopkeeper
             ? widget.currentUser.shopId
-            : (_selectedShopId == 'all' ? 'shop-1' : _selectedShopId),
+            : (_selectedShopId == 'all'
+                ? (_shops.isNotEmpty ? _shops.first.id : null)
+                : _selectedShopId),
       ),
     );
 
@@ -1312,6 +1332,17 @@ class _MainScreenState extends State<MainScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final filteredEsmiz = _searchQuery.trim().isEmpty
+        ? _esmizEntries
+        : _esmizEntries
+            .where((e) =>
+                e.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                e.amount.toString().contains(_searchQuery) ||
+                e.transactionDate.contains(_searchQuery))
+            .toList();
+
+    final esmizDisplayBalance = filteredEsmiz.fold(0.0, (sum, item) => sum + item.rowTotal);
+
     return RefreshIndicator(
       onRefresh: _loadEsmizData,
       child: SingleChildScrollView(
@@ -1427,7 +1458,7 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ],
                   rows: [
-                    ..._esmizEntries.asMap().entries.map((itemEntry) {
+                    ...filteredEsmiz.asMap().entries.map((itemEntry) {
                       final idx = itemEntry.key;
                       final e = itemEntry.value;
                       final isNeg = e.rowTotal < 0;
@@ -1523,12 +1554,12 @@ class _MainScreenState extends State<MainScreen> {
                         // Negative balance in blue
                         DataCell(
                           Text(
-                            _currencyFormat.format(_esmizTotalBalance).replaceAll('.00', ''),
+                            _currencyFormat.format(esmizDisplayBalance).replaceAll('.00', ''),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13.5,
                               fontFamily: 'monospace',
-                              color: _esmizTotalBalance < 0
+                              color: esmizDisplayBalance < 0
                                   ? const Color(0xFF2563EB)
                                   : null,
                             ),
@@ -2421,6 +2452,9 @@ class _MainScreenState extends State<MainScreen> {
     for (final r in records) {
       tabTotalBalance += r.balance;
     }
+    final currentBalance = _currentTabIndex == 2
+        ? _esmizTotalBalance
+        : tabTotalBalance;
 
     return Scaffold(
       backgroundColor: isDark
@@ -2431,7 +2465,7 @@ class _MainScreenState extends State<MainScreen> {
             ? const Color(0xFF182036)
             : const Color(0xFFFFFFFF),
         elevation: 0.5,
-        titleSpacing: 14,
+        titleSpacing: 12,
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
@@ -2440,50 +2474,80 @@ class _MainScreenState extends State<MainScreen> {
         title: Row(
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
-                color: const Color(0xFF2563EB),
-                borderRadius: BorderRadius.circular(6),
+                color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(
-                Icons.table_chart,
-                color: Colors.white,
-                size: 16,
+                Icons.storefront_rounded,
+                color: Color(0xFF2563EB),
+                size: 18,
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        _currentTabLabel,
+                  if (widget.currentUser.isAdmin)
+                    DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: (_selectedShopId == 'all' ||
+                                _shops.any((s) => s.id == _selectedShopId))
+                            ? _selectedShopId
+                            : 'all',
+                        isDense: true,
+                        isExpanded: true,
+                        dropdownColor: theme.colorScheme.surface,
+                        icon: Icon(
+                          Icons.arrow_drop_down,
+                          size: 18,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
                         style: TextStyle(
-                          fontSize: 15,
                           fontWeight: FontWeight.bold,
+                          fontSize: 13,
                           color: theme.colorScheme.onSurface,
                           letterSpacing: -0.2,
                         ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 'all',
+                            child: Text('All Shops'),
+                          ),
+                          ..._shops.map(
+                            (s) => DropdownMenuItem(
+                              value: s.id,
+                              child: Text(
+                                s.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: _onShopChanged,
                       ),
-                    ],
-                  ),
+                    )
+                  else
+                    Text(
+                      _activeShopLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
                   Text(
-                    widget.currentUser.isAdmin
-                        ? (_selectedShopId == 'all'
-                              ? 'All Shops (Central)'
-                              : (_shops
-                                    .firstWhere(
-                                      (s) => s.id == _selectedShopId,
-                                      orElse: () =>
-                                          Shop(id: '', name: 'Shop', code: ''),
-                                    )
-                                    .name))
-                        : (widget.currentUser.shopName ?? 'Shop 1 - Merkato'),
+                    _currentTabLabel,
                     style: TextStyle(
                       fontSize: 10,
+                      fontWeight: FontWeight.w500,
                       color: isDark
                           ? const Color(0xFF94A3B8)
                           : const Color(0xFF64748B),
@@ -2495,6 +2559,51 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         actions: [
+          // Merged Tab Balance Pill
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(right: 2),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: currentBalance >= 0
+                    ? (isDark
+                          ? const Color(0xFF172554)
+                          : const Color(0xFFEFF6FF))
+                    : (isDark
+                          ? const Color(0xFF7F1D1D)
+                          : const Color(0xFFFEF2F2)),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: currentBalance >= 0
+                      ? (isDark
+                            ? const Color(0xFF2563EB)
+                            : const Color(0xFFBFDBFE))
+                      : (isDark
+                            ? const Color(0xFFBA1A1A)
+                            : const Color(0xFFFCA5A5)),
+                ),
+              ),
+              child: Text(
+                'ETB ${_currencyFormat.format(currentBalance).replaceAll('.00', '')}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  fontFamily: 'monospace',
+                  color: currentBalance >= 0
+                      ? (isDark
+                            ? const Color(0xFF93C5FD)
+                            : const Color(0xFF2563EB))
+                      : (isDark
+                            ? const Color(0xFFFFB4AB)
+                            : const Color(0xFFBA1A1A)),
+                ),
+              ),
+            ),
+          ),
+
           // Sign out
           IconButton(
             icon: const Icon(
@@ -2577,141 +2686,9 @@ class _MainScreenState extends State<MainScreen> {
               onRefresh: _reloadRecordsOnly,
               child: Column(
                 children: [
-                  // Sub-header: Shop selector & Tab Balance pill
+                  // Search Bar directly at the top of the screen content
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        if (widget.currentUser.isAdmin)
-                          Flexible(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.storefront,
-                                  size: 16,
-                                  color: isDark
-                                      ? const Color(0xFF93C5FD)
-                                      : const Color(0xFF2563EB),
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: DropdownButton<String>(
-                                    value: (_selectedShopId == 'all' ||
-                                            _shops.any((s) => s.id == _selectedShopId))
-                                        ? _selectedShopId
-                                        : 'all',
-                                    underline: const SizedBox(),
-                                    isDense: true,
-                                    isExpanded: true,
-                                    dropdownColor: theme.colorScheme.surface,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                      color: theme.colorScheme.onSurface,
-                                    ),
-                                    items: [
-                                      const DropdownMenuItem(
-                                        value: 'all',
-                                        child: Text('All Shops'),
-                                      ),
-                                      ..._shops.map(
-                                        (s) => DropdownMenuItem(
-                                          value: s.id,
-                                          child: Text(
-                                            s.name,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                    onChanged: _onShopChanged,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          Flexible(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.storefront,
-                                  size: 16,
-                                  color: isDark
-                                      ? const Color(0xFF93C5FD)
-                                      : const Color(0xFF2563EB),
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    widget.currentUser.shopName ?? 'Shop 1',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                      color: theme.colorScheme.onSurface,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        const SizedBox(width: 8),
-
-                        // Tab Total Balance Pill
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: tabTotalBalance >= 0
-                                ? (isDark
-                                      ? const Color(0xFF172554)
-                                      : const Color(0xFFEFF6FF))
-                                : (isDark
-                                      ? const Color(0xFF7F1D1D)
-                                      : const Color(0xFFFEF2F2)),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: tabTotalBalance >= 0
-                                  ? (isDark
-                                        ? const Color(0xFF2563EB)
-                                        : const Color(0xFFBFDBFE))
-                                  : (isDark
-                                        ? const Color(0xFFBA1A1A)
-                                        : const Color(0xFFFCA5A5)),
-                            ),
-                          ),
-                          child: Text(
-                            'ETB ${_currencyFormat.format(tabTotalBalance)}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: tabTotalBalance >= 0
-                                  ? (isDark
-                                        ? const Color(0xFF93C5FD)
-                                        : const Color(0xFF2563EB))
-                                  : (isDark
-                                        ? const Color(0xFFFFB4AB)
-                                        : const Color(0xFFBA1A1A)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Search Bar
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
                     child: TextField(
                       controller: _searchController,
                       style: TextStyle(
@@ -2719,7 +2696,9 @@ class _MainScreenState extends State<MainScreen> {
                         color: theme.colorScheme.onSurface,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Search $_currentTabLabel by name, item...',
+                        hintText: _currentTabIndex == 2
+                            ? 'Search Esmiz entries by description, amount...'
+                            : 'Search $_currentTabLabel by name, item...',
                         hintStyle: TextStyle(
                           fontSize: 11.5,
                           color: isDark

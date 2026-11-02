@@ -335,7 +335,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
       date: dateStr,
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       items: lineItems,
-      shopId: widget.shopId ?? 'shop-1',
+      shopId: widget.shopId,
     );
 
     Navigator.of(context).pop(record);

@@ -93,7 +93,9 @@ class _StatementScreenState extends State<StatementScreen> {
                     ),
                     pw.SizedBox(height: 3),
                     pw.Text(
-                      '${st.shopName} - Account Statement',
+                      st.shopName.isEmpty
+                          ? 'Account Statement'
+                          : '${st.shopName} - Account Statement',
                       style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
                     ),
                     pw.SizedBox(height: 2),

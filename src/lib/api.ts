@@ -266,11 +266,10 @@ async function getShopNameMap(): Promise<Map<string, string>> {
 async function resolveShopId(shopId?: string | null): Promise<string> {
   if (shopId && shopId !== 'all') return shopId
   const { shops } = await getShops()
-  const first = shops[0]
-  if (!first) {
+  if (shops.length === 0) {
     throw new ApiError(400, 'No shop exists yet — create a shop before saving records')
   }
-  return first.id
+  return shops[0].id
 }
 
 export async function createShop(name: string, code?: string): Promise<{ shop: Shop }> {

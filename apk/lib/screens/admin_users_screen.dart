@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
+import '../models/shop.dart';
 import '../services/api_service.dart';
 
 class AdminUsersScreen extends StatefulWidget {
@@ -11,43 +12,60 @@ class AdminUsersScreen extends StatefulWidget {
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
   List<AppUser> _users = [];
+  List<Shop> _shops = [];
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchUsers();
+    _loadData();
   }
 
-  Future<void> _fetchUsers() async {
+  Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      final list = await ApiService.getShopkeepers();
+      // Both lists come straight from the database.
+      final users = await ApiService.getShopkeepers();
+      final shops = await ApiService.getShops();
       if (mounted) {
         setState(() {
-          _users = list;
+          _users = users;
+          _shops = shops;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = e.toString().replaceAll('Exception:', '').trim();
           _isLoading = false;
         });
       }
     }
   }
 
+  Future<void> _fetchUsers() async {
+    await _loadData();
+  }
+
   Future<void> _showCreateUserDialog() async {
+    if (_shops.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No shops exist in the database yet — create a shop first'),
+        ),
+      );
+      return;
+    }
+
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     final passCtrl = TextEditingController();
-    String selectedShopId = 'shop-1';
+    String selectedShopId = _shops.first.id;
 
     await showDialog(
       context: context,
@@ -78,9 +96,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: selectedShopId,
                     decoration: const InputDecoration(labelText: 'Assign Retail Shop'),
-                    items: const [
-                      DropdownMenuItem(value: 'shop-1', child: Text('Shop 1 - Merkato')),
-                      DropdownMenuItem(value: 'shop-2', child: Text('Shop 2 - Bole')),
+                    items: [
+                      for (final shop in _shops)
+                        DropdownMenuItem(value: shop.id, child: Text(shop.name)),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -144,7 +162,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final nameCtrl = TextEditingController(text: user.name);
     final phoneCtrl = TextEditingController(text: user.phone ?? '');
     final passCtrl = TextEditingController();
-    String selectedShopId = user.shopId ?? 'shop-1';
+    final shopIds = _shops.map((s) => s.id).toSet();
+    String selectedShopId = (user.shopId != null && shopIds.contains(user.shopId))
+        ? user.shopId!
+        : (_shops.isNotEmpty ? _shops.first.id : '');
     bool active = user.active;
 
     await showDialog(
@@ -172,11 +193,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
-                    initialValue: selectedShopId,
+                    initialValue: selectedShopId.isEmpty ? null : selectedShopId,
                     decoration: const InputDecoration(labelText: 'Assigned Shop'),
-                    items: const [
-                      DropdownMenuItem(value: 'shop-1', child: Text('Shop 1 - Merkato')),
-                      DropdownMenuItem(value: 'shop-2', child: Text('Shop 2 - Bole')),
+                    items: [
+                      for (final shop in _shops)
+                        DropdownMenuItem(value: shop.id, child: Text(shop.name)),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -221,7 +242,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       user.id,
                       name: nameCtrl.text.trim(),
                       phone: phoneCtrl.text.trim(),
-                      shopId: selectedShopId,
+                      shopId: selectedShopId.isEmpty ? null : selectedShopId,
                       active: active,
                       password: passCtrl.text.isNotEmpty ? passCtrl.text : null,
                     );
@@ -275,7 +296,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (ctx, index) {
                         final u = _users[index];
-                        final isShop1 = u.shopId == 'shop-1';
+                        final shopLabel = u.shopName ?? 'No shop assigned';
                         return Card(
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -287,12 +308,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                             leading: CircleAvatar(
                               backgroundColor: u.active
-                                  ? (isShop1 ? const Color(0xFFEEF2FF) : const Color(0xFFEFF6FF))
+                                  ? const Color(0xFFEFF6FF)
                                   : const Color(0xFFF1F5F9),
                               child: Icon(
                                 Icons.storefront,
                                 color: u.active
-                                    ? (isShop1 ? const Color(0xFF4F46E5) : const Color(0xFF2563EB))
+                                    ? const Color(0xFF2563EB)
                                     : Colors.grey,
                               ),
                             ),
@@ -310,18 +331,18 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: isShop1 ? const Color(0xFFEEF2FF) : const Color(0xFFEFF6FF),
+                                    color: const Color(0xFFEFF6FF),
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
-                                      color: isShop1 ? const Color(0xFFC7D2FE) : const Color(0xFFBFDBFE),
+                                      color: const Color(0xFFBFDBFE),
                                     ),
                                   ),
                                   child: Text(
-                                    u.shopName ?? (isShop1 ? 'Shop 1' : 'Shop 2'),
-                                    style: TextStyle(
+                                    shopLabel,
+                                    style: const TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
-                                      color: isShop1 ? const Color(0xFF4F46E5) : const Color(0xFF2563EB),
+                                      color: Color(0xFF2563EB),
                                     ),
                                   ),
                                 ),

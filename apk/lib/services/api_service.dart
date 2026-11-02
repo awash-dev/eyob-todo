@@ -124,7 +124,19 @@ class ApiService {
       return false;
     }).toList();
 
-    return _generateLocalStatement(name, type, shopId, matching);
+    final shopName = await _shopNameFromDb(shopId);
+    return _generateLocalStatement(name, type, shopId, shopName, matching);
+  }
+
+  /// Resolves a shop's display name straight from the shops table.
+  /// There is no hardcoded shop name: an unknown id simply has no name.
+  static Future<String> _shopNameFromDb(String? shopId) async {
+    if (shopId == null || shopId.isEmpty || shopId == 'all') return 'All Shops';
+    final shops = await getShops();
+    for (final shop in shops) {
+      if (shop.id == shopId) return shop.name;
+    }
+    return '';
   }
 
   /* ------------------- Shopkeeper Admin Management (Online Neon) ------------------- */
@@ -244,6 +256,7 @@ class ApiService {
     String name,
     String type,
     String? shopId,
+    String shopName,
     List<LedgerRecord> records,
   ) {
     final entries = <Map<String, dynamic>>[];
@@ -337,7 +350,7 @@ class ApiService {
       accountName: name,
       accountType: type,
       shopId: shopId,
-      shopName: shopId == 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato',
+      shopName: shopName,
       entries: computedEntries,
       payments: computedEntries
           .where((e) => type == 'customer' ? e.credit > 0 : e.debit > 0)

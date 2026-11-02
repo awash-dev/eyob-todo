@@ -58,7 +58,7 @@ class NeonDatabaseService {
 
   static const Duration requestTimeout = Duration(seconds: 15);
 
-  /// Verify password against stored hash (supporting sha256:salt:hash, plain sha256, plaintext, or demo credentials)
+  /// Verify password against stored hash (supporting sha256:salt:hash, plain sha256 or plaintext)
   static bool verifyPassword(String password, String storedHash) {
     if (storedHash.startsWith('sha256:')) {
       final parts = storedHash.split(':');
@@ -80,6 +80,16 @@ class NeonDatabaseService {
       return true;
     }
     return false;
+  }
+
+  /// Interprets a boolean column as returned by Neon's raw-text transport.
+  /// Booleans arrive as `true`/`false`, `t`/`f`, `1`/`0` or as strings, so a
+  /// plain `== false` check would silently misread deactivated accounts.
+  static bool isTruthy(dynamic value) {
+    if (value is bool) return value;
+    final text = value?.toString().trim().toLowerCase() ?? '';
+    if (text.isEmpty) return false;
+    return !(text == 'false' || text == 'f' || text == '0');
   }
 
   /// Hash password using SHA-256 with salt to match backend Neon user table
@@ -229,8 +239,7 @@ class NeonDatabaseService {
     if (rows.isEmpty) return null;
     final row = rows.first;
 
-    final active = row['active'];
-    if (active == false || active == 'false') {
+    if (!isTruthy(row['active'])) {
       throw Exception('This account has been deactivated by the Admin');
     }
 
@@ -238,7 +247,10 @@ class NeonDatabaseService {
     if (password.trim().isEmpty) {
       throw Exception('Please enter your password');
     }
-    if (storedHash.isNotEmpty && !verifyPassword(password.trim(), storedHash)) {
+    if (storedHash.isEmpty) {
+      throw Exception('This account has no password stored in the database');
+    }
+    if (!verifyPassword(password.trim(), storedHash)) {
       throw Exception('Incorrect password. Please try again.');
     }
 
@@ -254,17 +266,12 @@ class NeonDatabaseService {
     );
   }
 
-  /// Fetch shops directly from Neon
+  /// Fetch shops directly from Neon (returns an empty list when the table is
+  /// empty — no hardcoded shops are ever invented).
   static Future<List<Shop>> getShopsDirect() async {
     final rows = await executeSql(
       'SELECT id, name, code FROM shops ORDER BY id ASC',
     );
-    if (rows.isEmpty) {
-      return [
-        Shop(id: 'shop-1', name: 'Shop 1 - Merkato', code: 'SHOP1'),
-        Shop(id: 'shop-2', name: 'Shop 2 - Bole', code: 'SHOP2'),
-      ];
-    }
     return rows
         .map(
           (r) => Shop(
@@ -274,6 +281,29 @@ class NeonDatabaseService {
           ),
         )
         .toList();
+  }
+
+  /// First shop id stored in the database, or null when no shop exists.
+  static Future<String?> _firstShopId() async {
+    final rows = await executeSql(
+      'SELECT id FROM shops ORDER BY id ASC LIMIT 1',
+    );
+    if (rows.isEmpty) return null;
+    final id = rows.first['id']?.toString();
+    return (id == null || id.isEmpty) ? null : id;
+  }
+
+  /// Resolves the shop a record belongs to: the given shop, or the first shop
+  /// in the database. Throws when the database has no shop at all.
+  static Future<String> resolveShopId(String? shopId) async {
+    if (shopId != null && shopId.isNotEmpty && shopId != 'all') return shopId;
+    final first = await _firstShopId();
+    if (first == null) {
+      throw Exception(
+        'No shop exists in the database yet — create a shop first',
+      );
+    }
+    return first;
   }
 
   /// Fetch records directly from Neon
@@ -353,7 +383,7 @@ class NeonDatabaseService {
     String? shopId,
   }) async {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final finalShopId = shopId ?? record.shopId ?? 'shop-1';
+    final finalShopId = await resolveShopId(shopId ?? record.shopId);
     final itemsJson = jsonEncode(record.items.map((i) => i.toJson()).toList());
 
     await executeSql(
@@ -386,23 +416,44 @@ class NeonDatabaseService {
   static Future<void> updateRecordDirect(LedgerRecord record) async {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final itemsJson = jsonEncode(record.items.map((i) => i.toJson()).toList());
+    final shopId = record.shopId;
 
-    await executeSql(
-      '''
-      UPDATE ledger_records
-      SET title = \$1, date = \$2, notes = \$3, items = \$4, shop_id = \$5, updated_at = \$6
-      WHERE id = \$7
-      ''',
-      [
-        record.title,
-        record.date,
-        record.notes ?? '',
-        itemsJson,
-        record.shopId ?? 'shop-1',
-        nowMs,
-        record.id,
-      ],
-    );
+    // Only rewrite shop_id when the record actually has one — never fall
+    // back to a hardcoded shop.
+    if (shopId != null && shopId.isNotEmpty) {
+      await executeSql(
+        '''
+        UPDATE ledger_records
+        SET title = \$1, date = \$2, notes = \$3, items = \$4, shop_id = \$5, updated_at = \$6
+        WHERE id = \$7
+        ''',
+        [
+          record.title,
+          record.date,
+          record.notes ?? '',
+          itemsJson,
+          shopId,
+          nowMs,
+          record.id,
+        ],
+      );
+    } else {
+      await executeSql(
+        '''
+        UPDATE ledger_records
+        SET title = \$1, date = \$2, notes = \$3, items = \$4, updated_at = \$5
+        WHERE id = \$6
+        ''',
+        [
+          record.title,
+          record.date,
+          record.notes ?? '',
+          itemsJson,
+          nowMs,
+          record.id,
+        ],
+      );
+    }
   }
 
   /// Delete record directly from Neon
@@ -477,7 +528,7 @@ class NeonDatabaseService {
             role: 'shopkeeper',
             shopId: r['shop_id']?.toString(),
             shopName: r['shop_name']?.toString(),
-            active: r['active'] != false && r['active'] != 'false',
+            active: isTruthy(r['active']),
           ),
         )
         .toList();
@@ -609,7 +660,7 @@ class NeonDatabaseService {
         role: 'shopkeeper',
         shopId: r['shop_id']?.toString(),
         shopName: r['shop_name']?.toString(),
-        active: r['active'] != false && r['active'] != 'false',
+        active: isTruthy(r['active']),
       );
     }
     return AppUser(
