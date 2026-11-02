@@ -101,7 +101,6 @@ async function sha256Hex(str: string): Promise<string> {
 }
 
 async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  if (password === 'Admin@123' || password === 'Shop@123') return true
   if (stored.startsWith('sha256:')) {
     const [, salt, expected] = stored.split(':')
     const actual = await sha256Hex(salt + password)
@@ -176,11 +175,12 @@ export async function login(phone: string, password: string): Promise<LoginRespo
     throw new ApiError(400, 'Please enter your password')
   }
   const storedHash = String(row.password_hash || '')
-  if (storedHash) {
-    const isValid = await verifyPassword(password.trim(), storedHash)
-    if (!isValid) {
-      throw new ApiError(401, 'Incorrect password. Please try again.')
-    }
+  if (!storedHash) {
+    throw new ApiError(500, 'This account has no password stored in the database')
+  }
+  const isValid = await verifyPassword(password.trim(), storedHash)
+  if (!isValid) {
+    throw new ApiError(401, 'Incorrect password. Please try again.')
   }
 
   const user: AuthUser = {
@@ -231,6 +231,10 @@ export async function getMe(): Promise<{ user: AuthUser }> {
 
 /* ------------------------------- Shops ------------------------------ */
 
+/**
+ * Reads the shop list straight from the database.
+ * There is no local/mock fallback: a failed query is surfaced as an error.
+ */
 export async function getShops(): Promise<{ shops: Shop[] }> {
   const sql = getSql()
   try {
@@ -242,14 +246,31 @@ export async function getShops(): Promise<{ shops: Shop[] }> {
     }))
     return { shops }
   } catch (err) {
-    console.warn('Neon direct getShops fallback:', err)
-    return {
-      shops: [
-        { id: 'shop-1', name: 'Shop 1 - Merkato', code: 'SHOP1' },
-        { id: 'shop-2', name: 'Shop 2 - Bole', code: 'SHOP2' },
-      ],
-    }
+    console.error('Neon getShops failed:', err)
+    throw new ApiError(0, 'Could not load shops from the database')
   }
+}
+
+/** id -> name lookup used to replace any hardcoded shop name. */
+async function getShopNameMap(): Promise<Map<string, string>> {
+  const { shops } = await getShops()
+  return new Map(shops.map((shop) => [shop.id, shop.name]))
+}
+
+/**
+ * Resolves the shop a record should be written to.
+ * When no concrete shop is selected ("all" / none) the first shop in the
+ * database is used; if the database has no shop at all, this fails instead
+ * of silently inventing one.
+ */
+async function resolveShopId(shopId?: string | null): Promise<string> {
+  if (shopId && shopId !== 'all') return shopId
+  const { shops } = await getShops()
+  const first = shops[0]
+  if (!first) {
+    throw new ApiError(400, 'No shop exists yet — create a shop before saving records')
+  }
+  return first.id
 }
 
 export async function createShop(name: string, code?: string): Promise<{ shop: Shop }> {
@@ -471,9 +492,12 @@ export async function getRecords(
     `
   }
 
+  // Real shop names come from the shops table — never hardcoded.
+  const shopNames = await getShopNameMap()
+
   const records: LedgerRecord[] = rows.map((row: any) => {
     const sId = row.shop_id ? String(row.shop_id) : undefined
-    const sName = sId === 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato'
+    const sName = sId ? shopNames.get(sId) : undefined
     return {
       id: String(row.id),
       type: row.type as LedgerRecord['type'],
@@ -499,7 +523,7 @@ export async function createRecord(
   const sql = getSql()
   const id = `rec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   const now = Date.now()
-  const finalShopId = (!shopId || shopId === 'all') ? 'shop-1' : shopId
+  const finalShopId = await resolveShopId(shopId)
 
   await sql`
     INSERT INTO ledger_records (
@@ -572,8 +596,9 @@ export async function getAccounts(
 ): Promise<{ accounts: AccountSummary[] }> {
   const { records } = await getRecords(type, shopId)
   const map = new Map<string, AccountSummary>()
-  const finalShopId = (!shopId || shopId === 'all') ? 'shop-1' : shopId
-  const shopName = finalShopId === 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato'
+  const finalShopId = (!shopId || shopId === 'all') ? 'all' : shopId
+  const shopName =
+    finalShopId === 'all' ? 'All Shops' : (await getShopNameMap()).get(finalShopId) ?? ''
 
   for (const r of records) {
     const key = r.title.trim().toLowerCase()
@@ -650,7 +675,7 @@ export async function getStatement(
     }
   }
 
-  const finalShopId = (!shopId || shopId === 'all') ? 'shop-1' : shopId
+  const finalShopId = (!shopId || shopId === 'all') ? 'all' : shopId
   const outstanding =
     type === 'customer' ? totalDebit - totalCredit : totalCredit - totalDebit
 
@@ -659,7 +684,10 @@ export async function getStatement(
       accountName: name,
       accountType: type,
       shopId: finalShopId,
-      shopName: finalShopId === 'shop-2' ? 'Shop 2 - Bole' : 'Shop 1 - Merkato',
+      shopName:
+        finalShopId === 'all'
+          ? 'All Shops'
+          : (await getShopNameMap()).get(finalShopId) ?? '',
       entries,
       payments: entries
         .filter((e) => (type === 'customer' ? e.credit > 0 : e.debit > 0))
@@ -689,5 +717,144 @@ export async function getSettings(): Promise<{ settings: Record<string, unknown>
 }
 
 export async function saveSetting(_key: string, _value: unknown): Promise<{ ok: boolean }> {
+  return { ok: true }
+}
+
+/* ------------------------------ Esmiz (Delala) ---------------------------- */
+
+export async function getEsmizTable(): Promise<{
+  record: { id: string; title: string };
+  entries: Array<{
+    id: string;
+    esmizId: string;
+    description: string;
+    amount: number;
+    sign: -1 | 1;
+    position: number;
+    transactionDate: string;
+    rowTotal: number;
+  }>;
+  totalBalance: number;
+}> {
+  const sql = getSql()
+
+  // Find or create default Esmiz record
+  let records = await sql`
+    SELECT id, title, reference_id, created_by, created_at, updated_at
+    FROM esmiz_records
+    ORDER BY created_at ASC
+    LIMIT 1
+  `
+
+  let record = records[0]
+  if (!record) {
+    const inserted = await sql`
+      INSERT INTO esmiz_records (title)
+      VALUES ('Esmiz')
+      RETURNING id, title
+    `
+    record = inserted[0]
+  }
+
+  const rawEntries = await sql`
+    SELECT id, esmiz_id, description, amount, sign, position, transaction_date, created_at, updated_at
+    FROM esmiz_entries
+    WHERE esmiz_id = ${record.id}
+    ORDER BY position ASC, created_at ASC
+  `
+
+  let totalBalance = 0
+  const entries = rawEntries.map((row: any, idx: number) => {
+    const amount = Number(row.amount) || 0
+    const sign = (Number(row.sign) === -1 ? -1 : 1) as -1 | 1
+    const rowTotal = amount * sign
+    totalBalance += rowTotal
+
+    return {
+      id: String(row.id),
+      esmizId: String(row.esmiz_id),
+      description: String(row.description || ''),
+      amount,
+      sign,
+      position: Number(row.position) || idx + 1,
+      transactionDate: String(row.transaction_date || new Date().toISOString().split('T')[0]),
+      rowTotal,
+    }
+  })
+
+  return {
+    record: { id: String(record.id), title: String(record.title) },
+    entries,
+    totalBalance,
+  }
+}
+
+export async function createEsmizEntry(data: {
+  esmizId?: string;
+  description: string;
+  amount: number;
+  sign: -1 | 1;
+  transactionDate?: string;
+}): Promise<{ id: string }> {
+  const sql = getSql()
+
+  let esmizId = data.esmizId
+  if (!esmizId) {
+    const recs = await sql`SELECT id FROM esmiz_records ORDER BY created_at ASC LIMIT 1`
+    if (recs[0]) {
+      esmizId = recs[0].id
+    } else {
+      const ins = await sql`INSERT INTO esmiz_records (title) VALUES ('Esmiz') RETURNING id`
+      esmizId = ins[0].id
+    }
+  }
+
+  // Get max position
+  const posRes = await sql`
+    SELECT COALESCE(MAX(position), 0) as max_pos
+    FROM esmiz_entries
+    WHERE esmiz_id = ${esmizId}
+  `
+  const nextPos = (Number(posRes[0]?.max_pos) || 0) + 1
+  const txDate = data.transactionDate || new Date().toISOString().split('T')[0]
+
+  const inserted = await sql`
+    INSERT INTO esmiz_entries (esmiz_id, description, amount, sign, position, transaction_date)
+    VALUES (${esmizId}, ${data.description.trim()}, ${data.amount}, ${data.sign}, ${nextPos}, ${txDate})
+    RETURNING id
+  `
+
+  return { id: String(inserted[0].id) }
+}
+
+export async function updateEsmizEntry(
+  id: string,
+  data: {
+    description: string;
+    amount: number;
+    sign: -1 | 1;
+    transactionDate?: string;
+  }
+): Promise<{ ok: boolean }> {
+  const sql = getSql()
+  const txDate = data.transactionDate || new Date().toISOString().split('T')[0]
+
+  await sql`
+    UPDATE esmiz_entries
+    SET
+      description = ${data.description.trim()},
+      amount = ${data.amount},
+      sign = ${data.sign},
+      transaction_date = ${txDate},
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${id}
+  `
+
+  return { ok: true }
+}
+
+export async function deleteEsmizEntry(id: string): Promise<{ ok: boolean }> {
+  const sql = getSql()
+  await sql`DELETE FROM esmiz_entries WHERE id = ${id}`
   return { ok: true }
 }

@@ -119,3 +119,24 @@ export interface LedgerStats {
   positiveTotal: number
   negativeTotal: number
 }
+
+export interface EsmizRecord {
+  id: string
+  title: string
+  referenceId?: string | null
+  createdBy?: string | null
+  createdAt: string | number
+  updatedAt: string | number
+}
+
+export interface EsmizEntry {
+  id: string
+  esmizId: string
+  description: string
+  amount: number
+  sign: -1 | 1
+  position: number
+  transactionDate: string
+  createdAt: string | number
+  updatedAt: string | number
+}

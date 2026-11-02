@@ -9,6 +9,7 @@ import '../models/user.dart';
 import '../models/shop.dart';
 import '../models/ledger_record.dart';
 import '../models/line_item.dart';
+import '../models/esmiz_entry.dart';
 
 /// Direct Neon PostgreSQL Service
 ///
@@ -625,5 +626,98 @@ class NeonDatabaseService {
   static Future<void> deleteShopkeeperDirect(String userId) async {
     await executeSql('DELETE FROM sessions WHERE user_id = \$1', [userId]);
     await executeSql('DELETE FROM users WHERE id = \$1', [userId]);
+  }
+
+  // =========================================================================
+  // ESMIZ (DELALA) SCHEMA OPERATIONS
+  // =========================================================================
+
+  /// Fetch all Esmiz entries from Neon PostgreSQL
+  static Future<List<EsmizEntry>> getEsmizEntriesDirect() async {
+    // Ensure an Esmiz record exists
+    final recordRows = await executeSql(
+      'SELECT id, title FROM esmiz_records ORDER BY created_at ASC LIMIT 1',
+    );
+
+    String esmizId = '';
+    if (recordRows.isEmpty) {
+      final ins = await executeSql(
+        "INSERT INTO esmiz_records (title) VALUES ('Esmiz') RETURNING id",
+      );
+      if (ins.isNotEmpty) {
+        esmizId = ins.first['id']?.toString() ?? '';
+      }
+    } else {
+      esmizId = recordRows.first['id']?.toString() ?? '';
+    }
+
+    if (esmizId.isEmpty) return [];
+
+    final rows = await executeSql(
+      'SELECT id, esmiz_id, description, amount, sign, position, transaction_date, created_at, updated_at '
+      'FROM esmiz_entries WHERE esmiz_id = \$1 ORDER BY position ASC, created_at ASC',
+      [esmizId],
+    );
+
+    final entries = <EsmizEntry>[];
+    for (int i = 0; i < rows.length; i++) {
+      entries.add(EsmizEntry.fromMap(rows[i], i + 1));
+    }
+    return entries;
+  }
+
+  /// Add a new Esmiz row
+  static Future<void> createEsmizEntryDirect({
+    required String description,
+    required double amount,
+    required int sign,
+    required String transactionDate,
+  }) async {
+    // Get Esmiz record ID
+    final recordRows = await executeSql(
+      'SELECT id FROM esmiz_records ORDER BY created_at ASC LIMIT 1',
+    );
+    String esmizId = '';
+    if (recordRows.isEmpty) {
+      final ins = await executeSql(
+        "INSERT INTO esmiz_records (title) VALUES ('Esmiz') RETURNING id",
+      );
+      esmizId = ins.first['id']?.toString() ?? '';
+    } else {
+      esmizId = recordRows.first['id']?.toString() ?? '';
+    }
+
+    final maxPosRows = await executeSql(
+      'SELECT COALESCE(MAX(position), 0) AS max_pos FROM esmiz_entries WHERE esmiz_id = \$1',
+      [esmizId],
+    );
+    final rawMax = maxPosRows.isNotEmpty ? maxPosRows.first['max_pos'] : 0;
+    final int nextPos = (rawMax is num ? rawMax.toInt() : int.tryParse(rawMax?.toString() ?? '0') ?? 0) + 1;
+
+    await executeSql(
+      'INSERT INTO esmiz_entries (esmiz_id, description, amount, sign, position, transaction_date) '
+      'VALUES (\$1, \$2, \$3, \$4, \$5, \$6)',
+      [esmizId, description.trim(), amount, sign, nextPos, transactionDate],
+    );
+  }
+
+  /// Update an existing Esmiz row
+  static Future<void> updateEsmizEntryDirect({
+    required String id,
+    required String description,
+    required double amount,
+    required int sign,
+    required String transactionDate,
+  }) async {
+    await executeSql(
+      'UPDATE esmiz_entries SET description = \$1, amount = \$2, sign = \$3, '
+      'transaction_date = \$4, updated_at = CURRENT_TIMESTAMP WHERE id = \$5',
+      [description.trim(), amount, sign, transactionDate, id],
+    );
+  }
+
+  /// Delete an Esmiz row
+  static Future<void> deleteEsmizEntryDirect(String id) async {
+    await executeSql('DELETE FROM esmiz_entries WHERE id = \$1', [id]);
   }
 }

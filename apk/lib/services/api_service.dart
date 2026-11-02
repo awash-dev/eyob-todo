@@ -4,6 +4,7 @@ import '../models/user.dart';
 import '../models/shop.dart';
 import '../models/ledger_record.dart';
 import '../models/statement.dart';
+import '../models/esmiz_entry.dart';
 import 'neon_database_service.dart';
 
 /// Application service layer (Online-Only via Neon PostgreSQL).
@@ -195,6 +196,48 @@ class ApiService {
 
   static Future<void> deleteShop(String shopId) async {
     await NeonDatabaseService.deleteShopDirect(shopId);
+  }
+
+  // =========================================================================
+  // ESMIZ (DELALA) METHODS
+  // =========================================================================
+
+  static Future<List<EsmizEntry>> getEsmizEntries() async {
+    return await NeonDatabaseService.getEsmizEntriesDirect();
+  }
+
+  static Future<void> createEsmizEntry({
+    required String description,
+    required double amount,
+    required int sign,
+    required String transactionDate,
+  }) async {
+    await NeonDatabaseService.createEsmizEntryDirect(
+      description: description,
+      amount: amount,
+      sign: sign,
+      transactionDate: transactionDate,
+    );
+  }
+
+  static Future<void> updateEsmizEntry({
+    required String id,
+    required String description,
+    required double amount,
+    required int sign,
+    required String transactionDate,
+  }) async {
+    await NeonDatabaseService.updateEsmizEntryDirect(
+      id: id,
+      description: description,
+      amount: amount,
+      sign: sign,
+      transactionDate: transactionDate,
+    );
+  }
+
+  static Future<void> deleteEsmizEntry(String id) async {
+    await NeonDatabaseService.deleteEsmizEntryDirect(id);
   }
 
   static AccountStatement _generateLocalStatement(

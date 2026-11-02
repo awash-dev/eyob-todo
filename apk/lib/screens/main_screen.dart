@@ -6,6 +6,7 @@ import '../models/user.dart';
 import '../models/shop.dart';
 import '../models/ledger_record.dart';
 import '../models/line_item.dart';
+import '../models/esmiz_entry.dart';
 import '../services/api_service.dart';
 import 'login_screen.dart';
 import 'record_form_dialog.dart';
@@ -33,6 +34,34 @@ class _MainScreenState extends State<MainScreen> {
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
+  // Esmiz Entries for Delala Tab
+  List<EsmizEntry> _esmizEntries = [];
+  bool _isLoadingEsmiz = false;
+
+  double get _esmizTotalBalance =>
+      _esmizEntries.fold(0.0, (sum, item) => sum + item.rowTotal);
+
+  Future<void> _loadEsmizData() async {
+    try {
+      setState(() {
+        _isLoadingEsmiz = true;
+      });
+      final items = await ApiService.getEsmizEntries();
+      if (mounted) {
+        setState(() {
+          _esmizEntries = items;
+          _isLoadingEsmiz = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingEsmiz = false;
+        });
+      }
+    }
+  }
+
   // Records collapsed by default (tap header to expand) — mobile friendly cards
   final Set<String> _expandedRecordIds = <String>{};
 
@@ -57,6 +86,7 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     _loadShopsAndRecords();
+    _loadEsmizData();
   }
 
   @override
@@ -1271,6 +1301,506 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// Authentic Esmiz Spreadsheet Table View matching the User's Specification
+  Widget _buildEsmizSpreadsheetTable(ThemeData theme, bool isDark) {
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
+    final headerBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF3F4F6);
+    final rowBg = isDark ? const Color(0xFF0F172A) : Colors.white;
+    final totalRowBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFE5E7EB);
+
+    if (_isLoadingEsmiz) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadEsmizData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top Bar: Simple Title "Esmiz" and Add Row Button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Esmiz',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    Text(
+                      'Delala Ledger (ደላላ ሂሳብ)',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _showEsmizEntryDialog(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text(
+                    'Add Row',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Spreadsheet Container with thin gray borders
+            Container(
+              decoration: BoxDecoration(
+                color: rowBg,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: borderColor, width: 1.0),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  horizontalMargin: 12,
+                  columnSpacing: 14,
+                  headingRowHeight: 38,
+                  dataRowMinHeight: 42,
+                  dataRowMaxHeight: 52,
+                  headingRowColor: WidgetStateProperty.all(headerBg),
+                  border: TableBorder(
+                    horizontalInside: BorderSide(color: borderColor, width: 0.8),
+                    verticalInside: BorderSide(color: borderColor, width: 0.8),
+                  ),
+                  columns: const [
+                    DataColumn(
+                      label: Text(
+                        'No.',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'የእቃው አይነት',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                    DataColumn(
+                      numeric: true,
+                      label: Text(
+                        'ዋጋ',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                    DataColumn(
+                      numeric: true,
+                      label: Text(
+                        'ብዛት',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                    DataColumn(
+                      numeric: true,
+                      label: Text(
+                        'ድምር',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'Action',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                  rows: [
+                    ..._esmizEntries.asMap().entries.map((itemEntry) {
+                      final idx = itemEntry.key;
+                      final e = itemEntry.value;
+                      final isNeg = e.rowTotal < 0;
+                      return DataRow(
+                        cells: [
+                          DataCell(Text('${idx + 1}', style: const TextStyle(fontSize: 12))),
+                          DataCell(
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  e.description,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (e.transactionDate.isNotEmpty)
+                                  Text(
+                                    e.transactionDate,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              _currencyFormat.format(e.amount).replaceAll('.00', ''),
+                              style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              e.sign == -1 ? '-1' : '+1',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: e.sign == -1 ? const Color(0xFF2563EB) : null,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              _currencyFormat.format(e.rowTotal).replaceAll('.00', ''),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace',
+                                color: isNeg ? const Color(0xFF2563EB) : null,
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, size: 16),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                                  onPressed: () => _showEsmizEntryDialog(e),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFBA1A1A)),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                                  onPressed: () => _deleteEsmizEntry(e.id),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                    // Bottom Total Row
+                    DataRow(
+                      color: WidgetStateProperty.all(totalRowBg),
+                      cells: [
+                        const DataCell(Text('')),
+                        const DataCell(
+                          Text(
+                            'ጠቅላላ ድምር',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        // Negative balance in blue
+                        DataCell(
+                          Text(
+                            _currencyFormat.format(_esmizTotalBalance).replaceAll('.00', ''),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
+                              fontFamily: 'monospace',
+                              color: _esmizTotalBalance < 0
+                                  ? const Color(0xFF2563EB)
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        const DataCell(Text('')),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 80),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Add / Edit Esmiz Entry Dialog
+  Future<void> _showEsmizEntryDialog([EsmizEntry? entry]) async {
+    final isEditing = entry != null;
+    final descController = TextEditingController(text: entry?.description ?? '');
+    final amountController = TextEditingController(
+      text: entry != null ? entry.amount.toStringAsFixed(0) : '',
+    );
+    int selectedSign = entry?.sign ?? -1;
+    String selectedDate = entry?.transactionDate ?? DateTime.now().toIso8601String().split('T').first;
+    bool saving = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          final amt = double.tryParse(amountController.text.replaceAll(',', '')) ?? 0.0;
+          final calcTotal = amt * selectedSign;
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            title: Text(
+              isEditing ? 'Edit Esmiz Row' : 'Add Esmiz Row (አዲስ ረድፍ)',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: descController,
+                    decoration: const InputDecoration(
+                      labelText: 'የእቃው አይነት (Description) *',
+                      hintText: 'e.g. yebefit keri, 2.5 bmt, 2.5 elusdy...',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TextField(
+                          controller: amountController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'ዋጋ (Amount) *',
+                            hintText: '13450',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<int>(
+                          initialValue: selectedSign,
+                          decoration: const InputDecoration(
+                            labelText: 'ብዛት',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: -1, child: Text('-1 (ቀናሽ)')),
+                            DropdownMenuItem(value: 1, child: Text('+1 (ደማሪ)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() {
+                                selectedSign = val;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () async {
+                      final parsed = DateTime.tryParse(selectedDate) ?? DateTime.now();
+                      final picked = await showDatePicker(
+                        context: dialogCtx,
+                        initialDate: parsed,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (picked != null) {
+                        setDialogState(() {
+                          selectedDate = picked.toIso8601String().split('T').first;
+                        });
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Transaction Date (ቀን)',
+                        prefixIcon: Icon(Icons.calendar_today, size: 16),
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      child: Text(selectedDate, style: const TextStyle(fontSize: 13)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Calculated Row Total (ድምር):',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF1E40AF)),
+                        ),
+                        Text(
+                          '${_currencyFormat.format(calcTotal).replaceAll('.00', '')} ETB',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
+                            color: calcTotal < 0 ? const Color(0xFF2563EB) : const Color(0xFF1E40AF),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final desc = descController.text.trim();
+                        final parsedAmt = double.tryParse(amountController.text.replaceAll(',', '')) ?? 0.0;
+                        if (desc.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter description (የእቃው አይነት)')),
+                          );
+                          return;
+                        }
+                        if (parsedAmt <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter valid amount (ዋጋ)')),
+                          );
+                          return;
+                        }
+
+                        setDialogState(() {
+                          saving = true;
+                        });
+
+                        try {
+                          if (isEditing) {
+                            await ApiService.updateEsmizEntry(
+                              id: entry.id,
+                              description: desc,
+                              amount: parsedAmt,
+                              sign: selectedSign,
+                              transactionDate: selectedDate,
+                            );
+                          } else {
+                            await ApiService.createEsmizEntry(
+                              description: desc,
+                              amount: parsedAmt,
+                              sign: selectedSign,
+                              transactionDate: selectedDate,
+                            );
+                          }
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          await _loadEsmizData();
+                        } catch (e) {
+                          setDialogState(() {
+                            saving = false;
+                          });
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error saving: $e')),
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                ),
+                child: saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Save Row'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Delete Esmiz Entry
+  Future<void> _deleteEsmizEntry(String id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Row'),
+        content: const Text('Are you sure you want to delete this Esmiz row?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFBA1A1A),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await ApiService.deleteEsmizEntry(id);
+        await _loadEsmizData();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting: $e')),
+          );
+        }
+      }
+    }
+  }
+
   /// Authentic Excel Spreadsheet Table View matching the User's Excel Ledger
   Widget _buildRecordTable(LedgerRecord rec, ThemeData theme, bool isDark) {
     final isExpanded = _expandedRecordIds.contains(rec.id);
@@ -1996,6 +2526,9 @@ class _MainScreenState extends State<MainScreen> {
                   setState(() {
                     _currentTabIndex = index;
                   });
+                  if (index == 2) {
+                    _loadEsmizData();
+                  }
                 },
                 selectedItemColor: isDark
                     ? const Color(0xFF93C5FD)
@@ -2241,15 +2774,17 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
 
-                  // Stitch Statement Summary Card (for Customer/Supplier/Delala)
-                  if (_currentTabIndex != 3)
+                  // Stitch Statement Summary Card (for Customer/Supplier only)
+                  if (_currentTabIndex != 3 && _currentTabIndex != 2)
                     _buildStatementSummary(theme, isDark),
 
-                  // Content view: Store Inventory on Hand for Stock; Excel Ledgers for Parties
+                  // Content view: Store Inventory on Hand for Stock; Esmiz for Delala; Excel Ledgers for Parties
                   Expanded(
                     child: _currentTabIndex == 3
                         ? _buildStockInventorySheet(theme, isDark)
-                        : (records.isEmpty
+                        : _currentTabIndex == 2
+                            ? _buildEsmizSpreadsheetTable(theme, isDark)
+                            : (records.isEmpty
                             ? (_errorMessage != null
                                 ? Center(
                                     child: Padding(
@@ -2352,13 +2887,15 @@ class _MainScreenState extends State<MainScreen> {
           _currentTabIndex == 3
               ? 'Store Entry'
               : _currentTabIndex == 2
-                  ? 'Delala Entry'
+                  ? 'Add Row'
                   : _currentTabIndex == 1
                       ? 'Supplier Entry'
                       : 'Customer Entry',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
-        onPressed: _openCreateRecordDialog,
+        onPressed: _currentTabIndex == 2
+            ? () => _showEsmizEntryDialog()
+            : _openCreateRecordDialog,
       ),
     );
   }
