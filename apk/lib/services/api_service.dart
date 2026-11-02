@@ -4,7 +4,9 @@ import '../models/user.dart';
 import '../models/shop.dart';
 import '../models/ledger_record.dart';
 import '../models/statement.dart';
-import '../models/esmiz_entry.dart';
+import '../models/broker.dart';
+import '../models/delala_transaction.dart';
+import '../models/delala_entry.dart';
 import 'neon_database_service.dart';
 
 /// Application service layer (Online-Only via Neon PostgreSQL).
@@ -211,45 +213,141 @@ class ApiService {
   }
 
   // =========================================================================
-  // ESMIZ (DELALA) METHODS
+  // DELALA — EXTERNAL BROKER MANAGEMENT METHODS
   // =========================================================================
 
-  static Future<List<EsmizEntry>> getEsmizEntries() async {
-    return await NeonDatabaseService.getEsmizEntriesDirect();
+  static Future<List<Broker>> getBrokers([String? storeId]) async {
+    return await NeonDatabaseService.getBrokersDirect(storeId);
   }
 
-  static Future<void> createEsmizEntry({
-    required String description,
-    required double amount,
-    required int sign,
-    required String transactionDate,
+  static Future<Broker> createBroker({
+    required String fullName,
+    String? phone,
+    String? alternativePhone,
+    String? businessName,
+    String? location,
+    String? website,
+    String? referenceNumber,
+    String? notes,
+    String? storeId,
   }) async {
-    await NeonDatabaseService.createEsmizEntryDirect(
-      description: description,
-      amount: amount,
-      sign: sign,
-      transactionDate: transactionDate,
+    return await NeonDatabaseService.createBrokerDirect(
+      fullName: fullName,
+      phone: phone,
+      alternativePhone: alternativePhone,
+      businessName: businessName,
+      location: location,
+      website: website,
+      referenceNumber: referenceNumber,
+      notes: notes,
+      storeId: storeId,
     );
   }
 
-  static Future<void> updateEsmizEntry({
+  static Future<void> updateBroker({
     required String id,
-    required String description,
-    required double amount,
-    required int sign,
-    required String transactionDate,
+    String? fullName,
+    String? phone,
+    String? alternativePhone,
+    String? businessName,
+    String? location,
+    String? website,
+    String? referenceNumber,
+    String? notes,
+    String? status,
   }) async {
-    await NeonDatabaseService.updateEsmizEntryDirect(
+    await NeonDatabaseService.updateBrokerDirect(
       id: id,
-      description: description,
-      amount: amount,
-      sign: sign,
-      transactionDate: transactionDate,
+      fullName: fullName,
+      phone: phone,
+      alternativePhone: alternativePhone,
+      businessName: businessName,
+      location: location,
+      website: website,
+      referenceNumber: referenceNumber,
+      notes: notes,
+      status: status,
     );
   }
 
-  static Future<void> deleteEsmizEntry(String id) async {
-    await NeonDatabaseService.deleteEsmizEntryDirect(id);
+  static Future<void> deleteBroker(String id) async {
+    await NeonDatabaseService.deleteBrokerDirect(id);
+  }
+
+  static Future<List<DelalaTransaction>> getDelalaTransactions([String? brokerId]) async {
+    return await NeonDatabaseService.getDelalaTransactionsDirect(brokerId);
+  }
+
+  static Future<void> createDelalaTransaction({
+    required String brokerId,
+    String? accountId,
+    String? storeId,
+    required String transactionType,
+    required String description,
+    String? productId,
+    double? quantity,
+    String? unit,
+    double? unitPrice,
+    required double amount,
+    int? accountingEffect,
+    required String transactionDate,
+    String? paymentMethod,
+    String? referenceNumber,
+    String? notes,
+  }) async {
+    await NeonDatabaseService.createDelalaTransactionDirect(
+      brokerId: brokerId,
+      accountId: accountId,
+      storeId: storeId,
+      transactionType: transactionType,
+      description: description,
+      productId: productId,
+      quantity: quantity,
+      unit: unit,
+      unitPrice: unitPrice,
+      amount: amount,
+      accountingEffect: accountingEffect,
+      transactionDate: transactionDate,
+      paymentMethod: paymentMethod,
+      referenceNumber: referenceNumber,
+      notes: notes,
+    );
+  }
+
+  static Future<void> updateDelalaTransaction({
+    required String id,
+    String? transactionType,
+    String? description,
+    String? productId,
+    double? quantity,
+    String? unit,
+    double? unitPrice,
+    double? amount,
+    int? accountingEffect,
+    String? transactionDate,
+    String? paymentMethod,
+    String? referenceNumber,
+    String? notes,
+  }) async {
+    await NeonDatabaseService.updateDelalaTransactionDirect(
+      id: id,
+      transactionType: transactionType,
+      description: description,
+      productId: productId,
+      quantity: quantity,
+      unit: unit,
+      unitPrice: unitPrice,
+      amount: amount,
+      accountingEffect: accountingEffect,
+      transactionDate: transactionDate,
+      paymentMethod: paymentMethod,
+      referenceNumber: referenceNumber,
+      notes: notes,
+    );
+  }
+
+  static Future<void> deleteDelalaTransaction(String id) async {
+    await NeonDatabaseService.deleteDelalaTransactionDirect(id);
   }
 
   static AccountStatement _generateLocalStatement(
@@ -370,5 +468,59 @@ class ApiService {
         entryCount: entries.length,
       ),
     );
+  }
+
+  // =========================================================================
+  // DELALA SPREADSHEET ENTRIES
+  // =========================================================================
+
+  static Future<List<DelalaEntry>> getDelalaEntries([String? storeId]) async {
+    return NeonDatabaseService.getDelalaEntriesDirect(storeId);
+  }
+
+  static Future<DelalaEntry> createDelalaEntry({
+    required String delalaName,
+    required String productName,
+    required double unitPrice,
+    required double pieces,
+    required int sign,
+    required String transactionDate,
+    String? storeId,
+  }) async {
+    return NeonDatabaseService.createDelalaEntryDirect(
+      delalaName: delalaName,
+      productName: productName,
+      unitPrice: unitPrice,
+      pieces: pieces,
+      sign: sign,
+      transactionDate: transactionDate,
+      storeId: storeId,
+    );
+  }
+
+  static Future<void> updateDelalaEntry({
+    required String id,
+    String? delalaName,
+    String? productName,
+    double? unitPrice,
+    double? pieces,
+    int? sign,
+    String? transactionDate,
+    String? storeId,
+  }) async {
+    return NeonDatabaseService.updateDelalaEntryDirect(
+      id: id,
+      delalaName: delalaName,
+      productName: productName,
+      unitPrice: unitPrice,
+      pieces: pieces,
+      sign: sign,
+      transactionDate: transactionDate,
+      storeId: storeId,
+    );
+  }
+
+  static Future<void> deleteDelalaEntry(String id) async {
+    return NeonDatabaseService.deleteDelalaEntryDirect(id);
   }
 }

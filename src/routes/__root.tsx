@@ -1,6 +1,7 @@
 import { createRootRoute } from '@tanstack/react-router'
 import '../styles.css'
 import { AuthProvider } from '../context/AuthContext'
+import { LanguageProvider } from '../context/LanguageContext'
 import { AuthGate } from '../components/auth/AuthGate'
 
 export const Route = createRootRoute({
@@ -9,9 +10,12 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <AuthProvider>
-      <AuthGate />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <AuthGate />
+      </AuthProvider>
+    </LanguageProvider>
   )
 }
+
 

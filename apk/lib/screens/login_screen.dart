@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import '../services/neon_database_service.dart';
+import '../services/language_service.dart';
 import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,6 +20,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+
+  bool get _isAmharic => LanguageService.isAmharic;
 
   @override
   void dispose() {
@@ -68,8 +71,18 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => MainScreen(currentUser: user)),
       );
     } catch (e) {
+      final msg = e.toString().replaceAll('Exception:', '').trim();
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+        if (msg.contains('Socket') ||
+            msg.contains('Failed host lookup') ||
+            msg.contains('ClientException') ||
+            msg.contains('timeout') ||
+            msg.contains('No address associated with hostname')) {
+          _errorMessage =
+              'Network error. Please check your internet connection.\nየኢንተርኔት ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።';
+        } else {
+          _errorMessage = msg;
+        }
       });
     } finally {
       if (mounted) {
@@ -95,6 +108,20 @@ class _LoginScreenState extends State<LoginScreen> {
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         ),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.language, size: 18),
+            label: Text(_isAmharic ? 'English' : 'አማርኛ'),
+            style: TextButton.styleFrom(
+              foregroundColor: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+            ),
+            onPressed: () async {
+              await LanguageService.setLanguage(_isAmharic ? 'en' : 'am');
+              setState(() {});
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SafeArea(
         child: Center(
@@ -135,7 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'Merkato Credit Record',
+                    _isAmharic ? 'መርካቶ የብድር መዝገብ' : 'Merkato Credit Record',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22,
@@ -167,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'Sign In',
+                            _isAmharic ? 'ግባ (Sign In)' : 'Sign In',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -284,9 +311,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                         color: Colors.white,
                                       ),
                                     )
-                                  : const Text(
-                                      'Sign In',
-                                      style: TextStyle(
+                                  : Text(
+                                      _isAmharic ? 'ግባ' : 'Sign In',
+                                      style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),

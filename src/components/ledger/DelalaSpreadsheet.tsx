@@ -1,0 +1,665 @@
+import { useState, useEffect, useMemo } from 'react'
+import {
+  Plus,
+  Search,
+  Trash2,
+  Edit2,
+  RefreshCw,
+  TrendingUp,
+  TrendingDown,
+  Scale,
+  Calendar,
+  X,
+  Check,
+  AlertCircle,
+  FileSpreadsheet,
+  Menu,
+} from 'lucide-react'
+import {
+  getDelalaEntries,
+  createDelalaEntry,
+  updateDelalaEntry,
+  deleteDelalaEntry,
+  type DelalaEntry,
+} from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
+import { useLanguage } from '../../context/LanguageContext'
+import { Button } from '../ui/button'
+
+
+function cleanDelalaName(name: string): string {
+  return name.replace(/^(delala|ደላላ)\s+/i, '').trim()
+}
+
+function getTodayEthiopianDatePlaceholder(): string {
+  const d = new Date()
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
+export function DelalaSpreadsheet({
+  onOpenMobileMenu,
+}: {
+  onOpenMobileMenu?: () => void
+} = {}) {
+  const { activeShop, activeShopId } = useAuth()
+  const { t, isAmharic } = useLanguage()
+  const [entries, setEntries] = useState<DelalaEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('')
+  const [dateFilter, setDateFilter] = useState('')
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<DelalaEntry | null>(null)
+  const [delalaName, setDelalaName] = useState('')
+  const [productName, setProductName] = useState('')
+  const [unitPrice, setUnitPrice] = useState('')
+  const [pieces, setPieces] = useState('')
+  const [sign, setSign] = useState<1 | -1>(1)
+  const [transactionDate, setTransactionDate] = useState(getTodayEthiopianDatePlaceholder())
+  const [formError, setFormError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  // Delete confirm
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const shopId = !activeShopId || activeShopId === 'all' ? undefined : activeShopId
+      const data = await getDelalaEntries(shopId)
+      setEntries(data)
+    } catch (err: any) {
+      console.error('Failed to load Delala entries:', err)
+      setError(err?.message || 'Failed to load Delala entries')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [activeShopId, activeShop?.id])
+
+
+  // Summary stats
+  const { totalPositive, totalNegative, finalBalance } = useMemo(() => {
+    let pos = 0
+    let neg = 0
+    for (const e of entries) {
+      if (e.total >= 0) pos += e.total
+      else neg += Math.abs(e.total)
+    }
+    return {
+      totalPositive: pos,
+      totalNegative: neg,
+      finalBalance: pos - neg,
+    }
+  }, [entries])
+
+  // Filtered rows
+  const filteredEntries = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const df = dateFilter.trim().toLowerCase()
+    return entries.filter((e) => {
+      const matchSearch =
+        !q ||
+        e.delalaName.toLowerCase().includes(q) ||
+        e.productName.toLowerCase().includes(q)
+      const matchDate = !df || e.transactionDate.toLowerCase().includes(df)
+      return matchSearch && matchDate
+    })
+  }, [entries, searchQuery, dateFilter])
+
+  // Live total in modal
+  const livePrice = parseFloat(unitPrice) || 0
+  const livePieces = parseFloat(pieces) || 0
+  const liveTotal = parseFloat((livePrice * livePieces * sign).toFixed(2))
+
+  const openAddModal = () => {
+    setEditingEntry(null)
+    setDelalaName('')
+    setProductName('')
+    setUnitPrice('')
+    setPieces('')
+    setSign(1)
+    setTransactionDate(getTodayEthiopianDatePlaceholder())
+    setFormError(null)
+    setIsModalOpen(true)
+  }
+
+  const openEditModal = (entry: DelalaEntry) => {
+    setEditingEntry(entry)
+    setDelalaName(entry.delalaName)
+    setProductName(entry.productName)
+    setUnitPrice(entry.unitPrice.toString())
+    setPieces(entry.pieces.toString())
+    setSign(entry.sign)
+    setTransactionDate(entry.transactionDate)
+    setFormError(null)
+    setIsModalOpen(true)
+  }
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanName = cleanDelalaName(delalaName)
+    if (!cleanName) {
+      setFormError('Please enter Name (ስም ያስገቡ)')
+      return
+    }
+    if (!productName.trim()) {
+      setFormError('Please enter Item/Product name (የዕቃ ዓይነት ያስገቡ)')
+      return
+    }
+    if (isNaN(livePrice) || livePrice < 0) {
+      setFormError('Please enter a valid unit price (ትክክለኛ ዋጋ ያስገቡ)')
+      return
+    }
+    if (isNaN(livePieces) || livePieces <= 0) {
+      setFormError('Please enter valid pieces/quantity (ትክክለኛ ብዛት ያስገቡ)')
+      return
+    }
+    if (!transactionDate.trim()) {
+      setFormError('Please enter transaction date in Ethiopian calendar format (ቀን ያስገቡ)')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      setFormError(null)
+      if (editingEntry) {
+        const updated = await updateDelalaEntry(editingEntry.id, {
+          delalaName: cleanName,
+          productName: productName.trim(),
+          unitPrice: livePrice,
+          pieces: livePieces,
+          sign,
+          transactionDate: transactionDate.trim(),
+        })
+        setEntries((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+      } else {
+        const created = await createDelalaEntry({
+          delalaName: cleanName,
+          productName: productName.trim(),
+          unitPrice: livePrice,
+          pieces: livePieces,
+          sign,
+          transactionDate: transactionDate.trim(),
+          storeId: activeShop?.id,
+        })
+        setEntries((prev) => [...prev, created])
+      }
+      setIsModalOpen(false)
+    } catch (err: any) {
+      setFormError(err?.message || 'Error saving Delala entry')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      setDeletingId(id)
+      await deleteDelalaEntry(id)
+      setEntries((prev) => prev.filter((e) => e.id !== id))
+    } catch (err: any) {
+      alert(err?.message || 'Failed to delete Delala entry')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Error alert */}
+      {error && (
+        <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadData}
+            className="font-bold underline cursor-pointer hover:opacity-80 ml-2"
+          >
+            {t('Retry', 'እንደገና ሞክር')}
+          </button>
+        </div>
+      )}
+
+      {/* Modern Unified Command & Action Bar */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 p-1.5 sm:p-2 bg-card rounded-2xl shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5">
+        {/* Left: Mobile Menu + Search */}
+        <div className="flex items-center gap-2 flex-1">
+          {onOpenMobileMenu && (
+            <button
+              type="button"
+              onClick={onOpenMobileMenu}
+              className="md:hidden p-2 rounded-xl bg-muted/60 hover:bg-muted text-foreground shrink-0 flex items-center justify-center cursor-pointer shadow-2xs"
+              title={t('Open menu', 'ሜኑ ክፈት')}
+            >
+              <Menu size={18} />
+            </button>
+          )}
+
+          {/* Search Delala Name & Product */}
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+              <Search size={16} />
+            </span>
+            <input
+              type="text"
+              placeholder={t(
+                'Search by Delala name or Product...',
+                'በደላላ ስም ወይም ዕቃ ፈልግ...'
+              )}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-transparent rounded-xl focus:outline-none placeholder:text-muted-foreground/70"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 cursor-pointer"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Middle/Right: Ethiopian Date Filter */}
+        <div className="relative w-full md:w-60">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+            <Calendar size={15} />
+          </span>
+          <input
+            type="text"
+            placeholder={t('Filter date (DD/MM/YYYY)', 'በቀን ፈልግ (02/11/2026)')}
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-muted/30 rounded-xl focus:outline-none placeholder:text-muted-foreground/70 ring-1 ring-zinc-200 dark:ring-zinc-800"
+          />
+          {dateFilter && (
+            <button
+              onClick={() => setDateFilter('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 cursor-pointer"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        {/* Right: Actions (Refresh + Add Entry) */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadData}
+            disabled={loading}
+            className="h-8 text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
+            title={t('Refresh', 'አድስ')}
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">{t('Refresh', 'አድስ')}</span>
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={openAddModal}
+            className="h-8 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 shadow-xs cursor-pointer"
+          >
+            <Plus size={16} />
+            <span>{t('Add Delala Entry', 'አዲስ የደላላ መዝገብ')}</span>
+          </Button>
+        </div>
+      </div>
+
+
+      {/* Spreadsheet Table */}
+      <div className="rounded-2xl bg-card ring-1 ring-zinc-950/5 dark:ring-white/5 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs sm:text-sm border-collapse">
+            <thead>
+              <tr className="bg-zinc-100/80 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-muted-foreground font-semibold">
+                <th className="py-2.5 px-3 w-12 text-center">{t('No.', 'ተ.ቁ')}</th>
+                <th className="py-2.5 px-3">{t('Name', 'ስም')}</th>
+                <th className="py-2.5 px-3">{t('Product / Item', 'የዕቃው አይነት')}</th>
+                <th className="py-2.5 px-3 text-right">{t('Price', 'ዋጋ')}</th>
+                <th className="py-2.5 px-3 text-right">{t('Pieces', 'ብዛት')}</th>
+                <th className="py-2.5 px-3 text-center w-16">{t('Sign', 'ምልክት')}</th>
+                <th className="py-2.5 px-3 text-right">{t('Total ETB', 'ድምር')}</th>
+                <th className="py-2.5 px-3 text-center">{t('Date', 'ቀን')}</th>
+                <th className="py-2.5 px-3 text-center w-24">{t('Action', 'እርምጃ')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                    <div className="flex items-center justify-center gap-2">
+                      <RefreshCw size={18} className="animate-spin text-blue-600" />
+                      <span className="text-xs font-medium">
+                        {t('Loading Delala entries...', 'የደላላ መዝገቦችን በመጫን ላይ...')}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredEntries.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                    {searchQuery || dateFilter
+                      ? t('No entries match your filter.', 'ምንም የተገኘ መዝገብ የለም።')
+                      : t('No Delala entries recorded yet.', 'ምንም የተመዘገበ የደላላ መዝገብ የለም።')}
+                  </td>
+                </tr>
+              ) : (
+                filteredEntries.map((row, idx) => {
+                  const isNegative = row.sign === -1
+                  return (
+                    <tr
+                      key={row.id}
+                      className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
+                    >
+                      <td className="py-2.5 px-3 text-center font-medium text-muted-foreground">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-foreground">
+                        {cleanDelalaName(row.delalaName)}
+                      </td>
+                      <td className="py-2.5 px-3 text-muted-foreground">
+                        {row.productName}
+                      </td>
+                      <td className="py-2.5 px-3 text-right tabular-nums">
+                        {row.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2.5 px-3 text-right tabular-nums font-medium">
+                        {row.pieces}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span
+                          className={`inline-flex items-center justify-center w-6 h-6 rounded-md font-bold text-xs ${
+                            isNegative
+                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                          }`}
+                        >
+                          {row.sign === -1 ? '-' : '+'}
+                        </span>
+                      </td>
+                      <td
+                        className={`py-2.5 px-3 text-right tabular-nums font-bold ${
+                          isNegative
+                            ? 'text-blue-600 dark:text-blue-400'
+                            : 'text-emerald-600 dark:text-emerald-400'
+                        }`}
+                      >
+                        {row.total >= 0 ? '+' : ''}
+                        {row.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2.5 px-3 text-center text-xs text-muted-foreground whitespace-nowrap">
+                        {row.transactionDate}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => openEditModal(row)}
+                            className="p-1 rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 cursor-pointer"
+                            title="Edit entry"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(row.id)}
+                            disabled={deletingId === row.id}
+                            className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 cursor-pointer"
+                            title="Delete entry"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+            {filteredEntries.length > 0 && (
+              <tfoot>
+                <tr className="bg-zinc-100/90 dark:bg-zinc-900 border-t-2 border-zinc-300 dark:border-zinc-700 font-black">
+                  <td colSpan={3} className="py-3 px-3 text-foreground font-extrabold text-right">
+                    ጠቅላላ ድምር (Final Total):
+                  </td>
+                  <td className="py-3 px-3"></td>
+                  <td className="py-3 px-3 text-right tabular-nums text-foreground">
+                    {filteredEntries.reduce((sum, r) => sum + r.pieces, 0).toLocaleString()}
+                  </td>
+                  <td className="py-3 px-3"></td>
+                  <td
+                    className={`py-3 px-3 text-right tabular-nums text-sm font-black ${
+                      finalBalance < 0
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : finalBalance > 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-foreground'
+                    }`}
+                  >
+                    {finalBalance >= 0 ? '+' : ''}
+                    {finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETB
+                  </td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
+      {/* Modal Dialog: Add / Edit Entry */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-card w-full max-w-md rounded-2xl ring-1 ring-zinc-950/10 dark:ring-white/10 shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet size={18} className="text-blue-600" />
+                <h3 className="font-bold text-base text-foreground">
+                  {editingEntry
+                    ? t('Edit Delala Entry', 'የደላላ መዝገብ አርትዕ')
+                    : t('Add Delala Entry', 'አዲስ የደላላ መዝገብ')}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSave} className="space-y-3.5">
+              {/* Delala Name (No prefix) */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  {t('1. Name (ስም) *', '1. ስም (Name) *')}
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="John Doe"
+                  value={delalaName}
+                  onChange={(e) => setDelalaName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Item / Product */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  {t('2. Item / Product (የዕቃው አይነት) *', '2. የዕቃው አይነት (Item / Product) *')}
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={t('e.g. 12W Safari / 2.5 bmt', 'ምሳሌ፦ 12W ሳፋሪ')}
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Unit Price & Pieces */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    {t('3. Unit Price (ዋጋ ETB) *', '3. ዋጋ (Unit Price ETB) *')}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="65"
+                    value={unitPrice}
+                    onChange={(e) => setUnitPrice(e.target.value)}
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    {t('4. Pieces (ብዛት) *', '4. ብዛት (Pieces) *')}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0.001"
+                    required
+                    placeholder="10"
+                    value={pieces}
+                    onChange={(e) => setPieces(e.target.value)}
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Sign Selector (+ / -) */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  {t('5. Sign (ምልክት) *', '5. ምልክት (Sign) *')}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSign(1)}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      sign === 1
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'bg-background text-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    <span>{t('+ Positive (+1)', '+ ፖዘቲቭ (+1)')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSign(-1)}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      sign === -1
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                        : 'bg-background text-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    <span>{t('- Negative (-1)', '- ኔጌቲቭ (-1)')}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Total Display */}
+              <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-border flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-muted-foreground block">
+                    {t('6. Total (Unit Price × Pieces × Sign):', '6. ድምር (ዋጋ × ብዛት × ምልክት):')}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {livePrice} × {livePieces} × {sign === -1 ? '-1' : '+1'}
+                  </span>
+                </div>
+                <div
+                  className={`text-lg font-black ${
+                    liveTotal < 0
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : liveTotal > 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-foreground'
+                  }`}
+                >
+                  {liveTotal >= 0 ? '+' : ''}
+                  {liveTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} ETB
+                </div>
+              </div>
+
+              {/* Date Input (Ethiopian Calendar text) */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  {t('7. Date (ቀን - የኢትዮጵያ የቀን አቆጣጠር) *', '7. ቀን (የኢትዮጵያ የቀን አቆጣጠር) *')}
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="02/11/2026 (DD/MM/YYYY)"
+                  value={transactionDate}
+                  onChange={(e) => setTransactionDate(e.target.value)}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+                <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                  {t('Accepts Ethiopian calendar format as text (e.g. 02/11/2026)', 'የኢትዮጵያ ቀን አቆጣጠር በጽሑፍ ያስገቡ (ምሳሌ፦ 02/11/2026)')}
+                </span>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsModalOpen(false)}
+                  className="rounded-xl h-9 text-xs"
+                >
+                  {t('Cancel', 'ይቅር')}
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={submitting}
+                  className="rounded-xl h-9 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 shadow-xs"
+                >
+                  <Check size={14} />
+                  <span>
+                    {submitting
+                      ? t('Saving...', 'በማስቀመጥ ላይ...')
+                      : editingEntry
+                      ? t('Update Entry', 'መዝገብ አድስ')
+                      : t('Save Entry', 'መዝግብ (አስቀምጥ)')}
+                  </span>
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -6,6 +6,7 @@ dist-ssr
 .env
 !apk/.env
 credential.txt
+credentials.txt
 .nitro
 .tanstack
 .wrangler

@@ -243,7 +243,7 @@ export const RecordModal: React.FC = () => {
             modalMode === 'create'
               ? 'New Customer Entry'
               : 'Edit Customer Entry',
-          placeholder: 'Customer / Store name (e.g. Alex Johnson, Kelil Aginbi)',
+          placeholder: 'John Doe',
           badge: 'Customer Credit',
           badgeColor:
             'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
@@ -255,7 +255,7 @@ export const RecordModal: React.FC = () => {
             modalMode === 'create'
               ? 'New Supplier Entry'
               : 'Edit Supplier Entry',
-          placeholder: 'Supplier / Vendor name (e.g. Global Tech, Metro Packaging)',
+          placeholder: 'John Doe',
           badge: 'Supplier Credit',
           badgeColor:
             'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
@@ -267,7 +267,7 @@ export const RecordModal: React.FC = () => {
             modalMode === 'create'
               ? 'New Delala Entry'
               : 'Edit Delala Entry',
-          placeholder: 'Delala / Broker name (e.g. Abebe Delala, Merkato Agent)',
+          placeholder: 'John Doe',
           badge: 'Delala Credit',
           badgeColor:
             'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
@@ -417,7 +417,8 @@ export const RecordModal: React.FC = () => {
             </div>
             <div>
               <Input
-                type="date"
+                type="text"
+                placeholder="DD/MM/YYYY (e.g. 02/11/2026)"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="text-xs h-9 bg-muted/30 focus:bg-background rounded-lg border-0 ring-1 ring-zinc-950/10 dark:ring-white/10"

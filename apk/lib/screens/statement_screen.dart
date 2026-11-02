@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../models/statement.dart';
 import '../services/api_service.dart';
+import '../services/language_service.dart';
 
 class StatementScreen extends StatefulWidget {
   final String accountName;
@@ -25,6 +26,7 @@ class StatementScreen extends StatefulWidget {
 
 class _StatementScreenState extends State<StatementScreen> {
   final _currencyFormat = NumberFormat('#,##0.00', 'en_US');
+  bool get _isAmharic => LanguageService.isAmharic;
   AccountStatement? _statement;
   bool _isLoading = true;
   String? _error;
@@ -244,7 +246,7 @@ class _StatementScreenState extends State<StatementScreen> {
           if (_statement != null)
             IconButton(
               icon: const Icon(Icons.print_outlined),
-              tooltip: 'Print Statement',
+              tooltip: _isAmharic ? 'መግለጫ አትም / ፒዲኤፍ' : 'Print Statement',
               onPressed: _printOrExportPdf,
             ),
         ],
@@ -254,7 +256,7 @@ class _StatementScreenState extends State<StatementScreen> {
           : _error != null
               ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
               : _statement == null || _statement!.entries.isEmpty
-                  ? const Center(child: Text('No transaction records found for this account.'))
+                  ? Center(child: Text(_isAmharic ? 'ምንም የግብይት መዝገብ አልተገኘም' : 'No transaction records found for this account.'))
                   : _buildStatementContent(_statement!),
     );
   }
@@ -267,20 +269,20 @@ class _StatementScreenState extends State<StatementScreen> {
     final isStock = st.accountType == 'stock';
 
     final String typeTitle = isStock
-        ? 'Store Inventory'
+        ? (_isAmharic ? 'የመደብር እቃዎች' : 'Store Inventory')
         : isCustomer
-            ? 'Customer Credit'
+            ? (_isAmharic ? 'የደንበኛ ብድር' : 'Customer Credit')
             : isDelala
-                ? 'Delala (Broker)'
-                : 'Supplier Credit';
+                ? (_isAmharic ? 'ደላላ' : 'Delala (Broker)')
+                : (_isAmharic ? 'የአቅራቢ ብድር' : 'Supplier Credit');
 
     final formulaText = isStock
-        ? 'Store On Hand = Stock In (+) - Stock Out (-)'
+        ? (_isAmharic ? 'በመደብር ያለው = ገቢ (+) - ወጪ (-)' : 'Store On Hand = Stock In (+) - Stock Out (-)')
         : isCustomer
-            ? 'Customer Balance = Total Debit - Total Credit'
+            ? (_isAmharic ? 'የደንበኛ ቀሪ = ጠቅላላ ተቀባይ - ጠቅላላ ተከፋይ' : 'Customer Balance = Total Debit - Total Credit')
             : isDelala
-                ? 'Delala Balance = Commission Earned - Paid'
-                : 'Supplier Balance = Total Credit - Total Debit';
+                ? (_isAmharic ? 'የደላላ ቀሪ = የወሰደው - የመለሰው' : 'Delala Balance = Commission Earned - Paid')
+                : (_isAmharic ? 'የአቅራቢ ቀሪ = ጠቅላላ ተከፋይ - ጠቅላላ ተቀባይ' : 'Supplier Balance = Total Credit - Total Debit');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(10.0),
@@ -419,7 +421,7 @@ class _StatementScreenState extends State<StatementScreen> {
                         border: Border(right: BorderSide(color: gridColor, width: 0.8)),
                       ),
                       child: Text(
-                        'Date',
+                        _isAmharic ? 'ቀን' : 'Date',
                         style: TextStyle(
                           color: isDark ? Colors.white : const Color(0xFF1E293B),
                           fontSize: 10.5,
@@ -436,7 +438,7 @@ class _StatementScreenState extends State<StatementScreen> {
                         border: Border(right: BorderSide(color: gridColor, width: 0.8)),
                       ),
                       child: Text(
-                        'Item / Description',
+                        _isAmharic ? 'የዕቃ ዓይነት / ማብራሪያ' : 'Item / Description',
                         style: TextStyle(
                           color: isDark ? Colors.white : const Color(0xFF1E293B),
                           fontSize: 10.5,
@@ -453,7 +455,9 @@ class _StatementScreenState extends State<StatementScreen> {
                         border: Border(right: BorderSide(color: gridColor, width: 0.8)),
                       ),
                       child: Text(
-                        isStock ? 'Stock In (+)' : 'Debit (+)',
+                        isStock
+                            ? (_isAmharic ? 'ገቢ (+)' : 'Stock In (+)')
+                            : (_isAmharic ? 'ተቀባይ (+)' : 'Debit (+)'),
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           color: isDark ? Colors.white : const Color(0xFF1E293B),
@@ -471,7 +475,9 @@ class _StatementScreenState extends State<StatementScreen> {
                         border: Border(right: BorderSide(color: gridColor, width: 0.8)),
                       ),
                       child: Text(
-                        isStock ? 'Stock Out (-)' : 'Credit (-)',
+                        isStock
+                            ? (_isAmharic ? 'ወጪ (-)' : 'Stock Out (-)')
+                            : (_isAmharic ? 'ተከፋይ (-)' : 'Credit (-)'),
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           color: isDark ? const Color(0xFFFEF08A) : const Color(0xFF854D0E),
@@ -486,7 +492,7 @@ class _StatementScreenState extends State<StatementScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Text(
-                        isStock ? 'On Hand' : 'Balance',
+                        _isAmharic ? 'ቀሪ' : (isStock ? 'On Hand' : 'Balance'),
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           color: isDark ? Colors.white : const Color(0xFF1E293B),
@@ -708,7 +714,7 @@ class _StatementScreenState extends State<StatementScreen> {
                         border: Border(right: BorderSide(color: gridColor, width: 0.8)),
                       ),
                       child: Text(
-                        'TOTAL (ETB)',
+                        _isAmharic ? 'ጠቅላላ ድምር (ETB)' : 'TOTAL (ETB)',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 11,
@@ -804,7 +810,9 @@ class _StatementScreenState extends State<StatementScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isStock ? 'Total Stock In:' : 'Total Debit:',
+                isStock
+                    ? (_isAmharic ? 'ጠቅላላ ገቢ ዕቃ፦' : 'Total Stock In:')
+                    : (_isAmharic ? 'ጠቅላላ ተቀባይ፦' : 'Total Debit:'),
                 style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
               ),
               Text(
@@ -818,7 +826,9 @@ class _StatementScreenState extends State<StatementScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isStock ? 'Total Stock Out:' : 'Total Credit (Payments):',
+                isStock
+                    ? (_isAmharic ? 'ጠቅላላ ወጪ ዕቃ፦' : 'Total Stock Out:')
+                    : (_isAmharic ? 'ጠቅላላ ተከፋይ (ክፍያዎች)፦' : 'Total Credit (Payments):'),
                 style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFDE047) : const Color(0xFF854D0E)),
               ),
               Container(
@@ -839,7 +849,9 @@ class _StatementScreenState extends State<StatementScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isStock ? 'INVENTORY ON HAND VALUE:' : 'OUTSTANDING BALANCE:',
+                isStock
+                    ? (_isAmharic ? 'የመደብር እቃዎች ዋጋ፦' : 'INVENTORY ON HAND VALUE:')
+                    : (_isAmharic ? 'የተጣራ ቀሪ ሂሳብ፦' : 'OUTSTANDING BALANCE:'),
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
               ),
               Text(

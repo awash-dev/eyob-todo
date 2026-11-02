@@ -9,7 +9,9 @@ import '../models/user.dart';
 import '../models/shop.dart';
 import '../models/ledger_record.dart';
 import '../models/line_item.dart';
-import '../models/esmiz_entry.dart';
+import '../models/broker.dart';
+import '../models/delala_transaction.dart';
+import '../models/delala_entry.dart';
 
 /// Direct Neon PostgreSQL Service
 ///
@@ -28,33 +30,34 @@ class NeonDatabaseService {
     return 'postgresql://neondb_owner:npg_OtyTj7F9Aqnz@ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require';
   }
 
-  static String get neonDirectEndpoint {
+  static List<String> get candidateEndpoints {
+    final list = <String>[];
     try {
       if (dotenv.isInitialized) {
-        final val = dotenv.env['NEON_DIRECT_ENDPOINT'];
-        if (val != null && val.isNotEmpty) {
-          return val.replaceAll('-pooler', '');
+        final dir = dotenv.env['NEON_DIRECT_ENDPOINT'];
+        if (dir != null && dir.isNotEmpty) {
+          list.add(dir.replaceAll('-pooler', ''));
+          list.add(dir);
+        }
+        final reg = dotenv.env['NEON_REGION_ENDPOINT'];
+        if (reg != null && reg.isNotEmpty) {
+          list.add(reg.replaceAll('-pooler', ''));
+          list.add(reg);
         }
       }
     } catch (_) {}
 
-    // Automatically derive clean HTTP endpoint from connection string
-    try {
-      final uri = Uri.parse(
-        connectionString
-            .replaceFirst('postgresql://', 'http://')
-            .replaceFirst('postgres://', 'http://'),
-      );
-      if (uri.host.isNotEmpty) {
-        final cleanHost = uri.host.replaceAll('-pooler', '');
-        return 'https://$cleanHost/sql';
-      }
-    } catch (_) {}
+    // Clean standard serverless endpoint
+    list.add('https://ep-red-sea-b5yphk96.c-7.us-east-2.aws.neon.tech/sql');
+    list.add('https://ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/sql');
 
-    return 'https://ep-red-sea-b5yphk96.c-7.us-east-2.aws.neon.tech/sql';
+    // Remove duplicates while preserving order
+    final seen = <String>{};
+    return list.where((url) => seen.add(url)).toList();
   }
 
-  static String get neonRegionEndpoint => neonDirectEndpoint;
+  static String get neonDirectEndpoint => candidateEndpoints.first;
+  static String get neonRegionEndpoint => candidateEndpoints.first;
 
   static const Duration requestTimeout = Duration(seconds: 15);
 
@@ -121,29 +124,45 @@ class NeonDatabaseService {
     };
 
     http.Response? response;
+    dynamic lastError;
 
-    // Try primary region endpoint
-    try {
-      response = await http
-          .post(Uri.parse(neonRegionEndpoint), headers: headers, body: body)
-          .timeout(requestTimeout);
-    } catch (_) {
-      // Try direct host endpoint as fallback
+    // Try all candidate endpoints with failover
+    for (final endpoint in candidateEndpoints) {
       try {
         response = await http
-            .post(Uri.parse(neonDirectEndpoint), headers: headers, body: body)
+            .post(Uri.parse(endpoint), headers: headers, body: body)
             .timeout(requestTimeout);
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          break; // Success
+        }
       } catch (e) {
-        throw Exception(' direct connection timeout: $e');
+        lastError = e;
       }
     }
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
+    if (response != null && response.statusCode >= 200 && response.statusCode < 300) {
       final decoded = jsonDecode(response.body);
       return _parseNeonRows(decoded);
-    } else {
-      throw Exception(' error (${response.statusCode}): ${response.body}');
     }
+
+    if (response != null) {
+      throw Exception('Server error (${response.statusCode}): ${response.body}');
+    }
+
+    // Clean user-friendly network error translation
+    final errStr = lastError?.toString() ?? 'Network timeout';
+    if (errStr.contains('Socket') ||
+        errStr.contains('Failed host lookup') ||
+        errStr.contains('ClientException') ||
+        errStr.contains('timeout') ||
+        errStr.contains('No address associated with hostname') ||
+        errStr.contains('Connection refused')) {
+      throw Exception(
+        'Network error: No internet connection. Please verify your Wi-Fi or mobile data is turned on and try again. (የኢንተርኔት ግንኙነት አልተገኘም)',
+      );
+    }
+
+    throw Exception('Connection failed: $errStr');
   }
 
   /// Parses both Neon array mode and object mode rows into `List<Map<String, dynamic>>`
@@ -230,10 +249,10 @@ class NeonDatabaseService {
       SELECT u.id, u.name, u.email, u.phone, u.password_hash, u.role, u.shop_id, u.active, sh.name AS shop_name
       FROM users u
       LEFT JOIN shops sh ON sh.id = u.shop_id
-      WHERE u.phone = \$1
+      WHERE u.phone = \$1 OR u.phone = \$2
       LIMIT 1
       ''',
-      [cleanPhone],
+      [cleanPhone, phone.trim()],
     );
 
     if (rows.isEmpty) return null;
@@ -680,95 +699,465 @@ class NeonDatabaseService {
   }
 
   // =========================================================================
-  // ESMIZ (DELALA) SCHEMA OPERATIONS
+  // DELALA — EXTERNAL BROKER MANAGEMENT OPERATIONS
   // =========================================================================
 
-  /// Fetch all Esmiz entries from Neon PostgreSQL
-  static Future<List<EsmizEntry>> getEsmizEntriesDirect() async {
-    // Ensure an Esmiz record exists
-    final recordRows = await executeSql(
-      'SELECT id, title FROM esmiz_records ORDER BY created_at ASC LIMIT 1',
-    );
-
-    String esmizId = '';
-    if (recordRows.isEmpty) {
-      final ins = await executeSql(
-        "INSERT INTO esmiz_records (title) VALUES ('Esmiz') RETURNING id",
-      );
-      if (ins.isNotEmpty) {
-        esmizId = ins.first['id']?.toString() ?? '';
-      }
-    } else {
-      esmizId = recordRows.first['id']?.toString() ?? '';
-    }
-
-    if (esmizId.isEmpty) return [];
-
+  /// Fetch all Brokers with live balances and transaction counts
+  static Future<List<Broker>> getBrokersDirect([String? storeId]) async {
     final rows = await executeSql(
-      'SELECT id, esmiz_id, description, amount, sign, position, transaction_date, created_at, updated_at '
-      'FROM esmiz_entries WHERE esmiz_id = \$1 ORDER BY position ASC, created_at ASC',
-      [esmizId],
+      'SELECT b.id, b.store_id, b.full_name, b.phone, b.alternative_phone, '
+      'b.business_name, b.location, b.website, b.reference_number, b.notes, '
+      'b.status, b.created_by, b.created_at, b.updated_at, '
+      'COALESCE(a.id, b.id) AS account_id, '
+      'COALESCE(a.current_balance, 0) AS current_balance, '
+      'COUNT(t.id) AS transaction_count '
+      'FROM brokers b '
+      'LEFT JOIN delala_accounts a ON a.broker_id = b.id '
+      'LEFT JOIN delala_transactions t ON t.account_id = a.id '
+      'GROUP BY b.id, b.store_id, b.full_name, b.phone, b.alternative_phone, '
+      'b.business_name, b.location, b.website, b.reference_number, b.notes, '
+      'b.status, b.created_by, b.created_at, b.updated_at, a.id, a.current_balance '
+      'ORDER BY b.created_at ASC',
     );
 
-    final entries = <EsmizEntry>[];
-    for (int i = 0; i < rows.length; i++) {
-      entries.add(EsmizEntry.fromMap(rows[i], i + 1));
-    }
-    return entries;
-  }
-
-  /// Add a new Esmiz row
-  static Future<void> createEsmizEntryDirect({
-    required String description,
-    required double amount,
-    required int sign,
-    required String transactionDate,
-  }) async {
-    // Get Esmiz record ID
-    final recordRows = await executeSql(
-      'SELECT id FROM esmiz_records ORDER BY created_at ASC LIMIT 1',
-    );
-    String esmizId = '';
-    if (recordRows.isEmpty) {
-      final ins = await executeSql(
-        "INSERT INTO esmiz_records (title) VALUES ('Esmiz') RETURNING id",
+    if (rows.isEmpty) {
+      final newBroker = await createBrokerDirect(
+        fullName: 'Delala Mohammed (ደላላ መሀመድ)',
+        phone: '0911223344',
+        location: 'Merkato',
       );
-      esmizId = ins.first['id']?.toString() ?? '';
-    } else {
-      esmizId = recordRows.first['id']?.toString() ?? '';
+      return [newBroker];
     }
 
-    final maxPosRows = await executeSql(
-      'SELECT COALESCE(MAX(position), 0) AS max_pos FROM esmiz_entries WHERE esmiz_id = \$1',
-      [esmizId],
-    );
-    final rawMax = maxPosRows.isNotEmpty ? maxPosRows.first['max_pos'] : 0;
-    final int nextPos = (rawMax is num ? rawMax.toInt() : int.tryParse(rawMax?.toString() ?? '0') ?? 0) + 1;
+    return rows.map((r) => Broker.fromMap(r)).toList();
+  }
 
-    await executeSql(
-      'INSERT INTO esmiz_entries (esmiz_id, description, amount, sign, position, transaction_date) '
-      'VALUES (\$1, \$2, \$3, \$4, \$5, \$6)',
-      [esmizId, description.trim(), amount, sign, nextPos, transactionDate],
+  /// Register a new external broker
+  static Future<Broker> createBrokerDirect({
+    required String fullName,
+    String? phone,
+    String? alternativePhone,
+    String? businessName,
+    String? location,
+    String? website,
+    String? referenceNumber,
+    String? notes,
+    String? storeId,
+  }) async {
+    final cleanName = fullName.trim().isEmpty ? 'Delala Broker' : fullName.trim();
+    final inserted = await executeSql(
+      'INSERT INTO brokers (full_name, phone, alternative_phone, business_name, '
+      'location, website, reference_number, notes, store_id, status) '
+      'VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10) '
+      'RETURNING *',
+      [
+        cleanName,
+        phone?.trim(),
+        alternativePhone?.trim(),
+        businessName?.trim(),
+        location?.trim(),
+        website?.trim(),
+        referenceNumber?.trim(),
+        notes?.trim(),
+        storeId,
+        'active',
+      ],
+    );
+
+    final b = inserted.first;
+    final brokerId = b['id']?.toString() ?? '';
+
+    // Create associated account
+    final acc = await executeSql(
+      'INSERT INTO delala_accounts (broker_id, store_id, account_name, current_balance) '
+      'VALUES (\$1, \$2, \$3, 0.00) RETURNING id',
+      [brokerId, storeId, '$cleanName Account'],
+    );
+    final accountId = acc.first['id']?.toString() ?? brokerId;
+
+    return Broker(
+      id: brokerId,
+      storeId: storeId,
+      fullName: cleanName,
+      phone: phone,
+      alternativePhone: alternativePhone,
+      businessName: businessName,
+      location: location,
+      website: website,
+      referenceNumber: referenceNumber,
+      notes: notes,
+      status: 'active',
+      createdAt: b['created_at']?.toString() ?? '',
+      updatedAt: b['updated_at']?.toString() ?? '',
+      currentBalance: 0.0,
+      transactionCount: 0,
+      accountId: accountId,
     );
   }
 
-  /// Update an existing Esmiz row
-  static Future<void> updateEsmizEntryDirect({
+  /// Update broker profile
+  static Future<void> updateBrokerDirect({
     required String id,
-    required String description,
-    required double amount,
-    required int sign,
-    required String transactionDate,
+    String? fullName,
+    String? phone,
+    String? alternativePhone,
+    String? businessName,
+    String? location,
+    String? website,
+    String? referenceNumber,
+    String? notes,
+    String? status,
   }) async {
     await executeSql(
-      'UPDATE esmiz_entries SET description = \$1, amount = \$2, sign = \$3, '
-      'transaction_date = \$4, updated_at = CURRENT_TIMESTAMP WHERE id = \$5',
-      [description.trim(), amount, sign, transactionDate, id],
+      'UPDATE brokers SET '
+      'full_name = COALESCE(\$1, full_name), '
+      'phone = \$2, alternative_phone = \$3, business_name = \$4, '
+      'location = \$5, website = \$6, reference_number = \$7, notes = \$8, '
+      'status = COALESCE(\$9, status), updated_at = CURRENT_TIMESTAMP '
+      'WHERE id = \$10',
+      [
+        fullName?.trim(),
+        phone?.trim(),
+        alternativePhone?.trim(),
+        businessName?.trim(),
+        location?.trim(),
+        website?.trim(),
+        referenceNumber?.trim(),
+        notes?.trim(),
+        status,
+        id,
+      ],
+    );
+
+    if (fullName != null && fullName.trim().isNotEmpty) {
+      await executeSql(
+        'UPDATE delala_accounts SET account_name = \$1, updated_at = CURRENT_TIMESTAMP WHERE broker_id = \$2',
+        ['${fullName.trim()} Account', id],
+      );
+    }
+  }
+
+  /// Delete a broker and cascade delete account and transactions
+  static Future<void> deleteBrokerDirect(String id) async {
+    await executeSql('DELETE FROM brokers WHERE id = \$1', [id]);
+  }
+
+  /// Fetch all transactions for a broker
+  static Future<List<DelalaTransaction>> getDelalaTransactionsDirect([String? brokerId]) async {
+    List<Map<String, dynamic>> rows;
+    if (brokerId != null && brokerId.isNotEmpty) {
+      rows = await executeSql(
+        'SELECT * FROM delala_transactions WHERE broker_id = \$1 '
+        'ORDER BY transaction_date ASC, created_at ASC',
+        [brokerId],
+      );
+    } else {
+      rows = await executeSql(
+        'SELECT * FROM delala_transactions ORDER BY transaction_date ASC, created_at ASC',
+      );
+    }
+    return rows.map((r) => DelalaTransaction.fromMap(r)).toList();
+  }
+
+  /// Post a new Delala transaction
+  static Future<void> createDelalaTransactionDirect({
+    required String brokerId,
+    String? accountId,
+    String? storeId,
+    required String transactionType,
+    required String description,
+    String? productId,
+    double? quantity,
+    String? unit,
+    double? unitPrice,
+    required double amount,
+    int? accountingEffect,
+    required String transactionDate,
+    String? paymentMethod,
+    String? referenceNumber,
+    String? notes,
+  }) async {
+    String finalAccId = accountId ?? '';
+    if (finalAccId.isEmpty) {
+      final acc = await executeSql(
+        'SELECT id FROM delala_accounts WHERE broker_id = \$1 LIMIT 1',
+        [brokerId],
+      );
+      if (acc.isNotEmpty) {
+        finalAccId = acc.first['id']?.toString() ?? '';
+      } else {
+        final newAcc = await executeSql(
+          'INSERT INTO delala_accounts (broker_id, account_name, current_balance) VALUES (\$1, \$2, 0.00) RETURNING id',
+          [brokerId, 'Delala Account'],
+        );
+        finalAccId = newAcc.first['id']?.toString() ?? '';
+      }
+    }
+
+    int effect = 1;
+    if (accountingEffect != null) {
+      effect = accountingEffect;
+    } else {
+      switch (transactionType) {
+        case 'goods_given':
+        case 'money_paid':
+        case 'direct_sale':
+          effect = 1;
+          break;
+        case 'goods_returned':
+        case 'money_received':
+        case 'commission':
+          effect = -1;
+          break;
+        case 'adjustment':
+        default:
+          effect = 1;
+          break;
+      }
+    }
+
+    await executeSql(
+      'INSERT INTO delala_transactions (account_id, broker_id, store_id, transaction_type, '
+      'description, product_id, quantity, unit, unit_price, amount, accounting_effect, '
+      'transaction_date, payment_method, reference_number, notes) '
+      'VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10, \$11, \$12, \$13, \$14, \$15)',
+      [
+        finalAccId,
+        brokerId,
+        storeId,
+        transactionType,
+        description.trim(),
+        productId,
+        quantity,
+        unit,
+        unitPrice,
+        amount,
+        effect,
+        transactionDate,
+        paymentMethod,
+        referenceNumber,
+        notes,
+      ],
+    );
+
+    // Automatically recalculate and sync account balance
+    await executeSql(
+      'UPDATE delala_accounts SET current_balance = ('
+      'SELECT COALESCE(SUM(amount * accounting_effect), 0) FROM delala_transactions WHERE account_id = \$1'
+      '), updated_at = CURRENT_TIMESTAMP WHERE id = \$1',
+      [finalAccId],
     );
   }
 
-  /// Delete an Esmiz row
-  static Future<void> deleteEsmizEntryDirect(String id) async {
-    await executeSql('DELETE FROM esmiz_entries WHERE id = \$1', [id]);
+  /// Update an existing Delala transaction
+  static Future<void> updateDelalaTransactionDirect({
+    required String id,
+    String? transactionType,
+    String? description,
+    String? productId,
+    double? quantity,
+    String? unit,
+    double? unitPrice,
+    double? amount,
+    int? accountingEffect,
+    String? transactionDate,
+    String? paymentMethod,
+    String? referenceNumber,
+    String? notes,
+  }) async {
+    final existing = await executeSql(
+      'SELECT account_id, accounting_effect, transaction_type FROM delala_transactions WHERE id = \$1',
+      [id],
+    );
+    if (existing.isEmpty) return;
+    final accountId = existing.first['account_id']?.toString() ?? '';
+
+    int? effect = accountingEffect;
+    if (effect == null && transactionType != null) {
+      switch (transactionType) {
+        case 'goods_given':
+        case 'money_paid':
+        case 'direct_sale':
+          effect = 1;
+          break;
+        case 'goods_returned':
+        case 'money_received':
+        case 'commission':
+          effect = -1;
+          break;
+        default:
+          effect = int.tryParse(existing.first['accounting_effect']?.toString() ?? '1') ?? 1;
+      }
+    }
+
+    await executeSql(
+      'UPDATE delala_transactions SET '
+      'transaction_type = COALESCE(\$1, transaction_type), '
+      'description = COALESCE(\$2, description), '
+      'product_id = \$3, quantity = \$4, unit = \$5, unit_price = \$6, '
+      'amount = COALESCE(\$7, amount), '
+      'accounting_effect = COALESCE(\$8, accounting_effect), '
+      'transaction_date = COALESCE(\$9, transaction_date), '
+      'payment_method = \$10, reference_number = \$11, notes = \$12, '
+      'updated_at = CURRENT_TIMESTAMP WHERE id = \$13',
+      [
+        transactionType,
+        description?.trim(),
+        productId,
+        quantity,
+        unit,
+        unitPrice,
+        amount,
+        effect,
+        transactionDate,
+        paymentMethod,
+        referenceNumber,
+        notes,
+        id,
+      ],
+    );
+
+    // Recalculate balance
+    await executeSql(
+      'UPDATE delala_accounts SET current_balance = ('
+      'SELECT COALESCE(SUM(amount * accounting_effect), 0) FROM delala_transactions WHERE account_id = \$1'
+      '), updated_at = CURRENT_TIMESTAMP WHERE id = \$1',
+      [accountId],
+    );
+  }
+
+  /// Delete a Delala transaction
+  static Future<void> deleteDelalaTransactionDirect(String id) async {
+    final existing = await executeSql(
+      'SELECT account_id FROM delala_transactions WHERE id = \$1',
+      [id],
+    );
+    if (existing.isEmpty) return;
+    final accountId = existing.first['account_id']?.toString() ?? '';
+
+    await executeSql('DELETE FROM delala_transactions WHERE id = \$1', [id]);
+
+    await executeSql(
+      'UPDATE delala_accounts SET current_balance = ('
+      'SELECT COALESCE(SUM(amount * accounting_effect), 0) FROM delala_transactions WHERE account_id = \$1'
+      '), updated_at = CURRENT_TIMESTAMP WHERE id = \$1',
+      [accountId],
+    );
+  }
+
+  // =========================================================================
+  // DELALA SPREADSHEET ENTRIES OPERATIONS
+  // =========================================================================
+
+  static String cleanDelalaName(String name) {
+    return name
+        .replaceFirst(RegExp(r'^(delala|ደላላ)\s+', caseSensitive: false), '')
+        .trim();
+  }
+
+  /// Fetch Delala spreadsheet entries from Neon PostgreSQL
+  static Future<List<DelalaEntry>> getDelalaEntriesDirect([String? storeId]) async {
+    final query = (storeId != null && storeId.isNotEmpty && storeId != 'all')
+        ? 'SELECT id, delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id, created_at, updated_at '
+          'FROM delala_entries WHERE store_id = \$1 OR store_id IS NULL ORDER BY created_at ASC'
+        : 'SELECT id, delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id, created_at, updated_at '
+          'FROM delala_entries ORDER BY created_at ASC';
+
+    final params = (storeId != null && storeId.isNotEmpty && storeId != 'all') ? [storeId] : null;
+
+    final rows = await executeSql(query, params);
+    return rows.map((r) {
+      final map = Map<String, dynamic>.from(r);
+      map['delala_name'] = cleanDelalaName(map['delala_name']?.toString() ?? '');
+      return DelalaEntry.fromMap(map);
+    }).toList();
+  }
+
+  /// Create a new Delala spreadsheet entry
+  static Future<DelalaEntry> createDelalaEntryDirect({
+    required String delalaName,
+    required String productName,
+    required double unitPrice,
+    required double pieces,
+    required int sign,
+    required String transactionDate,
+    String? storeId,
+  }) async {
+    final cleanName = cleanDelalaName(delalaName).isEmpty ? 'Mohammed' : cleanDelalaName(delalaName);
+    final cleanProduct = productName.trim().isEmpty ? 'Item' : productName.trim();
+    final int finalSign = sign == -1 ? -1 : 1;
+    final double calculatedTotal = double.parse((unitPrice * pieces * finalSign).toStringAsFixed(2));
+
+    final inserted = await executeSql(
+      'INSERT INTO delala_entries ('
+      'delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id'
+      ') VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8) RETURNING *',
+      [
+        cleanName,
+        cleanProduct,
+        unitPrice,
+        pieces,
+        finalSign,
+        calculatedTotal,
+        transactionDate.trim(),
+        storeId,
+      ],
+    );
+
+    return DelalaEntry.fromMap(inserted.first);
+  }
+
+  /// Update an existing Delala spreadsheet entry
+  static Future<void> updateDelalaEntryDirect({
+    required String id,
+    String? delalaName,
+    String? productName,
+    double? unitPrice,
+    double? pieces,
+    int? sign,
+    String? transactionDate,
+    String? storeId,
+  }) async {
+    final existing = await executeSql(
+      'SELECT unit_price, pieces, sign FROM delala_entries WHERE id = \$1',
+      [id],
+    );
+    if (existing.isEmpty) return;
+    final cur = existing.first;
+
+    final double curPrice = unitPrice ?? (cur['unit_price'] is num ? (cur['unit_price'] as num).toDouble() : 0.0);
+    final double curPieces = pieces ?? (cur['pieces'] is num ? (cur['pieces'] as num).toDouble() : 0.0);
+    final int curSign = sign ?? (cur['sign'] is num ? (cur['sign'] as num).toInt() : 1);
+    final int finalSign = curSign == -1 ? -1 : 1;
+    final double finalTotal = double.parse((curPrice * curPieces * finalSign).toStringAsFixed(2));
+
+    await executeSql(
+      'UPDATE delala_entries SET '
+      'delala_name = COALESCE(\$1, delala_name), '
+      'product_name = COALESCE(\$2, product_name), '
+      'unit_price = COALESCE(\$3, unit_price), '
+      'pieces = COALESCE(\$4, pieces), '
+      'sign = COALESCE(\$5, sign), '
+      'total = \$6, '
+      'transaction_date = COALESCE(\$7, transaction_date), '
+      'store_id = COALESCE(\$8, store_id), '
+      'updated_at = CURRENT_TIMESTAMP WHERE id = \$9',
+      [
+        delalaName != null ? cleanDelalaName(delalaName) : null,
+        productName?.trim(),
+        unitPrice,
+        pieces,
+        finalSign,
+        finalTotal,
+        transactionDate?.trim(),
+        storeId,
+        id,
+      ],
+    );
+  }
+
+  /// Delete a Delala spreadsheet entry
+  static Future<void> deleteDelalaEntryDirect(String id) async {
+    await executeSql('DELETE FROM delala_entries WHERE id = \$1', [id]);
   }
 }

@@ -1,13 +1,14 @@
-import { Building2, Handshake, Layers, Plus, Users } from 'lucide-react'
+import { Building2, Handshake, Layers, Users } from 'lucide-react'
 import React from 'react'
 import { useLedger } from '../../context/LedgerContext'
 import { useAuth } from '../../context/AuthContext'
+import { useLanguage } from '../../context/LanguageContext'
 import type { TabType } from '../../types/ledger'
 
 export const MobileBottomNav: React.FC = () => {
-  const { activeTab, setActiveTab, tabRecordCounts, openCreateModal } =
-    useLedger()
+  const { activeTab, setActiveTab, tabRecordCounts } = useLedger()
   const { user } = useAuth()
+  const { t } = useLanguage()
 
   // Storekeeper handles only stock; bottom navigation is not needed
   if (user?.role === 'shopkeeper') {
@@ -21,22 +22,22 @@ export const MobileBottomNav: React.FC = () => {
   }[] = [
     {
       id: 'customer',
-      label: 'Customer',
+      label: t('Customer', 'ደንበኛ'),
       Icon: Users,
     },
     {
       id: 'supplier',
-      label: 'Supplier',
+      label: t('Supplier', 'አቅራቢ'),
       Icon: Building2,
     },
     {
       id: 'delala',
-      label: 'Delala',
+      label: t('Delala', 'ደላላ'),
       Icon: Handshake,
     },
     {
       id: 'stock',
-      label: 'Stock',
+      label: t('Store', 'መደብር'),
       Icon: Layers,
     },
   ]
@@ -49,22 +50,10 @@ export const MobileBottomNav: React.FC = () => {
           const count = tabRecordCounts[tab.id]
 
           const activeColorClass =
-            tab.id === 'customer'
-              ? 'text-blue-600 dark:text-blue-400 font-semibold'
-              : tab.id === 'supplier'
-                ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                : tab.id === 'delala'
-                  ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                  : 'text-blue-600 dark:text-blue-400 font-semibold'
+            'text-blue-600 dark:text-blue-400 font-semibold'
 
           const activeBadgeClass =
-            tab.id === 'customer'
-              ? 'bg-blue-600 text-white'
-              : tab.id === 'supplier'
-                ? 'bg-blue-600 text-white'
-                : tab.id === 'delala'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-blue-600 text-white'
+            'bg-blue-600 text-white'
 
           return (
             <button
@@ -102,19 +91,6 @@ export const MobileBottomNav: React.FC = () => {
             </button>
           )
         })}
-
-        {/* Quick Add Floating Button on Mobile */}
-        <button
-          type="button"
-          onClick={() => openCreateModal(activeTab)}
-          className="flex flex-col items-center justify-center min-h-[48px] py-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
-          title="Add New Entry"
-        >
-          <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md active:scale-95 transition-transform">
-            <Plus size={24} className="stroke-2" />
-          </div>
-          <span className="text-[10px] font-semibold mt-0.5">New</span>
-        </button>
       </div>
     </nav>
   )

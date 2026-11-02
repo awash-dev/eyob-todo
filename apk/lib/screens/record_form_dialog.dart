@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/ledger_record.dart';
 import '../models/line_item.dart';
+import '../services/language_service.dart';
 
 class RecordFormDialog extends StatefulWidget {
   final String activeTab; // 'customer' | 'supplier' | 'stock' | 'delala'
@@ -27,9 +28,12 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
   late TextEditingController _titleController;
   late TextEditingController _notesController;
+  late TextEditingController _dateController;
   late DateTime _selectedDate;
   late List<LineItemFormItem> _formItems;
   int _activeItemIndex = 0;
+
+  bool get _isAmharic => LanguageService.isAmharic;
 
   final TextEditingController _otherUnitController = TextEditingController();
 
@@ -92,9 +96,15 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     _notesController = TextEditingController(text: rec?.notes ?? '');
 
     if (rec != null && rec.date.isNotEmpty) {
+      _dateController = TextEditingController(text: rec.date);
       _selectedDate = DateTime.tryParse(rec.date) ?? DateTime.now();
     } else {
-      _selectedDate = DateTime.now();
+      final now = DateTime.now();
+      final d = now.day.toString().padLeft(2, '0');
+      final m = now.month.toString().padLeft(2, '0');
+      final y = now.year;
+      _dateController = TextEditingController(text: '$d/$m/$y');
+      _selectedDate = now;
     }
 
     if (rec != null && rec.items.isNotEmpty) {
@@ -134,6 +144,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   void dispose() {
     _titleController.dispose();
     _notesController.dispose();
+    _dateController.dispose();
     _otherUnitController.dispose();
     for (final it in _formItems) {
       it.dispose();
@@ -179,6 +190,10 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
+        final d = picked.day.toString().padLeft(2, '0');
+        final m = picked.month.toString().padLeft(2, '0');
+        final y = picked.year;
+        _dateController.text = '$d/$m/$y';
       });
     }
   }
@@ -254,7 +269,9 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   void _handleSubmit() {
     if (!_formKey.currentState!.validate()) return;
 
-    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final dateStr = _dateController.text.trim().isNotEmpty
+        ? _dateController.text.trim()
+        : DateFormat('dd/MM/yyyy').format(_selectedDate);
 
     // If Stock tab, ensure party name is the item name
     if (widget.activeTab == 'stock' && _formItems.isNotEmpty) {
@@ -356,35 +373,29 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     // Title label
     final headerTitle = widget.editingRecord == null
         ? (isStock
-            ? 'Store Entry'
+            ? (_isAmharic ? 'የመደብር እቃ መዝገብ' : 'Store Entry')
             : isCustomer
-                ? 'Customer Credit Entry'
+                ? (_isAmharic ? 'የደንበኛ ብድር መዝገብ' : 'Customer Credit Entry')
                 : isDelala
-                    ? 'Delala (Broker) Entry'
-                    : 'Supplier Credit Entry')
+                    ? (_isAmharic ? 'የደላላ መዝገብ' : 'Delala Entry')
+                    : (_isAmharic ? 'የአቅራቢ ብድር መዝገብ' : 'Supplier Credit Entry'))
         : (isStock
-            ? 'Edit Store Entry'
+            ? (_isAmharic ? 'የመደብር እቃ አርትዕ' : 'Edit Store Entry')
             : isCustomer
-                ? 'Edit Customer Entry'
+                ? (_isAmharic ? 'የደንበኛ መዝገብ አርትዕ' : 'Edit Customer Entry')
                 : isDelala
-                    ? 'Edit Delala Entry'
-                    : 'Edit Supplier Entry');
+                    ? (_isAmharic ? 'የደላላ መዝገብ አርትዕ' : 'Edit Delala Entry')
+                    : (_isAmharic ? 'የአቅራቢ መዝገብ አርትዕ' : 'Edit Supplier Entry'));
 
     final nameLabel = isCustomer
-        ? 'Customer Name (የደንበኛ ስም)'
+        ? (_isAmharic ? 'የደንበኛ ስም (Customer Name) *' : 'Customer Name (የደንበኛ ስም) *')
         : isDelala
-            ? 'Delala / Broker Name (የደላላ ስም)'
+            ? (_isAmharic ? 'ስም (Name) *' : 'Name (ስም) *')
             : isStock
-                ? 'Item Name (የዕቃ ስም)'
-                : 'Supplier Name (የአቅራቢ ስም)';
+                ? (_isAmharic ? 'የዕቃ ስም (Item Name) *' : 'Item Name (የዕቃ ስም) *')
+                : (_isAmharic ? 'የአቅራቢ ስም (Supplier Name) *' : 'Supplier Name (የአቅራቢ ስም) *');
 
-    final nameHint = isCustomer
-        ? 'e.g. Apex Construction, Kelil Aginbi, Esmiz'
-        : isDelala
-            ? 'e.g. Abebe Delala, Merkato Agent'
-            : isStock
-                ? 'e.g. 12W Safari'
-                : 'e.g. Summit Raw Materials Ltd.';
+    final nameHint = isStock ? 'e.g. 12W Safari' : 'John Doe';
 
     // Current active line item
     if (_activeItemIndex >= _formItems.length) {
@@ -1117,37 +1128,37 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     const SizedBox(height: 14),
                   ],
 
-                  // 5. Date Field with Calendar Picker
-                  _buildFieldLabel('Date (ቀን)', isDark),
+                  // 5. Date Field with Ethiopian text option + Calendar Picker button
+                  _buildFieldLabel(_isAmharic ? 'ቀን (Date) *' : 'Date (ቀን) *', isDark),
                   const SizedBox(height: 6),
-                  InkWell(
-                    onTap: _pickDate,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      height: 46,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: inputFill,
+                  TextFormField(
+                    controller: _dateController,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 02/11/2026 or 24/02/2018',
+                      helperText: _isAmharic
+                          ? 'ቀን በኢትዮጵያ አቆጣጠር (ምሳሌ፦ 02/11/2026)'
+                          : 'Accepts Ethiopian date text (e.g. 02/11/2026)',
+                      helperStyle: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                      filled: true,
+                      fillColor: inputFill,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: inputBorder),
+                        borderSide: BorderSide(color: inputBorder),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            DateFormat('dd/MM/yyyy').format(_selectedDate),
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                          Icon(
-                            Icons.calendar_today_outlined,
-                            size: 18,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                          ),
-                        ],
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: inputBorder),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_month_outlined, size: 20, color: Color(0xFF2563EB)),
+                        tooltip: _isAmharic ? 'ቀን ምረጥ' : 'Pick Date',
+                        onPressed: _pickDate,
                       ),
                     ),
                   ),
@@ -1184,14 +1195,14 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           TextButton.icon(
                             onPressed: () => _removeItem(_activeItemIndex),
                             icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
-                            label: const Text('Delete this item', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                            label: Text(_isAmharic ? 'ይህን ዕቃ ሰርዝ' : 'Delete this item', style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
                           )
                         else
                           const SizedBox(),
                         TextButton.icon(
                           onPressed: _addItem,
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('+ Add Another Row', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                          label: Text(_isAmharic ? '+ ሌላ ረድፍ ጨምር' : '+ Add Another Row', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                           style: TextButton.styleFrom(foregroundColor: const Color(0xFF2563EB)),
                         ),
                       ],
@@ -1213,9 +1224,9 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                      child: const Text(
-                        'Save',
-                        style: TextStyle(
+                      child: Text(
+                        _isAmharic ? 'መዝግብ' : 'Save',
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                         ),
