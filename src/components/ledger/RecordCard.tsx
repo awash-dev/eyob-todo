@@ -1,25 +1,18 @@
-import {
-  Building2,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Handshake,
-  Layers,
-  MoreVertical,
-  Pencil,
-  Trash2,
-  Users,
-} from 'lucide-react'
-import React, { useState } from 'react'
+import { MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import React from 'react'
 import type { LedgerRecord } from '../../types/ledger'
 import { useLedger } from '../../context/LedgerContext'
+import { useLanguage } from '../../context/LanguageContext'
 import {
   formatDate,
   calculateRecordTotal,
   calculateItemTotal,
-  generateRecordShareText,
 } from '../../lib/formatters'
-import { getItemBank, getItemCustomType } from '../../lib/bankUtils'
+import {
+  generateLedgerTableEntries,
+  isDemoRecord,
+} from '../../lib/creditAccounting'
+import { getItemCustomType } from '../../lib/bankUtils'
 import { Button } from '../ui/button'
 import {
   DropdownMenu,
@@ -34,26 +27,19 @@ interface RecordCardProps {
 }
 
 export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
-  const [isExpanded, setIsExpanded] = useState(false)
   const {
     openEditModal,
     deleteRecord,
-    showToast,
     formatCurrency,
+    openPaymentModal,
   } = useLedger()
+  const { t, isAmharic, translateDbText } = useLanguage()
 
-  const total = calculateRecordTotal(record)
-  const isPositive = total >= 0
+  const isCustomer = record.type === 'customer'
+  const isSupplier = record.type === 'supplier'
+  const isBroker = record.type === 'delala'
   const isStock = record.type === 'stock'
-
-  // Calculations for Customer / Supplier
-  const totalDebit = record.items
-    .filter((it) => it.sign === '+')
-    .reduce((sum, it) => sum + calculateItemTotal(it), 0)
-
-  const totalCredit = record.items
-    .filter((it) => it.sign === '-')
-    .reduce((sum, it) => sum + Math.abs(calculateItemTotal(it)), 0)
+  const isDemo = isDemoRecord(record.title)
 
   // Calculations for Stock
   const totalCartons = record.items.reduce(
@@ -64,23 +50,19 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
     (sum, it) => sum + (Number(it.quantity) || 0),
     0,
   )
+  const stockTotal = calculateRecordTotal(record)
 
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const text = generateRecordShareText(record, 'ETB')
-    navigator.clipboard.writeText(text).then(
-      () => {
-        showToast(`Copied "${record.title}" summary to clipboard!`, 'success')
-      },
-      () => {
-        showToast('Failed to copy to clipboard', 'error')
-      },
-    )
-  }
+  // Double-entry accounting table data for Customer, Supplier & Broker
+  const tableData = (isCustomer || isSupplier || isBroker)
+    ? generateLedgerTableEntries(record.type as 'customer' | 'supplier' | 'delala', record.items)
+    : null
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (window.confirm(`Are you sure you want to delete "${record.title}"?`)) {
+    const confirmMsg = isDemo
+      ? t(`Delete confirmed demo record "${record.title}"?`, `የተረጋገጠ የሙከራ መዝገብ "${record.title}"ን መሰረዝ ይፈልጋሉ?`)
+      : t(`Are you sure you want to delete "${record.title}"?`, `እርግጠኛ ነዎት "${record.title}"ን መሰረዝ ይፈልጋሉ?`)
+    if (window.confirm(confirmMsg)) {
       deleteRecord(record.id)
     }
   }
@@ -90,345 +72,288 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
     openEditModal(record)
   }
 
-  return (
-    <div className="bg-card rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs hover:border-zinc-300 dark:hover:border-zinc-700 transition-all overflow-hidden mb-3">
-      {/* Header bar */}
-      <div
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="p-3 sm:px-4 sm:py-3 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-card hover:bg-muted/30 transition-colors"
-      >
-        <div className="flex items-start gap-2.5 min-w-0">
-          <button
-            type="button"
-            className="p-1 rounded-md text-muted-foreground hover:bg-muted transition-colors mt-0.5 shrink-0"
-            aria-label={isExpanded ? 'Collapse' : 'Expand'}
-          >
-            {isExpanded ? (
-              <ChevronUp size={16} className="text-muted-foreground" />
-            ) : (
-              <ChevronDown size={16} className="text-muted-foreground" />
-            )}
-          </button>
-
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                  record.type === 'customer'
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                    : record.type === 'supplier'
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                      : record.type === 'delala'
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                        : 'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                }`}
-              >
-                {record.type === 'customer' ? (
-                  <Users size={12} />
-                ) : record.type === 'supplier' ? (
-                  <Building2 size={12} />
-                ) : record.type === 'delala' ? (
-                  <Handshake size={12} />
-                ) : (
-                  <Layers size={12} />
-                )}
-                <span>
-                  {record.type === 'customer'
-                    ? 'Customer'
-                    : record.type === 'supplier'
-                      ? 'Supplier'
-                      : record.type === 'delala'
-                        ? 'Delala'
-                        : 'Stock'}
-                </span>
-              </span>
-
-              <h3 className="font-bold text-sm sm:text-base text-foreground tracking-tight">
-                {record.title}
-              </h3>
-
-              {record.shopName && (
-                <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                  {record.shopName}
-                </span>
-              )}
-
-              <span className="text-xs text-muted-foreground">
-                ({record.items.length} {record.items.length === 1 ? 'item' : 'items'})
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-0.5">
-              <span>{formatDate(record.date)}</span>
-              {record.notes && (
-                <span className="text-zinc-500 dark:text-zinc-400 truncate max-w-md">
-                  • {record.notes}
-                </span>
-              )}
-            </div>
+  /* ========================================================================== */
+  /* 1. STOCK INVENTORY RECORD                                                  */
+  /* ========================================================================== */
+  if (isStock) {
+    return (
+      <div className="bg-white text-black border border-zinc-300 rounded-md shadow-2xs mb-5 overflow-hidden">
+        <div className="px-4 py-3 bg-white border-b border-zinc-300 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <h3 className="font-bold text-sm sm:text-base text-black">
+              {translateDbText(record.title)}
+            </h3>
+            <span className="text-xs text-zinc-600 font-medium">
+              {formatDate(record.date, isAmharic)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEdit}
+              className="h-8 text-xs font-medium px-2.5 rounded border-zinc-300 text-black hover:bg-zinc-100 cursor-pointer"
+            >
+              <Pencil size={13} className="mr-1" />
+              <span>{t('Edit', 'አስተካክል')}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDelete}
+              className="h-8 text-xs font-medium px-2.5 rounded border-zinc-300 text-black hover:bg-zinc-100 cursor-pointer"
+            >
+              <Trash2 size={13} className="mr-1" />
+              <span>{t('Delete', 'ሰርዝ')}</span>
+            </Button>
           </div>
         </div>
 
-        {/* Right side: Balance and actions */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 ml-7 sm:ml-0">
-          <div className="text-right">
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block">
-              {isStock ? 'Stock Total' : 'Net Balance'}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left border-collapse border-t border-zinc-300 bg-white text-black">
+            <thead>
+              <tr className="bg-zinc-100 text-black font-bold">
+                <th className="py-2 px-3 border border-zinc-300 w-10 text-center">#</th>
+                <th className="py-2 px-3 border border-zinc-300">{t('Product / Item Name', 'የምርት / ዕቃ ስም')}</th>
+                <th className="py-2 px-3 border border-zinc-300 w-44">{t('Packaging Breakdown', 'የማሸጊያ ዝርዝር')}</th>
+                <th className="py-2 px-3 border border-zinc-300 w-28 text-right">{t('Total Units', 'ጠቅላላ ፍሬ')}</th>
+                <th className="py-2 px-3 border border-zinc-300 w-32 text-right">{t('Unit Cost', 'የአንዱ ዋጋ')}</th>
+                <th className="py-2 px-3 border border-zinc-300 w-36 text-right font-bold">{t('Total Value', 'ጠቅላላ ዋጋ')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {record.items.map((item, idx) => {
+                const itemTotal = calculateItemTotal(item)
+                const ctns = Number(item.cartons) || 0
+                const pcs = Number(item.pcsPerCarton) || 0
+                const unit = item.packagingUnit || (ctns > 0 ? 'Carton' : 'Pcs')
+                const customType = getItemCustomType(item)
+
+                return (
+                  <tr key={item.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/60'}>
+                    <td className="py-2 px-3 text-center border border-zinc-300 text-zinc-600">{idx + 1}</td>
+                    <td className="py-2 px-3 font-semibold text-black border border-zinc-300">
+                      <span>{translateDbText(item.name)}</span>
+                      {customType && (
+                        <span className="ml-2 text-[10px] font-normal border border-zinc-300 px-1.5 py-0.5 rounded text-black bg-zinc-100">
+                          {translateDbText(customType)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 text-zinc-700 border border-zinc-300 font-medium">
+                      {ctns > 0 && pcs > 0 && unit === 'Carton' ? (
+                        <span><strong>{ctns}</strong> {t('ctns', 'ካርቶን')} × <strong>{pcs}</strong> {t('pcs', 'ፍሬ')}</span>
+                      ) : ctns > 0 ? (
+                        <span><strong>{ctns}</strong> {translateDbText(unit)}</span>
+                      ) : (
+                        <span>{t('Direct units', 'ቀጥታ ፍሬ')} ({translateDbText(unit)})</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 text-right font-medium text-black border border-zinc-300">
+                      {Number(item.quantity).toLocaleString()} {unit === 'Carton' ? t('pcs', 'ፍሬ') : translateDbText(unit.toLowerCase())}
+                    </td>
+                    <td className="py-2 px-3 text-right text-black border border-zinc-300">
+                      {formatCurrency(item.unitPrice)}
+                    </td>
+                    <td className="py-2 px-3 text-right font-bold text-black border border-zinc-300">
+                      {formatCurrency(itemTotal)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-300 text-black">
+                <td colSpan={2} className="py-2.5 px-3 border border-zinc-300">
+                  {t('Total:', 'ጠቅላላ:')} {record.items.length} {t('Products', 'ምርቶች')}
+                </td>
+                <td className="py-2.5 px-3 border border-zinc-300 text-zinc-700">
+                  {totalCartons > 0 ? `${totalCartons} ${t('cartons total', 'ጠቅላላ ካርቶን')}` : '—'}
+                </td>
+                <td className="py-2.5 px-3 text-right border border-zinc-300">
+                  {totalUnits.toLocaleString()} {t('units', 'ፍሬ')}
+                </td>
+                <td className="py-2.5 px-3 text-right border border-zinc-300 text-zinc-700 uppercase text-[10px]">
+                  {t('Stock Valuation:', 'የዕቃ ክምችት ግምት:')}
+                </td>
+                <td className="py-2.5 px-3 text-right text-sm text-black font-extrabold border border-zinc-300">
+                  {formatCurrency(stockTotal)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  /* ========================================================================== */
+  /* 2. CUSTOMER CREDIT & SUPPLIER CREDIT – EXCEL-LIKE SPREADSHEET TABLE        */
+  /* ========================================================================== */
+  return (
+    <div className="bg-white text-black border border-zinc-300 rounded-md shadow-2xs mb-6 overflow-hidden">
+      {/* Clean Header: ONLY Person's Name and Transaction Date */}
+      <div className="px-4 py-3 bg-white border-b border-zinc-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <h3 className="font-bold text-base sm:text-lg text-black tracking-tight">
+            {translateDbText(record.title)}
+          </h3>
+          <span className="text-xs text-zinc-600 font-medium">
+            {formatDate(record.date, isAmharic)}
+          </span>
+          {isDemo && (
+            <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-zinc-100 text-black border border-zinc-300 rounded">
+              {t('Demo Data', 'የሙከራ መረጃ')}
             </span>
-            <div
-              className={`text-base sm:text-lg font-bold ${
-                isPositive
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-rose-600 dark:text-rose-400'
-              }`}
-            >
-              {formatCurrency(total)}
-            </div>
-          </div>
+          )}
+        </div>
 
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleEdit}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
-              title="Edit"
+        <div className="flex items-center gap-2">
+          {isDemo && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="text-xs px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-black border border-zinc-300 rounded font-medium cursor-pointer"
+              title={t('Clean up confirmed demo record', 'የተረጋገጠ የሙከራ መዝገብ አጽዳ')}
             >
-              <Pencil size={16} />
-            </Button>
+              {t('Delete Demo Record', 'የሙከራ መዝገብ ሰርዝ')}
+            </button>
+          )}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreVertical size={16} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={handleEdit} className="cursor-pointer text-xs">
-                  <Pencil size={14} className="mr-2" />
-                  <span>Edit</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleCopy} className="cursor-pointer text-xs">
-                  <Copy size={14} className="mr-2" />
-                  <span>Copy Summary</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleDelete} className="cursor-pointer text-rose-600 text-xs">
-                  <Trash2 size={14} className="mr-2" />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <button
+            type="button"
+            onClick={() => openPaymentModal(record.type as 'customer' | 'supplier' | 'delala', record.title)}
+            className="text-xs font-semibold px-3 py-1.5 bg-black hover:bg-zinc-800 text-white rounded cursor-pointer transition-colors"
+          >
+            {isCustomer
+              ? t('+ Record Credit / Payment', '+ የደንበኛ ሂሳብ / ክፍያ መዝግብ')
+              : isSupplier
+              ? t('+ Record Purchase / Payment', '+ የአቅራቢ ሂሳብ / ክፍያ መዝግብ')
+              : t('+ Record Broker Transaction', '+ የደላላ ሂሳብ / ክፍያ መዝግብ')}
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 text-black border-zinc-300 hover:bg-zinc-100 rounded cursor-pointer"
+              >
+                <MoreVertical size={15} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 bg-white border border-zinc-300 text-black shadow-md">
+              <DropdownMenuItem onClick={handleEdit} className="cursor-pointer text-xs">
+                <Pencil size={13} className="mr-2" />
+                <span>{t('Edit Record', 'መዝገብ አስተካክል')}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-zinc-200" />
+              <DropdownMenuItem onClick={handleDelete} className="cursor-pointer text-xs text-black">
+                <Trash2 size={13} className="mr-2" />
+                <span>{t('Delete Record', 'መዝገብ ሰርዝ')}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* Expanded Table: Distinct clean designs for Stock vs Credit */}
-      {isExpanded && (
-        <div className="border-t border-zinc-200 dark:border-zinc-800 bg-background">
-          <div className="overflow-x-auto">
-            {isStock ? (
-              /* ==================== STOCK & INVENTORY REDESIGN ==================== */
-              <table className="w-full text-xs text-left border-collapse">
-                <thead>
-                  <tr className="bg-zinc-100 dark:bg-zinc-800/80 text-foreground font-bold border-b border-zinc-200 dark:border-zinc-700">
-                    <th className="py-2.5 px-3 w-10 text-center border-r border-zinc-200 dark:border-zinc-700">#</th>
-                    <th className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-700">Product / Item Name</th>
-                    <th className="py-2.5 px-3 w-48 border-r border-zinc-200 dark:border-zinc-700">Packaging Breakdown</th>
-                    <th className="py-2.5 px-3 w-28 text-right border-r border-zinc-200 dark:border-zinc-700">Total Units</th>
-                    <th className="py-2.5 px-3 w-32 text-right border-r border-zinc-200 dark:border-zinc-700">Unit Cost (ETB)</th>
-                    <th className="py-2.5 px-3 w-36 text-right">Total Value (ETB)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                  {record.items.map((item, idx) => {
-                    const itemTotal = calculateItemTotal(item)
-                    const ctns = Number(item.cartons) || 0
-                    const pcs = Number(item.pcsPerCarton) || 0
-                    const unit = item.packagingUnit || (ctns > 0 ? 'Carton' : 'Pcs')
-                    const customType = getItemCustomType(item)
-
-                    return (
-                      <tr
-                        key={item.id || idx}
-                        className={idx % 2 === 0 ? 'bg-background' : 'bg-zinc-50/60 dark:bg-zinc-900/30'}
-                      >
-                        <td className="py-2 px-3 text-center text-muted-foreground border-r border-zinc-200 dark:border-zinc-800 font-medium">
-                          {idx + 1}
-                        </td>
-                        <td className="py-2 px-3 font-semibold text-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          <div className="flex items-center gap-1.5">
-                            <span>{item.name}</span>
-                            {customType && (
-                              <span className="text-[10px] font-normal text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
-                                {customType}
-                              </span>
-                            )}
-                          </div>
-                          {(item.date || item.notes || item.reference) && (
-                            <div className="text-[10px] text-muted-foreground font-normal mt-0.5 space-x-1">
-                              {item.date && <span>{formatDate(item.date)}</span>}
-                              {(item.notes || item.reference) && (
-                                <span className="italic">• {item.notes || item.reference}</span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-muted-foreground border-r border-zinc-200 dark:border-zinc-800 font-medium">
-                          {ctns > 0 && pcs > 0 && unit === 'Carton' ? (
-                            <span>
-                              <strong>{ctns}</strong> ctns × <strong>{pcs}</strong> pcs
-                            </span>
-                          ) : ctns > 0 ? (
-                            <span><strong>{ctns}</strong> {unit}</span>
-                          ) : (
-                            <span>Direct units ({unit})</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-right font-bold text-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          {Number(item.quantity).toLocaleString()} {unit === 'Carton' ? 'pcs' : unit.toLowerCase()}
-                        </td>
-                        <td className="py-2 px-3 text-right text-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          {formatCurrency(item.unitPrice)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-bold text-blue-600 dark:text-blue-400">
-                          {formatCurrency(itemTotal)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-zinc-100 dark:bg-zinc-800/90 font-bold border-t-2 border-zinc-300 dark:border-zinc-600 text-xs text-foreground">
-                    <td colSpan={2} className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-700">
-                      Total: {record.items.length} Products
-                    </td>
-                    <td className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-700 text-muted-foreground">
-                      {totalCartons > 0 ? `${totalCartons} cartons total` : '—'}
-                    </td>
-                    <td className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-700">
-                      {totalUnits.toLocaleString()} units
-                    </td>
-                    <td className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-700 text-muted-foreground uppercase text-[10px]">
-                      Stock Valuation:
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-sm text-blue-600 dark:text-blue-400 font-extrabold">
-                      {formatCurrency(total)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+      {/* Excel-like Table with Exact Columns Specified in Section 2 & 3 */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs text-left border-collapse border-t border-zinc-300 bg-white text-black">
+          <thead>
+            <tr className="bg-zinc-100 text-black font-bold">
+              <th className="py-2.5 px-3 border border-zinc-300 w-28 whitespace-nowrap">{t('Date', 'ቀን')}</th>
+              <th className="py-2.5 px-3 border border-zinc-300 min-w-[180px]">{t('Product / Description', 'ምርት / መግለጫ')}</th>
+              <th className="py-2.5 px-3 border border-zinc-300 w-20 text-right">{t('Quantity', 'ብዛት')}</th>
+              <th className="py-2.5 px-3 border border-zinc-300 w-28 text-right">{t('Unit Price', 'የአንዱ ዋጋ')}</th>
+              <th className="py-2.5 px-3 border border-zinc-300 w-32 text-right">{t('Total Amount', 'ጠቅላላ ዋጋ')}</th>
+              <th className="py-2.5 px-3 border border-zinc-300 w-32">{t('Payment Method', 'የክፍያ ዘዴ')}</th>
+              <th className="py-2.5 px-3 border border-zinc-300 w-32 text-right">{t('Debit', 'ዴቢት')}</th>
+              <th className="py-2.5 px-3 border border-zinc-300 w-32 text-right">{t('Credit', 'ክሬዲት')}</th>
+              <th className="py-2.5 px-3 border border-zinc-300 w-36 text-right font-bold">{t('Balance', 'ቀሪ ሂሳብ')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableData && tableData.entries.length > 0 ? (
+              tableData.entries.map((row, idx) => (
+                <tr
+                  key={row.id || idx}
+                  className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/50'}
+                >
+                  <td className="py-2 px-3 border border-zinc-300 text-black whitespace-nowrap">
+                    {row.date ? formatDate(row.date, isAmharic) : '—'}
+                  </td>
+                  <td className="py-2 px-3 border border-zinc-300 text-black font-medium">
+                    {translateDbText(row.description)}
+                  </td>
+                  <td className="py-2 px-3 border border-zinc-300 text-black text-right">
+                    {row.quantity !== null && !isNaN(row.quantity)
+                      ? Number(row.quantity).toLocaleString()
+                      : '—'}
+                  </td>
+                  <td className="py-2 px-3 border border-zinc-300 text-black text-right">
+                    {row.unitPrice !== null && !isNaN(row.unitPrice)
+                      ? formatCurrency(row.unitPrice)
+                      : '—'}
+                  </td>
+                  <td className="py-2 px-3 border border-zinc-300 text-black text-right font-medium">
+                    {formatCurrency(row.totalAmount)}
+                  </td>
+                  <td className="py-2 px-3 border border-zinc-300 text-black">
+                    {translateDbText(row.paymentMethod)}
+                  </td>
+                  <td className="py-2 px-3 border border-zinc-300 text-black text-right font-medium">
+                    {formatCurrency(row.debit)}
+                  </td>
+                  <td className="py-2 px-3 border border-zinc-300 text-black text-right font-medium">
+                    {formatCurrency(row.credit)}
+                  </td>
+                  <td className="py-2 px-3 border border-zinc-300 text-black text-right font-bold">
+                    {formatCurrency(row.balance)}
+                  </td>
+                </tr>
+              ))
             ) : (
-              /* ==================== CUSTOMER & SUPPLIER REDESIGN ==================== */
-              <table className="w-full text-xs text-left border-collapse">
-                <thead>
-                  <tr className="bg-zinc-100 dark:bg-zinc-800/80 text-foreground font-bold border-b border-zinc-200 dark:border-zinc-700">
-                    <th className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-700">
-                      {record.type === 'customer' ? 'Item / Goods Delivered' : 'Item / Goods Received'}
-                    </th>
-                    <th className="py-2.5 px-3 w-32 border-r border-zinc-200 dark:border-zinc-700">Payment / Bank</th>
-                    <th className="py-2.5 px-3 w-20 text-right border-r border-zinc-200 dark:border-zinc-700">Qty</th>
-                    <th className="py-2.5 px-3 w-28 text-right border-r border-zinc-200 dark:border-zinc-700">Unit Price</th>
-                    <th className="py-2.5 px-3 w-36 text-right border-r border-zinc-200 dark:border-zinc-700 text-blue-700 dark:text-blue-400">
-                      Debit (+)
-                    </th>
-                    <th className="py-2.5 px-3 w-36 text-right text-rose-700 dark:text-rose-400">
-                      Credit (-)
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                  {record.items.map((item, idx) => {
-                    const isAdd = item.sign === '+'
-                    const itemTotal = calculateItemTotal(item)
-                    const bank = getItemBank(item, record.type)
-                    const ctns = Number(item.cartons) || 0
-                    const pcs = Number(item.pcsPerCarton) || 0
-                    const unit = item.packagingUnit || (ctns > 0 ? 'Carton' : 'Pcs')
-                    const packDetail = (ctns > 0 && pcs > 0 && unit === 'Carton')
-                      ? `${ctns} ctn × ${pcs} pcs`
-                      : (ctns > 0 && unit !== 'Carton')
-                        ? `${ctns} ${unit}`
-                        : null
-
-                    return (
-                      <tr
-                        key={item.id || idx}
-                        className={idx % 2 === 0 ? 'bg-background' : 'bg-zinc-50/60 dark:bg-zinc-900/30'}
-                      >
-                        <td className="py-2 px-3 font-semibold text-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          <div>{item.name}</div>
-                          {(packDetail || item.date || item.notes || item.reference) && (
-                            <div className="text-[10px] text-muted-foreground font-normal mt-0.5 space-x-1">
-                              {packDetail && <span className="font-medium text-foreground">{packDetail}</span>}
-                              {item.date && <span>• {formatDate(item.date)}</span>}
-                              {(item.notes || item.reference) && (
-                                <span className="italic">• {item.notes || item.reference}</span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 border-r border-zinc-200 dark:border-zinc-800">
-                          {bank ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                              {bank}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">Stock Delivery</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-right font-medium text-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          {!isAdd ? '—' : `${Number(item.quantity).toLocaleString()} ${unit === 'Carton' ? 'pcs' : unit.toLowerCase()}`}
-                        </td>
-                        <td className="py-2 px-3 text-right text-muted-foreground border-r border-zinc-200 dark:border-zinc-800">
-                          {formatCurrency(item.unitPrice)}
-                        </td>
-                        <td className="py-2 px-3 text-right font-bold text-blue-600 dark:text-blue-400 border-r border-zinc-200 dark:border-zinc-800">
-                          {isAdd ? formatCurrency(itemTotal) : '—'}
-                        </td>
-                        <td className="py-2 px-3 text-right font-bold text-rose-600 dark:text-rose-400">
-                          {!isAdd ? formatCurrency(Math.abs(itemTotal)) : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-zinc-100 dark:bg-zinc-800/90 font-bold border-t-2 border-zinc-300 dark:border-zinc-600 text-xs text-foreground">
-                    <td colSpan={2} className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-700">
-                      Total ({record.items.length} records)
-                    </td>
-                    <td colSpan={2} className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-700 text-muted-foreground">
-                      Subtotals:
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-blue-600 dark:text-blue-400 font-bold border-r border-zinc-200 dark:border-zinc-700">
-                      {formatCurrency(totalDebit)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-rose-600 dark:text-rose-400 font-bold">
-                      {formatCurrency(totalCredit)}
-                    </td>
-                  </tr>
-                  <tr className="bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">
-                    <td colSpan={4} className="py-2 px-3 text-right uppercase text-[10px] font-bold text-muted-foreground">
-                      Outstanding Net Balance:
-                    </td>
-                    <td colSpan={2} className={`py-2 px-3 text-right font-extrabold text-sm ${
-                      total >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-rose-600 dark:text-rose-400'
-                    }`}>
-                      {formatCurrency(total)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+              <tr>
+                <td colSpan={9} className="py-6 text-center text-zinc-500 border border-zinc-300">
+                  {t('No transactions recorded yet.', 'ምንም የተመዘገበ ዝውውር የለም።')}
+                </td>
+              </tr>
             )}
-          </div>
-        </div>
-      )}
+          </tbody>
+          {tableData && tableData.entries.length > 0 && (
+            <tfoot>
+              <tr className="bg-zinc-100 font-bold border-t-2 border-zinc-300 text-black">
+                <td colSpan={2} className="py-2.5 px-3 border border-zinc-300">
+                  {t('Total', 'ጠቅላላ')} ({tableData.entries.length} {tableData.entries.length === 1 ? t('record', 'መዝገብ') : t('records', 'መዝገቦች')})
+                </td>
+                <td colSpan={4} className="py-2.5 px-3 text-right border border-zinc-300 font-bold text-zinc-800">
+                  {t('Subtotals:', 'ንዑስ ድምር:')}
+                </td>
+                <td className="py-2.5 px-3 text-right border border-zinc-300 font-bold">
+                  {formatCurrency(tableData.totalDebit)}
+                </td>
+                <td className="py-2.5 px-3 text-right border border-zinc-300 font-bold">
+                  {formatCurrency(tableData.totalCredit)}
+                </td>
+                <td className="py-2.5 px-3 border border-zinc-300"></td>
+              </tr>
+              <tr className="bg-white font-extrabold border-t border-zinc-300 text-black">
+                <td colSpan={6} className="py-2.5 px-3 text-right uppercase text-xs tracking-wider border border-zinc-300">
+                  {isCustomer
+                    ? t('Outstanding Customer Balance:', 'የተጣራ ቀሪ የደንበኛ ሂሳብ:')
+                    : isSupplier
+                    ? t('Outstanding Supplier Balance:', 'የተጣራ ቀሪ የአቅራቢ ሂሳብ:')
+                    : t('Outstanding Broker Balance:', 'የተጣራ ቀሪ የደላላ ሂሳብ:')}
+                </td>
+                <td colSpan={3} className="py-2.5 px-3 text-right text-sm border border-zinc-300 font-extrabold text-black">
+                  {formatCurrency(tableData.outstandingBalance)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
     </div>
   )
 }

@@ -11,7 +11,7 @@ export const MobileBottomNav: React.FC = () => {
   const { t } = useLanguage()
 
   // Storekeeper handles only stock; bottom navigation is not needed
-  if (user?.role === 'shopkeeper') {
+  if (user?.role === 'storekeeper') {
     return null
   }
 

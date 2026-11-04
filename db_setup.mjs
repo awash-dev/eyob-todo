@@ -37,16 +37,16 @@ async function setupDatabase() {
   // 1. pgcrypto for UUID generation
   await executeSql(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
-  // 2. Shops
+  // 2. Stores
   await executeSql(`
-    CREATE TABLE IF NOT EXISTS shops (
+    CREATE TABLE IF NOT EXISTS stores (
       id varchar(64) PRIMARY KEY,
       name varchar(160) NOT NULL,
       code varchar(40) NOT NULL UNIQUE,
       created_at bigint NOT NULL
     );
   `);
-  console.log('✅ shops table ensured');
+  console.log('✅ stores table ensured');
 
   // 3. Users
   await executeSql(`
@@ -56,8 +56,8 @@ async function setupDatabase() {
       email varchar(200),
       phone varchar(30),
       password_hash text NOT NULL,
-      role varchar(20) NOT NULL CHECK (role IN ('admin', 'shopkeeper')),
-      shop_id varchar(64) REFERENCES shops(id),
+      role varchar(20) NOT NULL CHECK (role IN ('admin', 'storekeeper')),
+      store_id varchar(64) REFERENCES stores(id),
       active boolean NOT NULL DEFAULT true,
       created_at bigint NOT NULL
     );
@@ -86,12 +86,12 @@ async function setupDatabase() {
       notes text,
       exchange_rate numeric,
       items jsonb DEFAULT '[]'::jsonb,
-      shop_id varchar(64) REFERENCES shops(id),
+      store_id varchar(64) REFERENCES stores(id),
       created_at bigint NOT NULL,
       updated_at bigint NOT NULL
     );
   `);
-  await executeSql(`CREATE INDEX IF NOT EXISTS ledger_records_shop_type_idx ON ledger_records (shop_id, type);`);
+  await executeSql(`CREATE INDEX IF NOT EXISTS ledger_records_store_type_idx ON ledger_records (store_id, type);`);
   console.log('✅ ledger_records table ensured');
 
   // 6. Esmiz Records (as requested)
@@ -140,27 +140,27 @@ async function setupDatabase() {
   await executeSql(`CREATE INDEX IF NOT EXISTS esmiz_entries_position_idx ON esmiz_entries (esmiz_id, position);`);
   console.log('✅ esmiz_entries table ensured');
 
-  // Seed default Shops & Users if empty
+  // Seed default Stores & Users if empty
   const now = Date.now();
   await executeSql(`
-    INSERT INTO shops (id, name, code, created_at) VALUES
-      ('shop-1', 'Shop 1 - Merkato', 'SHOP1', ${now}),
-      ('shop-2', 'Shop 2 - Bole', 'SHOP2', ${now})
+    INSERT INTO stores (id, name, code, created_at) VALUES
+      ('store-1', 'Store 1 - Merkato', 'STORE1', ${now}),
+      ('store-2', 'Store 2 - Bole', 'STORE2', ${now})
     ON CONFLICT (id) DO NOTHING;
   `);
 
   const adminHash = hashPassword('Admin@123');
-  const shopHash = hashPassword('Shop@123');
+  const storeHash = hashPassword('Store@123');
 
   await executeSql(`
-    INSERT INTO users (id, name, email, phone, password_hash, role, shop_id, active, created_at) VALUES
+    INSERT INTO users (id, name, email, phone, password_hash, role, store_id, active, created_at) VALUES
       ('user-admin-1', 'Central Admin', 'admin@click.et', '+251911111111', '${adminHash}', 'admin', NULL, true, ${now}),
-      ('user-shop-1', 'Shopkeeper 1', 'shop1@click.et', '+251922222222', '${shopHash}', 'shopkeeper', 'shop-1', true, ${now}),
-      ('user-shop-2', 'Shopkeeper 2', 'shop2@click.et', '+251933333333', '${shopHash}', 'shopkeeper', 'shop-2', true, ${now})
+      ('user-store-1', 'Storekeeper 1', 'store1@click.et', '+251922222222', '${storeHash}', 'storekeeper', 'store-1', true, ${now}),
+      ('user-store-2', 'Storekeeper 2', 'store2@click.et', '+251933333333', '${storeHash}', 'storekeeper', 'store-2', true, ${now})
     ON CONFLICT (id) DO NOTHING;
   `);
 
-  console.log('✅ Default shops & users seeded.');
+  console.log('✅ Default stores & users seeded.');
 
   // Seed sample Esmiz Record if empty
   const existingEsmiz = await executeSql(`SELECT id FROM esmiz_records LIMIT 1;`);

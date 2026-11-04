@@ -22,11 +22,57 @@ export function formatCurrency(
   return isNegative ? `-${formatted}` : formatted
 }
 
-export function formatDate(dateString: string): string {
+const AMHARIC_MONTHS = [
+  'ጥር', 'የካቲት', 'መጋቢት', 'ሚያዝያ', 'ግንቦት', 'ሰኔ',
+  'ሐምሌ', 'ነሐሴ', 'መስከረም', 'ጥቅምት', 'ህዳር', 'ታህሳስ'
+]
+
+const MONTH_NAME_MAP: Record<string, string> = {
+  jan: 'ጥር', january: 'ጥር',
+  feb: 'የካቲት', february: 'የካቲት',
+  mar: 'መጋቢት', march: 'መጋቢት',
+  apr: 'ሚያዝያ', april: 'ሚያዝያ',
+  may: 'ግንቦት',
+  jun: 'ሰኔ', june: 'ሰኔ',
+  jul: 'ሐምሌ', july: 'ሐምሌ',
+  aug: 'ነሐሴ', august: 'ነሐሴ',
+  sep: 'መስከረም', september: 'መስከረም',
+  oct: 'ጥቅምት', october: 'ጥቅምት',
+  nov: 'ህዳር', november: 'ህዳር',
+  dec: 'ታህሳስ', december: 'ታህሳስ',
+}
+
+export function formatDate(dateString: string, isAmharic?: boolean): string {
   if (!dateString) return ''
+  const isAm =
+    isAmharic !== undefined
+      ? isAmharic
+      : typeof document !== 'undefined' && document.documentElement.lang === 'am'
+
   try {
-    const date = new Date(dateString)
-    if (isNaN(date.getTime())) return dateString
+    const trimmed = dateString.trim()
+    // Handle DD/MM/YYYY or DD-MM-YYYY formats (e.g. 23/02/2019)
+    const dmy = trimmed.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/)
+    let date: Date
+    if (dmy) {
+      date = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]))
+    } else {
+      date = new Date(trimmed)
+    }
+
+    if (isNaN(date.getTime())) {
+      if (isAm) {
+        // Handle pre-formatted dates with English month names like "Nov 1, 2026"
+        return trimmed.replace(
+          /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\b/gi,
+          (m) => MONTH_NAME_MAP[m.toLowerCase()] || m
+        )
+      }
+      return trimmed
+    }
+    if (isAm) {
+      return `${AMHARIC_MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
+    }
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',

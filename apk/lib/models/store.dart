@@ -1,16 +1,16 @@
-class Shop {
+class Store {
   final String id;
   final String name;
   final String code;
 
-  Shop({
+  Store({
     required this.id,
     required this.name,
     this.code = '',
   });
 
-  factory Shop.fromJson(Map<String, dynamic> json) {
-    return Shop(
+  factory Store.fromJson(Map<String, dynamic> json) {
+    return Store(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       code: json['code']?.toString() ?? '',

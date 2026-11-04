@@ -25,6 +25,11 @@ export interface LineItem {
   packagingUnit?: string
   date?: string
   notes?: string
+  invoiceId?: string
+  isAdvance?: boolean
+  allocatedAmount?: number
+  amount?: number
+  isPayment?: boolean
 }
 
 export interface LedgerRecord {
@@ -35,13 +40,15 @@ export interface LedgerRecord {
   notes?: string
   exchangeRate?: number
   items: LineItem[]
-  shopId?: string
-  shopName?: string
+  storeId?: string
+  storeName?: string
   createdAt: number
   updatedAt: number
+  phone?: string
+  address?: string
 }
 
-export type UserRole = 'admin' | 'shopkeeper'
+export type UserRole = 'admin' | 'storekeeper'
 
 export interface AuthUser {
   id: string
@@ -49,12 +56,12 @@ export interface AuthUser {
   phone: string
   email?: string
   role: UserRole
-  shopId: string | null
-  shopName: string | null
+  storeId: string | null
+  storeName: string | null
   active: boolean
 }
 
-export interface Shop {
+export interface Store {
   id: string
   name: string
   code: string
@@ -63,13 +70,17 @@ export interface Shop {
 export interface AccountSummary {
   name: string
   type: 'customer' | 'supplier'
-  shopId: string
-  shopName: string
+  storeId: string
+  storeName: string
   recordCount: number
   totalDebit: number
   totalCredit: number
   outstanding: number
+  advanceBalance: number
   lastDate: string
+  phone?: string
+  address?: string
+  notes?: string
 }
 
 export interface StatementEntry {
@@ -100,8 +111,8 @@ export interface StatementPayment {
 export interface Statement {
   accountName: string
   accountType: 'customer' | 'supplier'
-  shopId: string
-  shopName: string
+  storeId: string
+  storeName: string
   entries: StatementEntry[]
   payments: StatementPayment[]
   totals: {
@@ -139,4 +150,124 @@ export interface EsmizEntry {
   transactionDate: string
   createdAt: string | number
   updatedAt: string | number
+}
+
+
+// ============================================================================
+// SMART INVENTORY & PRODUCT CATALOG TYPES
+// ============================================================================
+export interface StoreInventoryItem {
+  id: string
+  storeId?: string
+  productName: string
+  sku?: string
+  category?: string
+  baseUnit: string
+  currentQuantity: number
+  minimumStock: number
+  unitPrice: number
+  costPrice: number
+  pcsPerCarton: number
+  supplierName?: string
+  lastTransactionDate?: string
+  description?: string
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface NewProductInput {
+  storeId?: string
+  /** Authenticated user performing the registration (recorded for audit). */
+  createdBy?: string
+  productName: string
+  sku?: string
+  category?: string
+  baseUnit?: string
+  initialQuantity?: number
+  minimumStock?: number
+  unitPrice?: number
+  costPrice?: number
+  pcsPerCarton?: number
+  supplierName?: string
+  description?: string
+  englishName?: string
+  amharicName?: string
+}
+
+export type StockMovementType = 'IN' | 'OUT'
+
+export interface StockMovement {
+  id: string
+  storeId?: string
+  productId: string
+  movementType: StockMovementType
+  quantity: number
+  transactionUnit: string
+  conversionFactor: number
+  baseQuantity: number
+  previousStock: number
+  newStock: number
+  unitPrice: number
+  totalPrice: number
+  transactionDate: string
+  sourceType?: string
+  sourceId?: string
+  destination?: string
+  referenceNumber?: string
+  note?: string
+  createdBy?: string
+  /** Display name resolved by joining the users table on created_by. */
+  createdByName?: string
+  createdAt?: string
+}
+
+/**
+ * The authenticated user who requested a stock transaction.
+ * The backend uses this to enforce store isolation and to
+ * record who performed every movement.
+ */
+export interface StockActor {
+  id: string
+  name: string
+  role: 'admin' | 'storekeeper'
+  storeId?: string | null
+}
+
+export interface StockTransactionInput {
+  storeId?: string
+  productId: string
+  movementType: StockMovementType
+  quantity: number
+  unitPrice: number
+  loosePieces?: number
+  paymentAmount?: number
+  bankName?: string
+  packagingUnit?: string
+  cartons?: number
+  pcsPerCarton?: number
+  supplierOrDestination?: string
+  referenceNumber?: string
+  transactionDate?: string
+  note?: string
+  /** Authenticated user performing the transaction (verified against the store). */
+  requestedBy?: StockActor
+}
+
+// ============================================================================
+// TRANSLATION & LOCALIZATION TYPES
+// ============================================================================
+export interface TranslationItem {
+  id?: string
+  translationKey: string
+  languageCode: 'en' | 'am'
+  translatedText: string
+}
+
+export interface ProductTranslationItem {
+  id?: string
+  productId: string
+  languageCode: 'en' | 'am'
+  productName: string
+  description?: string
 }

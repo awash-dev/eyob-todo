@@ -97,8 +97,8 @@ class StatementTotals {
 class AccountStatement {
   final String accountName;
   final String accountType; // 'customer' | 'supplier'
-  final String? shopId;
-  final String shopName;
+  final String? storeId;
+  final String storeName;
   final List<StatementEntry> entries;
   final List<StatementPayment> payments;
   final StatementTotals totals;
@@ -106,8 +106,8 @@ class AccountStatement {
   AccountStatement({
     required this.accountName,
     required this.accountType,
-    this.shopId,
-    required this.shopName,
+    this.storeId,
+    required this.storeName,
     required this.entries,
     required this.payments,
     required this.totals,
@@ -120,8 +120,8 @@ class AccountStatement {
     return AccountStatement(
       accountName: json['accountName']?.toString() ?? '',
       accountType: json['accountType']?.toString() ?? 'customer',
-      shopId: json['shopId']?.toString(),
-      shopName: json['shopName']?.toString() ?? '',
+      storeId: json['storeId']?.toString(),
+      storeName: json['storeName']?.toString() ?? '',
       entries: rawEntries
           .map((e) => StatementEntry.fromJson(e as Map<String, dynamic>))
           .toList(),

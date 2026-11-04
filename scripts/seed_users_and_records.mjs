@@ -13,7 +13,7 @@ function hashPasswordWithSalt(password) {
 }
 
 async function seed() {
-  console.log('=== SEEDING USERS, SHOPS & DELALA-STYLE CUSTOMER RECORDS ===');
+  console.log('=== SEEDING USERS, STORES & DELALA-STYLE CUSTOMER RECORDS ===');
 
   // 1. Remove obsolete esmiz tables if any exist
   console.log('1. Cleaning up obsolete esmiz tables...');
@@ -21,27 +21,27 @@ async function seed() {
   await sql`DROP TABLE IF EXISTS esmiz_records CASCADE;`;
   console.log('✓ Obsolete esmiz tables removed.');
 
-  // 2. Seed Shops
-  console.log('2. Seeding shops...');
+  // 2. Seed Stores
+  console.log('2. Seeding stores...');
   await sql`
-    INSERT INTO shops (id, name, code, created_at)
+    INSERT INTO stores (id, name, code, created_at)
     VALUES 
-      ('shop_1', 'Merkato Store (መደብር 1 - መርካቶ)', 'MERKATO', ${Date.now()}),
-      ('shop_2', 'Bole Store (መደብር 2 - ቦሌ)', 'BOLE', ${Date.now()})
+      ('store_1', 'Merkato Store (መደብር 1 - መርካቶ)', 'MERKATO', ${Date.now()}),
+      ('store_2', 'Bole Store (መደብር 2 - ቦሌ)', 'BOLE', ${Date.now()})
     ON CONFLICT (id) DO UPDATE SET 
       name = EXCLUDED.name,
       code = EXCLUDED.code;
   `;
-  console.log('✓ 2 Shops seeded (Merkato & Bole).');
+  console.log('✓ 2 Stores seeded (Merkato & Bole).');
 
   // 3. Seed Users (1 Admin + 2 Storekeepers)
   console.log('3. Seeding 1 Admin and 2 Storekeepers...');
   const adminHash = hashPasswordWithSalt('Admin@123');
-  const shopkeeperHash = hashPasswordWithSalt('Shop@123');
+  const storekeeperHash = hashPasswordWithSalt('Store@123');
 
   // Admin Controller
   await sql`
-    INSERT INTO users (id, name, email, phone, password_hash, role, shop_id, active, created_at)
+    INSERT INTO users (id, name, email, phone, password_hash, role, store_id, active, created_at)
     VALUES 
       ('usr_admin_1', 'Admin Controller', 'admin@merkato.com', '+251911111111', ${adminHash}, 'admin', NULL, true, ${Date.now()})
     ON CONFLICT (id) DO UPDATE SET 
@@ -54,29 +54,29 @@ async function seed() {
 
   // Storekeeper 1 (Merkato)
   await sql`
-    INSERT INTO users (id, name, email, phone, password_hash, role, shop_id, active, created_at)
+    INSERT INTO users (id, name, email, phone, password_hash, role, store_id, active, created_at)
     VALUES 
-      ('usr_storekeeper_1', 'Storekeeper 1 (Merkato)', 'store1@merkato.com', '+251922222222', ${shopkeeperHash}, 'shopkeeper', 'shop_1', true, ${Date.now()})
+      ('usr_storekeeper_1', 'Storekeeper 1 (Merkato)', 'store1@merkato.com', '+251922222222', ${storekeeperHash}, 'storekeeper', 'store_1', true, ${Date.now()})
     ON CONFLICT (id) DO UPDATE SET 
       name = EXCLUDED.name,
       phone = EXCLUDED.phone,
       password_hash = EXCLUDED.password_hash,
       role = EXCLUDED.role,
-      shop_id = 'shop_1',
+      store_id = 'store_1',
       active = true;
   `;
 
   // Storekeeper 2 (Bole)
   await sql`
-    INSERT INTO users (id, name, email, phone, password_hash, role, shop_id, active, created_at)
+    INSERT INTO users (id, name, email, phone, password_hash, role, store_id, active, created_at)
     VALUES 
-      ('usr_storekeeper_2', 'Storekeeper 2 (Bole)', 'store2@merkato.com', '+251933333333', ${shopkeeperHash}, 'shopkeeper', 'shop_2', true, ${Date.now()})
+      ('usr_storekeeper_2', 'Storekeeper 2 (Bole)', 'store2@merkato.com', '+251933333333', ${storekeeperHash}, 'storekeeper', 'store_2', true, ${Date.now()})
     ON CONFLICT (id) DO UPDATE SET 
       name = EXCLUDED.name,
       phone = EXCLUDED.phone,
       password_hash = EXCLUDED.password_hash,
       role = EXCLUDED.role,
-      shop_id = 'shop_2',
+      store_id = 'store_2',
       active = true;
   `;
   console.log('✓ 1 Admin and 2 Storekeepers seeded successfully!');
@@ -130,7 +130,7 @@ async function seed() {
   ]);
 
   await sql`
-    INSERT INTO ledger_records (id, type, title, date, notes, exchange_rate, items, shop_id, created_at, updated_at)
+    INSERT INTO ledger_records (id, type, title, date, notes, exchange_rate, items, store_id, created_at, updated_at)
     VALUES (
       'rec_cust_alex',
       'customer',
@@ -139,7 +139,7 @@ async function seed() {
       'Merkato wholesale customer - Delala credit account',
       198,
       ${alexItems},
-      'shop_1',
+      'store_1',
       ${Date.now()},
       ${Date.now()}
     )
@@ -178,7 +178,7 @@ async function seed() {
   ]);
 
   await sql`
-    INSERT INTO ledger_records (id, type, title, date, notes, exchange_rate, items, shop_id, created_at, updated_at)
+    INSERT INTO ledger_records (id, type, title, date, notes, exchange_rate, items, store_id, created_at, updated_at)
     VALUES (
       'rec_cust_kelil',
       'customer',
@@ -187,7 +187,7 @@ async function seed() {
       'Bole electrical contractor',
       198,
       ${kelilItems},
-      'shop_2',
+      'store_2',
       ${Date.now()},
       ${Date.now()}
     )
@@ -226,7 +226,7 @@ async function seed() {
   ]);
 
   await sql`
-    INSERT INTO ledger_records (id, type, title, date, notes, exchange_rate, items, shop_id, created_at, updated_at)
+    INSERT INTO ledger_records (id, type, title, date, notes, exchange_rate, items, store_id, created_at, updated_at)
     VALUES (
       'rec_supp_awash',
       'supplier',
@@ -235,7 +235,7 @@ async function seed() {
       'Primary wire and electrical supplier',
       198,
       ${awashItems},
-      'shop_1',
+      'store_1',
       ${Date.now()},
       ${Date.now()}
     )
@@ -248,7 +248,7 @@ async function seed() {
   console.log('✓ Customer and Supplier records seeded with Delala credit/debit structure.');
 
   // 5. Verify all users in database
-  const allUsers = await sql`SELECT id, name, phone, role, shop_id, active FROM users;`;
+  const allUsers = await sql`SELECT id, name, phone, role, store_id, active FROM users;`;
   console.log('\nVerified Database Users:');
   console.table(allUsers);
 
@@ -262,7 +262,7 @@ async function seed() {
   console.log('\nVerified Delala Brokers:');
   console.table(brokerRows);
 
-  console.log('\n=== ALL USERS, SHOPS & DELALA RECORDS READY IN DATABASE! ===');
+  console.log('\n=== ALL USERS, STORES & DELALA RECORDS READY IN DATABASE! ===');
 }
 
 seed().catch(console.error);

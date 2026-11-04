@@ -6,10 +6,10 @@ import React, {
   useMemo,
   useState,
 } from 'react'
-import type { AuthUser, Shop } from '../types/ledger'
+import type { AuthUser, Store } from '../types/ledger'
 import {
   getMe,
-  getShops,
+  getStores,
   loadStoredToken,
   login as apiLogin,
   logout as apiLogout,
@@ -17,20 +17,20 @@ import {
   setAuthToken,
 } from '../lib/api'
 
-const ACTIVE_SHOP_KEY = 'click_active_shop'
+const ACTIVE_STORE_KEY = 'click_active_store'
 
 interface AuthContextType {
   user: AuthUser | null
-  shops: Shop[]
-  activeShopId: string | null
-  activeShop: Shop | null
+  stores: Store[]
+  activeStoreId: string | null
+  activeStore: Store | null
   isAdmin: boolean
   loading: boolean
   error: string | null
-  refreshShops: () => Promise<void>
+  refreshStores: () => Promise<void>
   login: (phone: string, password: string) => Promise<AuthUser>
   logout: () => Promise<void>
-  setActiveShopId: (shopId: string) => void
+  setActiveStoreId: (storeId: string) => void
   clearError: () => void
 }
 
@@ -40,42 +40,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [shops, setShops] = useState<Shop[]>([])
-  const [activeShopId, setActiveShopIdState] = useState<string | null>(null)
+  const [stores, setStores] = useState<Store[]>([])
+  const [activeStoreId, setActiveStoreIdState] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const applyUser = useCallback(async (nextUser: AuthUser) => {
     setUser(nextUser)
     try {
-      const { shops: nextShops } = await getShops()
-      setShops(nextShops)
+      const { stores: nextStores } = await getStores()
+      setStores(nextStores)
 
       if (nextUser.role === 'admin') {
         let stored: string | null = null
         try {
-          stored = localStorage.getItem(ACTIVE_SHOP_KEY)
+          stored = localStorage.getItem(ACTIVE_STORE_KEY)
         } catch {
           stored = null
         }
-        const validStored = stored === 'all' || nextShops.some((shop) => shop.id === stored)
-        const nextShopId = validStored ? stored : 'all'
-        setActiveShopIdState(nextShopId)
-        if (nextShopId) {
+        const validStored = stored === 'all' || nextStores.some((store) => store.id === stored)
+        const nextStoreId = validStored ? stored : 'all'
+        setActiveStoreIdState(nextStoreId)
+        if (nextStoreId) {
           try {
-            localStorage.setItem(ACTIVE_SHOP_KEY, nextShopId)
+            localStorage.setItem(ACTIVE_STORE_KEY, nextStoreId)
           } catch {
             // Ignore storage failures.
           }
         }
       } else {
-        setActiveShopIdState(nextUser.shopId)
+        setActiveStoreIdState(nextUser.storeId)
       }
     } catch (err) {
-      // The user is authenticated; shop loading can retry later.
-      setShops([])
-      setActiveShopIdState(nextUser.shopId)
-      console.warn('Could not load shops:', err)
+      // The user is authenticated; store loading can retry later.
+      setStores([])
+      setActiveStoreIdState(nextUser.storeId)
+      console.warn('Could not load stores:', err)
     }
   }, [])
 
@@ -107,8 +107,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     return onUnauthorized(() => {
       setUser(null)
-      setShops([])
-      setActiveShopIdState(null)
+      setStores([])
+      setActiveStoreIdState(null)
       setAuthToken(null)
     })
   }, [])
@@ -135,77 +135,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       await apiLogout()
     } finally {
       setUser(null)
-      setShops([])
-      setActiveShopIdState(null)
+      setStores([])
+      setActiveStoreIdState(null)
       setError(null)
     }
   }, [])
 
-  const setActiveShopId = useCallback(
-    (shopId: string) => {
+  const setActiveStoreId = useCallback(
+    (storeId: string) => {
       if (user?.role !== 'admin') return
-      if (shopId !== 'all' && !shops.some((shop) => shop.id === shopId)) return
-      setActiveShopIdState(shopId)
+      if (storeId !== 'all' && !stores.some((store) => store.id === storeId)) return
+      setActiveStoreIdState(storeId)
       try {
-        localStorage.setItem(ACTIVE_SHOP_KEY, shopId)
+        localStorage.setItem(ACTIVE_STORE_KEY, storeId)
       } catch {
         // Ignore storage failures.
       }
     },
-    [shops, user],
+    [stores, user],
   )
 
   const clearError = useCallback(() => setError(null), [])
 
-  const refreshShops = useCallback(async () => {
+  const refreshStores = useCallback(async () => {
     try {
-      const { shops: nextShops } = await getShops()
-      setShops(nextShops)
+      const { stores: nextStores } = await getStores()
+      setStores(nextStores)
     } catch {
       // ignore
     }
   }, [])
 
-  const activeShop = useMemo(
+  const activeStore = useMemo(
     () => {
-      if (activeShopId === 'all') {
+      if (activeStoreId === 'all') {
         return {
           id: 'all',
-          name: 'All Shops (Combined)',
+          name: 'All Stores (Combined)',
           code: 'ALL',
-        } as Shop
+        } as Store
       }
-      return shops.find((shop) => shop.id === activeShopId) ?? null
+      return stores.find((store) => store.id === activeStoreId) ?? null
     },
-    [shops, activeShopId],
+    [stores, activeStoreId],
   )
 
   const value = useMemo<AuthContextType>(
     () => ({
       user,
-      shops,
-      activeShopId,
-      activeShop,
+      stores,
+      activeStoreId,
+      activeStore,
       isAdmin: user?.role === 'admin',
       loading,
       error,
-      refreshShops,
+      refreshStores,
       login,
       logout,
-      setActiveShopId,
+      setActiveStoreId,
       clearError,
     }),
     [
       user,
-      shops,
-      activeShopId,
-      activeShop,
+      stores,
+      activeStoreId,
+      activeStore,
       loading,
       error,
-      refreshShops,
+      refreshStores,
       login,
       logout,
-      setActiveShopId,
+      setActiveStoreId,
       clearError,
     ],
   )
@@ -213,10 +213,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+const fallbackAuthContext: AuthContextType = {
+  user: null,
+  stores: [],
+  activeStoreId: null,
+  activeStore: null,
+  isAdmin: false,
+  loading: true,
+  error: null,
+  refreshStores: async () => {},
+  login: async () => { throw new Error('AuthProvider not ready') },
+  logout: async () => {},
+  setActiveStoreId: () => {},
+  clearError: () => {},
+}
+
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    return fallbackAuthContext
   }
   return context
 }

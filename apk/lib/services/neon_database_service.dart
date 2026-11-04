@@ -6,12 +6,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/user.dart';
-import '../models/shop.dart';
+import '../models/store.dart';
 import '../models/ledger_record.dart';
 import '../models/line_item.dart';
 import '../models/broker.dart';
 import '../models/delala_transaction.dart';
 import '../models/delala_entry.dart';
+import '../models/inventory_product.dart';
+import '../models/stock_movement.dart';
 
 /// Direct Neon PostgreSQL Service
 ///
@@ -34,6 +36,10 @@ class NeonDatabaseService {
     final list = <String>[];
     try {
       if (dotenv.isInitialized) {
+        final proxy = dotenv.env['NEON_PROXY_ENDPOINT'] ?? dotenv.env['PROXY_SQL_ENDPOINT'];
+        if (proxy != null && proxy.isNotEmpty) {
+          list.add(proxy);
+        }
         final dir = dotenv.env['NEON_DIRECT_ENDPOINT'];
         if (dir != null && dir.isNotEmpty) {
           list.add(dir.replaceAll('-pooler', ''));
@@ -117,7 +123,10 @@ class NeonDatabaseService {
     final body = jsonEncode({'query': query, 'params': params ?? []});
 
     final headers = {
-      'Content-Type': 'application/json',
+      // Note on CORS for Flutter Web:
+      // Neon allows 'Neon-Connection-String' in CORS preflight responses but NOT 'Content-Type'.
+      // 'text/plain; charset=utf-8' is CORS-safelisted, preventing browser preflight block.
+      'Content-Type': 'text/plain; charset=utf-8',
       'Accept': 'application/json',
       'Neon-Connection-String': connectionString,
       'Neon-Raw-Text-Output': 'true',
@@ -246,9 +255,9 @@ class NeonDatabaseService {
 
     final rows = await executeSql(
       '''
-      SELECT u.id, u.name, u.email, u.phone, u.password_hash, u.role, u.shop_id, u.active, sh.name AS shop_name
+      SELECT u.id, u.name, u.email, u.phone, u.password_hash, u.role, u.store_id, u.active, sh.name AS store_name
       FROM users u
-      LEFT JOIN shops sh ON sh.id = u.shop_id
+      LEFT JOIN stores sh ON sh.id = u.store_id
       WHERE u.phone = \$1 OR u.phone = \$2
       LIMIT 1
       ''',
@@ -278,22 +287,22 @@ class NeonDatabaseService {
       name: row['name']?.toString() ?? '',
       email: row['email']?.toString(),
       phone: row['phone']?.toString(),
-      role: row['role']?.toString() ?? 'shopkeeper',
-      shopId: row['shop_id']?.toString(),
-      shopName: row['shop_name']?.toString(),
+      role: row['role']?.toString() ?? 'storekeeper',
+      storeId: row['store_id']?.toString(),
+      storeName: row['store_name']?.toString(),
       active: true,
     );
   }
 
-  /// Fetch shops directly from Neon (returns an empty list when the table is
-  /// empty — no hardcoded shops are ever invented).
-  static Future<List<Shop>> getShopsDirect() async {
+  /// Fetch stores directly from Neon (returns an empty list when the table is
+  /// empty — no hardcoded stores are ever invented).
+  static Future<List<Store>> getStoresDirect() async {
     final rows = await executeSql(
-      'SELECT id, name, code FROM shops ORDER BY id ASC',
+      'SELECT id, name, code FROM stores ORDER BY id ASC',
     );
     return rows
         .map(
-          (r) => Shop(
+          (r) => Store(
             id: r['id']?.toString() ?? '',
             name: r['name']?.toString() ?? '',
             code: r['code']?.toString() ?? '',
@@ -302,24 +311,24 @@ class NeonDatabaseService {
         .toList();
   }
 
-  /// First shop id stored in the database, or null when no shop exists.
-  static Future<String?> _firstShopId() async {
+  /// First store id stored in the database, or null when no store exists.
+  static Future<String?> _firstStoreId() async {
     final rows = await executeSql(
-      'SELECT id FROM shops ORDER BY id ASC LIMIT 1',
+      'SELECT id FROM stores ORDER BY id ASC LIMIT 1',
     );
     if (rows.isEmpty) return null;
     final id = rows.first['id']?.toString();
     return (id == null || id.isEmpty) ? null : id;
   }
 
-  /// Resolves the shop a record belongs to: the given shop, or the first shop
-  /// in the database. Throws when the database has no shop at all.
-  static Future<String> resolveShopId(String? shopId) async {
-    if (shopId != null && shopId.isNotEmpty && shopId != 'all') return shopId;
-    final first = await _firstShopId();
+  /// Resolves the store a record belongs to: the given store, or the first store
+  /// in the database. Throws when the database has no store at all.
+  static Future<String> resolveStoreId(String? storeId) async {
+    if (storeId != null && storeId.isNotEmpty && storeId != 'all') return storeId;
+    final first = await _firstStoreId();
     if (first == null) {
       throw Exception(
-        'No shop exists in the database yet — create a shop first',
+        'No store exists in the database yet — create a store first',
       );
     }
     return first;
@@ -327,19 +336,19 @@ class NeonDatabaseService {
 
   /// Fetch records directly from Neon
   static Future<List<LedgerRecord>> getRecordsDirect({
-    String? shopId,
+    String? storeId,
     String? type,
   }) async {
     String query = '''
-      SELECT id, type, title, date, notes, items, shop_id, created_at, updated_at
+      SELECT id, type, title, date, notes, items, store_id, created_at, updated_at
       FROM ledger_records
     ''';
     final conditions = <String>[];
     final params = <dynamic>[];
 
-    if (shopId != null && shopId.isNotEmpty && shopId != 'all') {
-      params.add(shopId);
-      conditions.add('shop_id = \$${params.length}');
+    if (storeId != null && storeId.isNotEmpty && storeId != 'all') {
+      params.add(storeId);
+      conditions.add('store_id = \$${params.length}');
     }
 
     if (type != null && type.isNotEmpty && type != 'all') {
@@ -383,7 +392,7 @@ class NeonDatabaseService {
             date: row['date']?.toString() ?? '',
             notes: row['notes']?.toString(),
             items: items,
-            shopId: row['shop_id']?.toString(),
+            storeId: row['store_id']?.toString(),
             createdAt: int.tryParse(row['created_at']?.toString() ?? '0') ?? 0,
             updatedAt: int.tryParse(row['updated_at']?.toString() ?? '0') ?? 0,
           ),
@@ -396,19 +405,87 @@ class NeonDatabaseService {
     return records;
   }
 
-  /// Insert record directly into Neon
+  /// Insert record directly into Neon (with smart merge for customers & suppliers)
   static Future<LedgerRecord> createRecordDirect(
     LedgerRecord record, {
-    String? shopId,
+    String? storeId,
   }) async {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final finalShopId = await resolveShopId(shopId ?? record.shopId);
+    final finalStoreId = await resolveStoreId(storeId ?? record.storeId);
+    final cleanTitle = record.title.trim();
+
+    // Smart-merge: if customer or supplier, merge items into existing account instead of creating duplicate
+    if (record.type == 'customer' || record.type == 'supplier') {
+      try {
+        final existingRows = await executeSql(
+          '''
+          SELECT id, type, title, date, notes, items, store_id, created_at, updated_at
+          FROM ledger_records
+          WHERE LOWER(TRIM(title)) = LOWER(\$1)
+            AND type = \$2
+            AND (store_id = \$3 OR store_id IS NULL)
+          LIMIT 1
+          ''',
+          [cleanTitle, record.type, finalStoreId],
+        );
+
+        if (existingRows.isNotEmpty) {
+          final existing = existingRows.first;
+          final existingId = existing['id']?.toString() ?? '';
+          final itemsRaw = existing['items'];
+          List<LineItem> existingItems = [];
+          if (itemsRaw is List) {
+            existingItems = itemsRaw
+                .map((it) => LineItem.fromJson(it as Map<String, dynamic>))
+                .toList();
+          } else if (itemsRaw is String && itemsRaw.isNotEmpty) {
+            try {
+              final decoded = jsonDecode(itemsRaw);
+              if (decoded is List) {
+                existingItems = decoded
+                    .map((it) => LineItem.fromJson(it as Map<String, dynamic>))
+                    .toList();
+              }
+            } catch (_) {}
+          }
+
+          final mergedItems = [...existingItems, ...record.items];
+          final mergedItemsJson = jsonEncode(mergedItems.map((i) => i.toJson()).toList());
+          final mergedNotes = (record.notes != null && record.notes!.trim().isNotEmpty)
+              ? record.notes!.trim()
+              : (existing['notes']?.toString() ?? '');
+
+          await executeSql(
+            '''
+            UPDATE ledger_records SET
+              items = \$1,
+              date = \$2,
+              notes = \$3,
+              updated_at = \$4
+            WHERE id = \$5
+            ''',
+            [mergedItemsJson, record.date, mergedNotes, nowMs, existingId],
+          );
+
+          return record.copyWith(
+            id: existingId,
+            items: mergedItems,
+            notes: mergedNotes,
+            storeId: existing['store_id']?.toString() ?? finalStoreId,
+            updatedAt: nowMs,
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) print('Smart-merge check error: $e');
+      }
+    }
+
     final itemsJson = jsonEncode(record.items.map((i) => i.toJson()).toList());
 
     await executeSql(
       '''
       INSERT INTO ledger_records (
-        id, type, title, date, notes, items, shop_id, created_at, updated_at
+        id, type, title, date, notes, items, store_id, created_at, updated_at
       ) VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9)
       ''',
       [
@@ -418,14 +495,14 @@ class NeonDatabaseService {
         record.date,
         record.notes ?? '',
         itemsJson,
-        finalShopId,
+        finalStoreId,
         nowMs,
         nowMs,
       ],
     );
 
     return record.copyWith(
-      shopId: finalShopId,
+      storeId: finalStoreId,
       createdAt: nowMs,
       updatedAt: nowMs,
     );
@@ -435,15 +512,15 @@ class NeonDatabaseService {
   static Future<void> updateRecordDirect(LedgerRecord record) async {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final itemsJson = jsonEncode(record.items.map((i) => i.toJson()).toList());
-    final shopId = record.shopId;
+    final storeId = record.storeId;
 
-    // Only rewrite shop_id when the record actually has one — never fall
-    // back to a hardcoded shop.
-    if (shopId != null && shopId.isNotEmpty) {
+    // Only rewrite store_id when the record actually has one — never fall
+    // back to a hardcoded store.
+    if (storeId != null && storeId.isNotEmpty) {
       await executeSql(
         '''
         UPDATE ledger_records
-        SET title = \$1, date = \$2, notes = \$3, items = \$4, shop_id = \$5, updated_at = \$6
+        SET title = \$1, date = \$2, notes = \$3, items = \$4, store_id = \$5, updated_at = \$6
         WHERE id = \$7
         ''',
         [
@@ -451,7 +528,7 @@ class NeonDatabaseService {
           record.date,
           record.notes ?? '',
           itemsJson,
-          shopId,
+          storeId,
           nowMs,
           record.id,
         ],
@@ -480,61 +557,61 @@ class NeonDatabaseService {
     await executeSql('DELETE FROM ledger_records WHERE id = \$1', [recordId]);
   }
 
-  /// Create shop directly in Neon
-  static Future<Shop> createShopDirect(String name, [String? code]) async {
+  /// Create store directly in Neon
+  static Future<Store> createStoreDirect(String name, [String? code]) async {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final id = 'shop-$nowMs';
+    final id = 'store-$nowMs';
     final finalCode =
         (code ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-'))
             .toUpperCase();
     await executeSql(
-      'INSERT INTO shops (id, name, code, created_at) VALUES (\$1, \$2, \$3, \$4)',
+      'INSERT INTO stores (id, name, code, created_at) VALUES (\$1, \$2, \$3, \$4)',
       [id, name, finalCode, nowMs],
     );
-    return Shop(id: id, name: name, code: finalCode);
+    return Store(id: id, name: name, code: finalCode);
   }
 
-  /// Update shop directly in Neon
-  static Future<Shop> updateShopDirect(
-    String shopId, {
+  /// Update store directly in Neon
+  static Future<Store> updateStoreDirect(
+    String storeId, {
     String? name,
     String? code,
   }) async {
     if (name != null) {
-      await executeSql('UPDATE shops SET name = \$1 WHERE id = \$2', [name, shopId]);
+      await executeSql('UPDATE stores SET name = \$1 WHERE id = \$2', [name, storeId]);
     }
     if (code != null) {
-      await executeSql('UPDATE shops SET code = \$1 WHERE id = \$2', [code, shopId]);
+      await executeSql('UPDATE stores SET code = \$1 WHERE id = \$2', [code, storeId]);
     }
-    final rows = await executeSql('SELECT id, name, code FROM shops WHERE id = \$1', [shopId]);
+    final rows = await executeSql('SELECT id, name, code FROM stores WHERE id = \$1', [storeId]);
     if (rows.isNotEmpty) {
-      return Shop(
+      return Store(
         id: rows[0]['id'].toString(),
         name: rows[0]['name'].toString(),
         code: rows[0]['code']?.toString() ?? '',
       );
     }
-    return Shop(id: shopId, name: name ?? '', code: code ?? '');
+    return Store(id: storeId, name: name ?? '', code: code ?? '');
   }
 
-  /// Delete shop directly in Neon
-  static Future<void> deleteShopDirect(String shopId) async {
-    await executeSql('DELETE FROM ledger_records WHERE shop_id = \$1', [
-      shopId,
+  /// Delete store directly in Neon
+  static Future<void> deleteStoreDirect(String storeId) async {
+    await executeSql('DELETE FROM ledger_records WHERE store_id = \$1', [
+      storeId,
     ]);
-    await executeSql('UPDATE users SET shop_id = NULL WHERE shop_id = \$1', [
-      shopId,
+    await executeSql('UPDATE users SET store_id = NULL WHERE store_id = \$1', [
+      storeId,
     ]);
-    await executeSql('DELETE FROM shops WHERE id = \$1', [shopId]);
+    await executeSql('DELETE FROM stores WHERE id = \$1', [storeId]);
   }
 
-  /// Get shopkeeper users directly from Neon
+  /// Get storekeeper users directly from Neon
   static Future<List<AppUser>> getUsersDirect() async {
     final rows = await executeSql('''
-      SELECT u.id, u.name, u.email, u.phone, u.role, u.shop_id, u.active, sh.name AS shop_name
+      SELECT u.id, u.name, u.email, u.phone, u.role, u.store_id, u.active, sh.name AS store_name
       FROM users u
-      LEFT JOIN shops sh ON sh.id = u.shop_id
-      WHERE u.role = 'shopkeeper'
+      LEFT JOIN stores sh ON sh.id = u.store_id
+      WHERE u.role = 'storekeeper'
       ORDER BY u.created_at ASC
       ''');
     return rows
@@ -544,22 +621,22 @@ class NeonDatabaseService {
             name: r['name']?.toString() ?? '',
             email: r['email']?.toString(),
             phone: r['phone']?.toString(),
-            role: 'shopkeeper',
-            shopId: r['shop_id']?.toString(),
-            shopName: r['shop_name']?.toString(),
+            role: 'storekeeper',
+            storeId: r['store_id']?.toString(),
+            storeName: r['store_name']?.toString(),
             active: isTruthy(r['active']),
           ),
         )
         .toList();
   }
 
-  /// Create shopkeeper user directly in Neon
-  static Future<AppUser> createShopkeeperDirect({
+  /// Create storekeeper user directly in Neon
+  static Future<AppUser> createStorekeeperDirect({
     required String name,
     required String phone,
     String? email,
     required String password,
-    required String shopId,
+    required String storeId,
   }) async {
     final cleanPhone = normalizePhone(phone);
     if (cleanPhone == null) {
@@ -572,7 +649,7 @@ class NeonDatabaseService {
       [cleanPhone],
     );
     if (existing.isNotEmpty) {
-      throw Exception('A shopkeeper with phone $cleanPhone already exists');
+      throw Exception('A storekeeper with phone $cleanPhone already exists');
     }
 
     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -580,7 +657,7 @@ class NeonDatabaseService {
     final hash = hashPasswordWithSalt(password);
     await executeSql(
       '''
-      INSERT INTO users (id, name, email, phone, password_hash, role, shop_id, active, created_at)
+      INSERT INTO users (id, name, email, phone, password_hash, role, store_id, active, created_at)
       VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9)
       ''',
       [
@@ -589,8 +666,8 @@ class NeonDatabaseService {
         email?.trim().isEmpty == true ? null : email?.trim().toLowerCase(),
         cleanPhone,
         hash,
-        'shopkeeper',
-        shopId,
+        'storekeeper',
+        storeId,
         true,
         nowMs,
       ],
@@ -600,18 +677,18 @@ class NeonDatabaseService {
       name: name,
       email: email?.trim().isEmpty == true ? null : email?.trim().toLowerCase(),
       phone: cleanPhone,
-      role: 'shopkeeper',
-      shopId: shopId,
+      role: 'storekeeper',
+      storeId: storeId,
       active: true,
     );
   }
 
-  /// Update shopkeeper user directly in Neon
-  static Future<AppUser> updateShopkeeperDirect(
+  /// Update storekeeper user directly in Neon
+  static Future<AppUser> updateStorekeeperDirect(
     String userId, {
     String? name,
     String? phone,
-    String? shopId,
+    String? storeId,
     bool? active,
     String? password,
   }) async {
@@ -633,16 +710,16 @@ class NeonDatabaseService {
         [cleanPhone, userId],
       );
       if (existing.isNotEmpty) {
-        throw Exception('Another shopkeeper already uses phone $cleanPhone');
+        throw Exception('Another storekeeper already uses phone $cleanPhone');
       }
       await executeSql('UPDATE users SET phone = \$1 WHERE id = \$2', [
         cleanPhone,
         userId,
       ]);
     }
-    if (shopId != null) {
-      await executeSql('UPDATE users SET shop_id = \$1 WHERE id = \$2', [
-        shopId,
+    if (storeId != null) {
+      await executeSql('UPDATE users SET store_id = \$1 WHERE id = \$2', [
+        storeId,
         userId,
       ]);
     }
@@ -661,9 +738,9 @@ class NeonDatabaseService {
     }
     final rows = await executeSql(
       '''
-      SELECT u.id, u.name, u.email, u.phone, u.role, u.shop_id, u.active, sh.name AS shop_name
+      SELECT u.id, u.name, u.email, u.phone, u.role, u.store_id, u.active, sh.name AS store_name
       FROM users u
-      LEFT JOIN shops sh ON sh.id = u.shop_id
+      LEFT JOIN stores sh ON sh.id = u.store_id
       WHERE u.id = \$1
       LIMIT 1
       ''',
@@ -676,9 +753,9 @@ class NeonDatabaseService {
         name: r['name']?.toString() ?? '',
         email: r['email']?.toString(),
         phone: r['phone']?.toString(),
-        role: 'shopkeeper',
-        shopId: r['shop_id']?.toString(),
-        shopName: r['shop_name']?.toString(),
+        role: 'storekeeper',
+        storeId: r['store_id']?.toString(),
+        storeName: r['store_name']?.toString(),
         active: isTruthy(r['active']),
       );
     }
@@ -686,14 +763,14 @@ class NeonDatabaseService {
       id: userId,
       name: name ?? '',
       phone: phone,
-      role: 'shopkeeper',
-      shopId: shopId,
+      role: 'storekeeper',
+      storeId: storeId,
       active: active ?? true,
     );
   }
 
-  /// Delete shopkeeper user directly in Neon
-  static Future<void> deleteShopkeeperDirect(String userId) async {
+  /// Delete storekeeper user directly in Neon
+  static Future<void> deleteStorekeeperDirect(String userId) async {
     await executeSql('DELETE FROM sessions WHERE user_id = \$1', [userId]);
     await executeSql('DELETE FROM users WHERE id = \$1', [userId]);
   }
@@ -1159,5 +1236,421 @@ class NeonDatabaseService {
   /// Delete a Delala spreadsheet entry
   static Future<void> deleteDelalaEntryDirect(String id) async {
     await executeSql('DELETE FROM delala_entries WHERE id = \$1', [id]);
+  }
+
+  /* ------------------- Store Inventory & Stock Movements ------------------- */
+
+  /// Fetch products from store_inventory table directly from Neon
+  static Future<List<InventoryProduct>> getInventoryProductsDirect({String? storeId}) async {
+    List<Map<String, dynamic>> rows;
+    if (storeId != null && storeId.isNotEmpty && storeId != 'all') {
+      rows = await executeSql(
+        '''
+        SELECT * FROM store_inventory
+        WHERE (store_id = \$1 OR store_id IS NULL)
+          AND (is_deleted IS NULL OR is_deleted = FALSE)
+        ORDER BY product_name ASC
+        ''',
+        [storeId],
+      );
+    } else {
+      rows = await executeSql(
+        '''
+        SELECT * FROM store_inventory
+        WHERE (is_deleted IS NULL OR is_deleted = FALSE)
+        ORDER BY product_name ASC
+        ''',
+      );
+    }
+    return rows.map((r) => InventoryProduct.fromJson(r)).toList();
+  }
+
+  /// Check whether a product with this name already exists in the given store
+  static Future<bool> checkProductExistsDirect(String productName, String? storeId) async {
+    final clean = productName.trim().toLowerCase();
+    List<Map<String, dynamic>> rows;
+    if (storeId != null && storeId.isNotEmpty && storeId != 'all') {
+      rows = await executeSql(
+        '''
+        SELECT id FROM store_inventory
+        WHERE LOWER(TRIM(product_name)) = \$1
+          AND (store_id = \$2 OR store_id IS NULL)
+        LIMIT 1
+        ''',
+        [clean, storeId],
+      );
+    } else {
+      rows = await executeSql(
+        '''
+        SELECT id FROM store_inventory
+        WHERE LOWER(TRIM(product_name)) = \$1
+        LIMIT 1
+        ''',
+        [clean],
+      );
+    }
+    return rows.isNotEmpty;
+  }
+
+  /// Register a brand new product in store_inventory and log initial stock if any
+  static Future<InventoryProduct> registerProductDirect({
+    required String productName,
+    required double unitPrice,
+    required double pcsPerCarton,
+    double openingCartons = 0,
+    double openingLoosePieces = 0,
+    double minimumStock = 0,
+    double costPrice = 0,
+    String? storeId,
+    String? category,
+    String? supplierName,
+    String? description,
+    String? createdBy,
+    String? date,
+  }) async {
+    final cleanName = productName.trim();
+    if (cleanName.isEmpty) {
+      throw Exception('Product name cannot be empty');
+    }
+    final pcsPerCtn = pcsPerCarton > 0 ? pcsPerCarton : 1.0;
+    final totalInitialPieces = (openingCartons * pcsPerCtn) + openingLoosePieces;
+    final txnDate = (date != null && date.trim().isNotEmpty)
+        ? date.trim()
+        : DateTime.now().toIso8601String().split('T')[0];
+    final sku = 'SKU-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+    final pCost = costPrice > 0 ? costPrice : unitPrice;
+
+    final rows = await executeSql(
+      '''
+      INSERT INTO store_inventory (
+        store_id, product_name, sku, category, base_unit,
+        current_quantity, minimum_stock, unit_price, cost_price,
+        pcs_per_carton, supplier_name, last_transaction_date, description, created_by
+      ) VALUES (
+        \$1, \$2, \$3, \$4, 'Pcs',
+        \$5, \$6, \$7, \$8,
+        \$9, \$10, \$11, \$12, \$13
+      )
+      RETURNING *
+      ''',
+      [
+        (storeId != null && storeId != 'all') ? storeId : null,
+        cleanName,
+        sku,
+        category ?? 'General',
+        totalInitialPieces,
+        minimumStock,
+        unitPrice,
+        pCost,
+        pcsPerCtn,
+        supplierName,
+        txnDate,
+        description,
+        createdBy,
+      ],
+    );
+
+    if (rows.isEmpty) {
+      throw Exception('Failed to insert product into database');
+    }
+
+    final product = InventoryProduct.fromJson(rows.first);
+
+    // If opening stock was specified, also log initial stock movement
+    if (totalInitialPieces > 0) {
+      try {
+        await executeSql(
+          '''
+          INSERT INTO stock_movements (
+            store_id, product_id, movement_type, quantity,
+            transaction_unit, conversion_factor, base_quantity,
+            previous_stock, new_stock, unit_price, total_price,
+            transaction_date, source_type, source_id, note, created_by
+          ) VALUES (
+            \$1, \$2, 'IN', \$3,
+            'Pcs', \$4, \$3,
+            0, \$3, \$5, \$6,
+            \$7::date, 'INITIAL', \$8, 'Initial product registration stock', \$9
+          )
+          ''',
+          [
+            product.storeId,
+            product.id,
+            totalInitialPieces,
+            pcsPerCtn,
+            pCost,
+            totalInitialPieces * pCost,
+            txnDate,
+            supplierName,
+            createdBy,
+          ],
+        );
+      } catch (e) {
+        debugPrint('Warning: Initial stock movement insert failed: \$e');
+      }
+    }
+
+    return product;
+  }
+
+  /// Atomic Stock In / Stock Out operation with strict negative inventory prevention
+  static Future<InventoryProduct> recordStockMovementDirect({
+    required String productId,
+    required String movementType, // 'IN' or 'OUT'
+    required double totalPieces,
+    required double unitPrice,
+    double cartons = 0,
+    double loosePieces = 0,
+    double pcsPerCarton = 1,
+    String? party, // Supplier (IN) or Destination / Customer (OUT)
+    String? note,
+    String? transactionDate,
+    String? storeId,
+    String? createdBy,
+  }) async {
+    final isOut = movementType.toUpperCase() == 'OUT';
+    final qty = totalPieces;
+    if (qty <= 0) {
+      throw Exception('Quantity must be greater than zero');
+    }
+
+    // 1. Fetch current product record
+    final prodRows = await executeSql(
+      'SELECT * FROM store_inventory WHERE id = \$1 LIMIT 1',
+      [productId],
+    );
+    if (prodRows.isEmpty) {
+      throw Exception('Product not found: \$productId');
+    }
+    final prod = prodRows.first;
+    final currentQty = (prod['current_quantity'] is num)
+        ? (prod['current_quantity'] as num).toDouble()
+        : double.tryParse(prod['current_quantity']?.toString() ?? '0') ?? 0.0;
+    final productName = prod['product_name']?.toString() ?? '';
+    final prodStoreId = (storeId != null && storeId.isNotEmpty && storeId != 'all')
+        ? storeId
+        : prod['store_id']?.toString();
+
+    final txnDate = (transactionDate != null && transactionDate.trim().isNotEmpty)
+        ? transactionDate.trim()
+        : DateTime.now().toIso8601String().split('T')[0];
+
+    final totalPrice = double.parse((qty * unitPrice).toStringAsFixed(2));
+    final conversion = pcsPerCarton > 0
+        ? pcsPerCarton
+        : ((prod['pcs_per_carton'] is num) ? (prod['pcs_per_carton'] as num).toDouble() : 1.0);
+
+    // 2. Strict Stock Out Check before DB write
+    if (isOut && qty > currentQty) {
+      throw Exception(
+        'Insufficient stock! Available quantity: ${currentQty.toInt()} pieces. You cannot withdraw ${qty.toInt()} pieces. (በቂ እቃ የለም! በመደብሩ ያለው መጠን ${currentQty.toInt()} ብቻ ነው። ${qty.toInt()} መውሰድ አይቻልም።)',
+      );
+    }
+
+    // 3. Atomic Database Update
+    List<Map<String, dynamic>> updatedRows;
+    if (isOut) {
+      updatedRows = await executeSql(
+        '''
+        UPDATE store_inventory
+        SET current_quantity = current_quantity - \$1,
+            unit_price = CASE WHEN \$2 > 0 THEN \$2 ELSE unit_price END,
+            last_transaction_date = \$3,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = \$4 AND current_quantity >= \$1
+        RETURNING *, (current_quantity + \$1) AS previous_qty
+        ''',
+        [qty, unitPrice, txnDate, productId],
+      );
+    } else {
+      updatedRows = await executeSql(
+        '''
+        UPDATE store_inventory
+        SET current_quantity = current_quantity + \$1,
+            cost_price = CASE WHEN \$2 > 0 THEN \$2 ELSE cost_price END,
+            pcs_per_carton = CASE WHEN \$3 > 0 THEN \$3 ELSE pcs_per_carton END,
+            supplier_name = COALESCE(\$4, supplier_name),
+            last_transaction_date = \$5,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = \$6
+        RETURNING *, (current_quantity - \$1) AS previous_qty
+        ''',
+        [qty, unitPrice, conversion, party, txnDate, productId],
+      );
+    }
+
+    if (updatedRows.isEmpty) {
+      if (isOut) {
+        final freshRows = await executeSql('SELECT current_quantity FROM store_inventory WHERE id = \$1', [productId]);
+        final freshQty = freshRows.isNotEmpty
+            ? ((freshRows.first['current_quantity'] is num)
+                ? (freshRows.first['current_quantity'] as num).toDouble()
+                : 0.0)
+            : 0.0;
+        throw Exception(
+          'Insufficient stock! Available quantity: ${freshQty.toInt()} pieces. (በቂ እቃ የለም! በመደብሩ ያለው መጠን ${freshQty.toInt()} ብቻ ነው።)',
+        );
+      }
+      throw Exception('Product update failed');
+    }
+
+    final updatedProd = InventoryProduct.fromJson(updatedRows.first);
+    final prevStock = (updatedRows.first['previous_qty'] is num)
+        ? (updatedRows.first['previous_qty'] as num).toDouble()
+        : (isOut ? updatedProd.currentQuantity + qty : updatedProd.currentQuantity - qty);
+
+    // 4. Insert into stock_movements (immutable audit trail)
+    try {
+      await executeSql(
+        '''
+        INSERT INTO stock_movements (
+          store_id, product_id, movement_type, quantity,
+          transaction_unit, conversion_factor, base_quantity,
+          previous_stock, new_stock, unit_price, total_price,
+          transaction_date, source_type, source_id, destination,
+          note, created_by
+        ) VALUES (
+          \$1, \$2, \$3, \$4,
+          'Pcs', \$5, \$4,
+          \$6, \$7, \$8, \$9,
+          \$10::date, \$11, \$12, \$13,
+          \$14, \$15
+        )
+        ''',
+        [
+          prodStoreId,
+          productId,
+          isOut ? 'OUT' : 'IN',
+          qty,
+          conversion,
+          prevStock,
+          updatedProd.currentQuantity,
+          unitPrice,
+          totalPrice,
+          txnDate,
+          isOut ? 'CUSTOMER' : 'SUPPLIER',
+          isOut ? null : party,
+          isOut ? party : null,
+          note,
+          createdBy,
+        ],
+      );
+    } catch (e) {
+      debugPrint('Warning: stock_movements insert error: \$e');
+    }
+
+    // 5. Also sync to ledger_records table for unified reporting
+    try {
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final ledgerId = 'rec-stock-$nowMs-${productId.substring(0, 4)}';
+      final itemMap = {
+        'id': 'item-$nowMs-1',
+        'name': productName,
+        'unitPrice': unitPrice,
+        'quantity': qty,
+        'sign': isOut ? '-' : '+',
+        'customType': isOut ? 'Stock Out' : 'Goods',
+        'cartons': cartons,
+        'pcsPerCarton': conversion,
+        'packagingUnit': cartons > 0 ? 'Carton' : 'Pcs',
+        'date': txnDate,
+        'notes': note ?? (isOut ? 'Stock Out (Outgoing)' : 'Stock In (Incoming)'),
+      };
+      final ledgerNotes = party != null && party.isNotEmpty
+          ? (isOut ? 'Destination: $party' : 'Supplier: $party')
+          : '';
+
+      await executeSql(
+        '''
+        INSERT INTO ledger_records (
+          id, type, title, date, notes, exchange_rate, items, store_id, created_at, updated_at
+        ) VALUES (
+          \$1, 'stock', \$2, \$3, \$4, 198, \$5::jsonb, \$6, \$7, \$7
+        )
+        ''',
+        [
+          ledgerId,
+          productName,
+          txnDate,
+          ledgerNotes,
+          jsonEncode([itemMap]),
+          prodStoreId,
+          nowMs,
+        ],
+      );
+    } catch (e) {
+      debugPrint('Warning: ledger_records stock sync: \$e');
+    }
+
+    return updatedProd;
+  }
+
+  /// Get transaction history (stock movements) for a specific product
+  static Future<List<StockMovement>> getProductStockMovementsDirect(String productId) async {
+    final rows = await executeSql(
+      '''
+      SELECT sm.*, u.name AS user_name
+      FROM stock_movements sm
+      LEFT JOIN users u ON u.id = sm.created_by
+      WHERE sm.product_id = \$1
+      ORDER BY sm.created_at DESC, sm.id DESC
+      ''',
+      [productId],
+    );
+    return rows.map((r) => StockMovement.fromJson(r)).toList();
+  }
+
+  /// Update metadata of an existing inventory product
+  static Future<InventoryProduct> updateInventoryProductDirect({
+    required String id,
+    String? productName,
+    double? unitPrice,
+    double? costPrice,
+    double? pcsPerCarton,
+    double? minimumStock,
+    String? category,
+    String? supplierName,
+    String? description,
+  }) async {
+    final rows = await executeSql(
+      '''
+      UPDATE store_inventory SET
+        product_name = COALESCE(\$1, product_name),
+        unit_price = COALESCE(\$2, unit_price),
+        cost_price = COALESCE(\$3, cost_price),
+        pcs_per_carton = COALESCE(\$4, pcs_per_carton),
+        minimum_stock = COALESCE(\$5, minimum_stock),
+        category = COALESCE(\$6, category),
+        supplier_name = COALESCE(\$7, supplier_name),
+        description = COALESCE(\$8, description),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = \$9
+      RETURNING *
+      ''',
+      [
+        productName?.trim(),
+        unitPrice,
+        costPrice,
+        pcsPerCarton,
+        minimumStock,
+        category,
+        supplierName,
+        description,
+        id,
+      ],
+    );
+
+    if (rows.isEmpty) {
+      throw Exception('Product not found: \$id');
+    }
+    return InventoryProduct.fromJson(rows.first);
+  }
+
+  /// Delete an inventory product without destroying historical transaction records
+  static Future<void> deleteInventoryProductDirect(String id) async {
+    await executeSql(
+      'UPDATE store_inventory SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = \$1',
+      [id],
+    );
   }
 }

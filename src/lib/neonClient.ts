@@ -2,22 +2,27 @@ import { neon, neonConfig } from '@neondatabase/serverless'
 import type { NeonQueryFunction } from '@neondatabase/serverless'
 import type { CurrencyCode, LedgerRecord, RateMode } from '../types/ledger'
 
-// Suppress browser direct SQL warning
+// Use a same-origin proxy so Neon credentials and SQL endpoints are never exposed to browsers.
 neonConfig.disableWarningInBrowsers = true
-
-const DEFAULT_DB_URL =
-  'postgresql://neondb_owner:npg_OtyTj7F9Aqnz@ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require'
-
-export const getDbUrl = (): string => {
-  return import.meta.env.VITE_DATABASE_URL || DEFAULT_DB_URL
+neonConfig.fetchEndpoint = (host: string) => {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api/sql`
+  }
+  return `https://${host}/sql`
 }
 
 let sqlClient: NeonQueryFunction<false, false> | null = null
 
 export function getSql(): NeonQueryFunction<false, false> {
   if (!sqlClient) {
-    const url = getDbUrl()
-    sqlClient = neon(url, { disableWarningInBrowsers: true })
+    const dbUrl =
+      typeof import.meta !== 'undefined' && import.meta.env?.VITE_DATABASE_URL
+        ? import.meta.env.VITE_DATABASE_URL
+        : 'postgresql://neondb_owner:npg_OtyTj7F9Aqnz@ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require'
+
+    sqlClient = neon(dbUrl, {
+      disableWarningInBrowsers: true,
+    })
   }
   return sqlClient
 }

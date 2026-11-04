@@ -7,8 +7,8 @@ class LedgerRecord {
   final String date;
   final String? notes;
   final List<LineItem> items;
-  final String? shopId;
-  final String? shopName;
+  final String? storeId;
+  final String? storeName;
   final int? createdAt;
   final int? updatedAt;
 
@@ -19,8 +19,8 @@ class LedgerRecord {
     required this.date,
     this.notes,
     required this.items,
-    this.shopId,
-    this.shopName,
+    this.storeId,
+    this.storeName,
     this.createdAt,
     this.updatedAt,
   });
@@ -65,8 +65,8 @@ class LedgerRecord {
     String? date,
     String? notes,
     List<LineItem>? items,
-    String? shopId,
-    String? shopName,
+    String? storeId,
+    String? storeName,
     int? createdAt,
     int? updatedAt,
   }) {
@@ -77,8 +77,8 @@ class LedgerRecord {
       date: date ?? this.date,
       notes: notes ?? this.notes,
       items: items ?? this.items,
-      shopId: shopId ?? this.shopId,
-      shopName: shopName ?? this.shopName,
+      storeId: storeId ?? this.storeId,
+      storeName: storeName ?? this.storeName,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -101,8 +101,8 @@ class LedgerRecord {
           DateTime.now().toIso8601String().split('T')[0],
       notes: json['notes']?.toString(),
       items: itemsList,
-      shopId: json['shopId']?.toString(),
-      shopName: json['shopName']?.toString(),
+      storeId: json['storeId']?.toString(),
+      storeName: json['storeName']?.toString(),
       createdAt:
           json['createdAt'] is num ? (json['createdAt'] as num).toInt() : null,
       updatedAt:
@@ -118,7 +118,7 @@ class LedgerRecord {
       'date': date,
       'notes': notes,
       'items': items.map((i) => i.toJson()).toList(),
-      'shopId': shopId,
+      'storeId': storeId,
     };
   }
 }

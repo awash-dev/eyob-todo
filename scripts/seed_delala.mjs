@@ -16,8 +16,8 @@ async function query(sql, params = []) {
 async function main() {
   console.log('--- Migrating & Seeding Multiple Delala Records ---');
   
-  // 1. Ensure shop_id on esmiz_records
-  await query('ALTER TABLE esmiz_records ADD COLUMN IF NOT EXISTS shop_id VARCHAR(64);');
+  // 1. Ensure store_id on esmiz_records
+  await query('ALTER TABLE esmiz_records ADD COLUMN IF NOT EXISTS store_id VARCHAR(64);');
   
   // 2. Fetch existing esmiz_records
   const records = await query('SELECT * FROM esmiz_records ORDER BY created_at ASC;');
@@ -50,12 +50,12 @@ async function main() {
   }
 
   const all = await query(`
-    SELECT r.id, r.title, r.shop_id, r.created_at,
+    SELECT r.id, r.title, r.store_id, r.created_at,
            COUNT(e.id) as entries_count,
            COALESCE(SUM(e.amount * e.sign), 0) as total_balance
     FROM esmiz_records r
     LEFT JOIN esmiz_entries e ON e.esmiz_id = r.id
-    GROUP BY r.id, r.title, r.shop_id, r.created_at
+    GROUP BY r.id, r.title, r.store_id, r.created_at
     ORDER BY r.created_at ASC;
   `);
   console.log('All Delalas in DB:', all.rows);

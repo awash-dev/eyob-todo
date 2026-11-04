@@ -1,0 +1,543 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import {
+  AlertTriangle,
+  ArrowDownUp,
+  CheckCircle2,
+  Download,
+  Package,
+  PackagePlus,
+  Store,
+  XCircle,
+} from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
+import { useLanguage } from '../../context/LanguageContext'
+import { useLedger } from '../../context/LedgerContext'
+import type { StoreInventoryItem } from '../../types/ledger'
+import { getInventoryProducts } from '../../lib/api'
+import { Button } from '../ui/button'
+import { SmartStockModal } from './SmartStockModal'
+import { StockHistoryModal } from './StockHistoryModal'
+import { EditProductModal } from './EditProductModal'
+import { ProductDetailsModal } from './ProductDetailsModal'
+
+interface StockSpreadsheetViewProps {
+  onOpenMobileMenu?: () => void
+}
+
+export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
+  onOpenMobileMenu,
+}) => {
+  const { activeStoreId, isAdmin } = useAuth()
+  const { t, translateDbText } = useLanguage()
+  const { formatCurrency, showToast, searchQuery } = useLedger()
+
+  // Products from store_inventory master catalog
+  const [products, setProducts] = useState<StoreInventoryItem[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // Modals state
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false)
+  const [stockModalMode, setStockModalMode] = useState<'IN' | 'OUT' | 'REGISTER'>('IN')
+  const [targetProductName, setTargetProductName] = useState<string | undefined>(undefined)
+
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [historyProductId, setHistoryProductId] = useState<string | undefined>(undefined)
+  const [historyProductName, setHistoryProductName] = useState<string | undefined>(undefined)
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<StoreInventoryItem | null>(null)
+
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [viewingProduct, setViewingProduct] = useState<StoreInventoryItem | null>(null)
+
+  // Fetch real-time products catalog from Neon database
+  const loadProducts = useCallback(async () => {
+    setLoading(true)
+    try {
+      const items = await getInventoryProducts(activeStoreId || undefined)
+      setProducts(items)
+    } catch (err) {
+      console.error('Failed to load inventory products:', err)
+      showToast(t('Failed to load inventory products.', 'የዕቃ ክምችት ዝርዝር መጫን አልተቻለም።'), 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [activeStoreId, showToast, t])
+
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
+
+  // Calculate Status: In Stock (> min), Low Stock (<= min && > 0), Out of Stock (<= 0)
+  const getProductStatus = (p: StoreInventoryItem): 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK' => {
+    const qty = Number(p.currentQuantity) || 0
+    const min = Number(p.minimumStock) || 0
+    if (qty <= 0) return 'OUT_OF_STOCK'
+    if (qty <= min) return 'LOW_STOCK'
+    return 'IN_STOCK'
+  }
+
+  // Filtered Products
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const matchName = p.productName.toLowerCase().includes(q)
+        const matchSku = p.sku?.toLowerCase().includes(q) ?? false
+        const matchCategory = p.category?.toLowerCase().includes(q) ?? false
+        const matchSupplier = p.supplierName?.toLowerCase().includes(q) ?? false
+        return matchName || matchSku || matchCategory || matchSupplier
+      }
+
+      return true
+    })
+  }, [products, searchQuery])
+
+  // Modal Handlers
+  const handleOpenStockIn = (productName?: string) => {
+    if (isAdmin) return
+    setTargetProductName(productName)
+    setStockModalMode('IN')
+    setIsStockModalOpen(true)
+  }
+
+  const handleOpenStockOut = (productName?: string) => {
+    if (isAdmin) return
+    setTargetProductName(productName)
+    setStockModalMode('OUT')
+    setIsStockModalOpen(true)
+  }
+
+  const handleOpenRegister = () => {
+    if (isAdmin) return
+    setTargetProductName(undefined)
+    setStockModalMode('REGISTER')
+    setIsStockModalOpen(true)
+  }
+
+  const handleOpenHistory = (prod?: StoreInventoryItem) => {
+    if (prod) {
+      setHistoryProductId(prod.id)
+      setHistoryProductName(prod.productName)
+    } else {
+      setHistoryProductId(undefined)
+      setHistoryProductName(undefined)
+    }
+    setIsHistoryModalOpen(true)
+  }
+
+  const handleOpenEdit = (prod: StoreInventoryItem) => {
+    if (isAdmin) return
+    setEditingProduct(prod)
+    setIsEditModalOpen(true)
+  }
+
+  const handleOpenDetails = (prod: StoreInventoryItem) => {
+    setViewingProduct(prod)
+    setIsDetailsModalOpen(true)
+  }
+
+  const handleCloseDetails = () => {
+    setIsDetailsModalOpen(false)
+    setViewingProduct(null)
+  }
+
+  // Export to CSV
+  const handleExportCsv = () => {
+    const headers = [
+      'No',
+      'Product Name',
+      'SKU',
+      'Current On-Hand Stock',
+      'Unit',
+      'Packaging Breakdown',
+      'Cost Price (ETB)',
+      'Selling Price (ETB)',
+      'Total Value (ETB)',
+      'Status',
+      'Supplier',
+    ]
+
+    const rows = filteredProducts.map((p, idx) => {
+      const qty = Number(p.currentQuantity) || 0
+      const cost = Number(p.costPrice) || 0
+      const pcsPerCtn = Number(p.pcsPerCarton) || 1
+      const ctns = pcsPerCtn > 1 ? Math.floor(qty / pcsPerCtn) : 0
+      const remPcs = pcsPerCtn > 1 ? qty % pcsPerCtn : 0
+      const packaging =
+        pcsPerCtn > 1
+          ? `${ctns} ctns + ${remPcs} pcs (${pcsPerCtn}/ctn)`
+          : `Direct ${p.baseUnit}`
+
+      const status = getProductStatus(p)
+      const statusLabel =
+        status === 'IN_STOCK' ? 'In Stock' : status === 'LOW_STOCK' ? 'Low Stock' : 'Out of Stock'
+
+      return [
+        String(idx + 1),
+        `"${p.productName.replace(/"/g, '""')}"`,
+        `"${p.sku || ''}"`,
+        String(qty),
+        `"${p.baseUnit}"`,
+        `"${packaging}"`,
+        cost.toFixed(2),
+        (Number(p.unitPrice) || 0).toFixed(2),
+        (qty * cost).toFixed(2),
+        `"${statusLabel}"`,
+        `"${(p.supplierName || '').replace(/"/g, '""')}"`,
+      ]
+    })
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,\uFEFF' +
+      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute('download', `inventory_products_${Date.now()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Action / Toolbar Header */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2 bg-white text-black rounded-lg border border-zinc-300 shadow-2xs">
+        <div className="flex items-center gap-2">
+          {onOpenMobileMenu && (
+            <button
+              type="button"
+              onClick={onOpenMobileMenu}
+              className="md:hidden p-2 rounded bg-zinc-100 hover:bg-zinc-200 text-black shrink-0 flex items-center justify-center cursor-pointer border border-zinc-300"
+              title={t('Open menu', 'ሜኑ ክፈት')}
+            >
+              <Store size={16} />
+            </button>
+          )}
+          <span className="text-sm font-bold text-foreground">
+            {t('Store & Stock Inventory', 'የመደብርና ዕቃዎች ክምችት')}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {!isAdmin && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenStockIn()}
+                className="text-xs h-8 rounded-lg border-zinc-300 hover:bg-zinc-100 font-semibold cursor-pointer"
+              >
+                <ArrowDownUp size={14} className="mr-1" />
+                <span>{t('Stock Movement', 'የዕቃ ዝውውር')}</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleOpenRegister}
+                className="text-xs h-8 rounded-lg bg-zinc-900 text-white hover:bg-zinc-800 font-semibold cursor-pointer"
+              >
+                <PackagePlus size={14} className="mr-1" />
+                <span>{t('New Product', 'አዲስ ዕቃ')}</span>
+              </Button>
+            </>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExportCsv}
+            className="text-xs h-8 rounded-lg border-zinc-300 hover:bg-zinc-100 font-semibold cursor-pointer"
+            title={t('Export as CSV', 'በCSV አውርድ')}
+          >
+            <Download size={14} className="mr-1" />
+            <span>{t('Export CSV', 'CSV አውርድ')}</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* ===================================================================== */}
+      {/* REAL INVENTORY PRODUCTS TABLE (ONLY STORE LIST VIEW MODE)             */}
+      {/* ===================================================================== */}
+      {loading ? (
+        <div className="p-10 text-center rounded-2xl bg-card border border-zinc-200 dark:border-zinc-800 shadow-xs my-4">
+          <p className="text-sm font-semibold text-muted-foreground">
+            {t('Loading stock inventory...', 'የክምችት ዝርዝር በመጫን ላይ...')}
+          </p>
+        </div>
+      ) : filteredProducts.length > 0 ? (
+        <div className="bg-card rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead>
+                {/* Totals summary row (moved to top of table) */}
+                <tr className="bg-zinc-100 dark:bg-zinc-800/90 font-bold text-xs text-foreground border-b-2 border-zinc-300 dark:border-zinc-600">
+                  <td colSpan={3} className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-700 font-black">
+                    {t('Total Products:', 'ጠቅላላ ምርቶች:')} {filteredProducts.length}
+                  </td>
+                  <td className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-700 font-black">
+                    {filteredProducts.reduce((sum, p) => sum + (Number(p.currentQuantity) || 0), 0).toLocaleString()}
+                  </td>
+                  <td className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-700 text-muted-foreground">
+                    {t('Units', 'ፍሬ / ዩኒት')}
+                  </td>
+                  <td className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-700 text-muted-foreground uppercase text-[10px] font-bold">
+                    {t('Total Inventory Valuation:', 'ጠቅላላ የክምችት ዋጋ:')}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-sm font-black text-blue-600 dark:text-blue-400 border-r border-zinc-200 dark:border-zinc-700">
+                    {formatCurrency(
+                      filteredProducts.reduce(
+                        (sum, p) => sum + (Number(p.currentQuantity) || 0) * (Number(p.costPrice) || 0),
+                        0
+                      )
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 text-center text-muted-foreground text-[10px]">
+                    {t('✓ Real Inventory', '✓ ትክክለኛ ክምችት')}
+                  </td>
+                </tr>
+                <tr className="bg-zinc-100 dark:bg-zinc-800/80 text-foreground font-bold border-b border-zinc-200 dark:border-zinc-700">
+                  <th className="py-2.5 px-3 w-10 text-center border-r border-zinc-200 dark:border-zinc-700">
+                    #
+                  </th>
+                  <th className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-700">
+                    {t('Product Name', 'የምርት ስም')}
+                  </th>
+                  <th className="py-2.5 px-3 w-32 border-r border-zinc-200 dark:border-zinc-700">
+                    {t('SKU / Code', 'የዕቃ መለያ')}
+                  </th>
+                  <th className="py-2.5 px-3 w-36 text-right border-r border-zinc-200 dark:border-zinc-700">
+                    {t('Current On-Hand', 'ያለ ክምችት')}
+                  </th>
+                  <th className="py-2.5 px-3 w-24 border-r border-zinc-200 dark:border-zinc-700">
+                    {t('Unit', 'መለኪያ')}
+                  </th>
+                  <th className="py-2.5 px-3 w-32 text-right border-r border-zinc-200 dark:border-zinc-700">
+                    {t('Purchase Price', 'የግዢ ዋጋ')}
+                  </th>
+                  <th className="py-2.5 px-3 w-32 text-right border-r border-zinc-200 dark:border-zinc-700">
+                    {t('Selling Price', 'የሽያጭ ዋጋ')}
+                  </th>
+                  <th className="py-2.5 px-3 w-32 text-center border-r border-zinc-200 dark:border-zinc-700">
+                    {t('Stock Status', 'ሁኔታ')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {filteredProducts.map((p, idx) => {
+                  const qty = Number(p.currentQuantity) || 0
+                  const cost = Number(p.costPrice) || 0
+                  const price = Number(p.unitPrice) || 0
+                  const status = getProductStatus(p)
+                  const pcsPerCtn = Number(p.pcsPerCarton) || 1
+                  const ctns = pcsPerCtn > 1 ? Math.floor(qty / pcsPerCtn) : 0
+                  const remPcs = pcsPerCtn > 1 ? qty % pcsPerCtn : 0
+
+                  return (
+                    <tr
+                      key={p.id}
+                      className={
+                        idx % 2 === 0
+                          ? 'bg-background hover:bg-muted/30 transition-colors'
+                          : 'bg-zinc-50/60 dark:bg-zinc-900/30 hover:bg-muted/30 transition-colors'
+                      }
+                    >
+                      {/* # */}
+                      <td className="py-2.5 px-3 text-center text-muted-foreground border-r border-zinc-200 dark:border-zinc-800 font-medium">
+                        {idx + 1}
+                      </td>
+
+                      {/* Product Name */}
+                      <td className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-800">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleOpenDetails(p)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              handleOpenDetails(p)
+                            }
+                          }}
+                          className="font-extrabold text-foreground text-sm tracking-tight cursor-pointer hover:text-primary hover:underline underline-offset-2"
+                          title={t('View product details', 'የምርት ዝርዝሮችን ተመልከት')}
+                        >
+                          {translateDbText(p.productName)}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground">
+                          <span className="bg-muted px-1.5 py-0.5 rounded font-medium">
+                            {translateDbText(p.category || 'General')}
+                          </span>
+                          {p.supplierName && (
+                            <span className="truncate max-w-[150px]">
+                              • {t('Supplier:', 'አቅራቢ:')} {translateDbText(p.supplierName)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* SKU / Code */}
+                      <td className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-800">
+                        <span className="font-mono text-xs font-semibold bg-muted/70 px-2 py-0.5 rounded border border-zinc-200/60 dark:border-zinc-700/60 text-foreground">
+                          {p.sku || 'N/A'}
+                        </span>
+                      </td>
+
+                      {/* Current On-Hand Stock */}
+                      <td className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-800">
+                        <div
+                          className={`text-base font-black tracking-tight ${
+                            status === 'IN_STOCK'
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : status === 'LOW_STOCK'
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-rose-600 dark:text-rose-400'
+                          }`}
+                        >
+                          {qty.toLocaleString()}
+                        </div>
+                        {pcsPerCtn > 1 && (
+                          <div className="text-[10px] text-muted-foreground font-medium">
+                            {ctns > 0 ? `${ctns} ${t('ctns', 'ካርቶን')}` : ''} {remPcs > 0 ? `+ ${remPcs} ${t('pcs', 'ፍሬ')}` : ''}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Unit */}
+                      <td className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-800 font-medium text-foreground">
+                        {translateDbText(p.baseUnit || 'Pieces')}
+                      </td>
+
+                      {/* Purchase Price */}
+                      <td className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-800 font-semibold text-foreground">
+                        {formatCurrency(cost)}
+                      </td>
+
+                      {/* Selling Price */}
+                      <td className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-800 font-semibold text-foreground">
+                        {formatCurrency(price)}
+                      </td>
+
+                      {/* Stock Status Badge */}
+                      <td className="py-2.5 px-3 text-center border-r border-zinc-200 dark:border-zinc-800">
+                        {status === 'IN_STOCK' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <CheckCircle2 size={12} />
+                            <span>{t('In Stock', 'ክምችት አለ')}</span>
+                          </span>
+                        ) : status === 'LOW_STOCK' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            <AlertTriangle size={12} />
+                            <span>{t('Low Stock', 'አነስተኛ ክምችት')}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                            <XCircle size={12} />
+                            <span>{t('Out of Stock', 'ያለቀ')}</span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* Empty State */
+        <div className="p-10 text-center rounded-2xl bg-card border border-zinc-200 dark:border-zinc-800 shadow-xs my-4">
+          <div className="w-12 h-12 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center mx-auto mb-3">
+            <Package size={24} />
+          </div>
+          <h3 className="text-base font-bold text-foreground">
+            {searchQuery
+              ? t('No matching products found', 'ምንም የተገኘ ምርት የለም')
+              : t('No products registered in this store yet', 'በዚህ መደብር የተመዘገበ ምርት የለም')}
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1 mb-5">
+            {isAdmin
+              ? t(
+                  'Products and stock levels will appear here once registered by assigned storekeepers.',
+                  'ምርቶች በመደብር ኃላፊዎች ሲመዘገቡ እዚህ ይታያሉ።'
+                )
+              : t(
+                  'Register your products to track real-time inventory, on-hand balances, and strict Stock In/Out movements.',
+                  'ምርቶችዎን በመመዝገብ ትክክለኛ የክምችት መጠንና የዕቃ ገቢ/ወጪ ዝውውሮችን ያስተዳድሩ።'
+                )}
+          </p>
+          {!isAdmin && (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                size="sm"
+                onClick={handleOpenRegister}
+                className="text-xs font-semibold h-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-xs"
+              >
+                <PackagePlus size={14} className="mr-1" />
+                <span>{t('Register First Product', 'የመጀመሪያውን ምርት መዝግብ')}</span>
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Smart Stock In / Stock Out / Register Modal */}
+      <SmartStockModal
+        isOpen={isStockModalOpen}
+        initialMode={stockModalMode}
+        preselectedProductName={targetProductName}
+        onClose={() => {
+          setIsStockModalOpen(false)
+          setTargetProductName(undefined)
+        }}
+        onSuccess={() => loadProducts()}
+      />
+
+      {/* Stock History Audit Trail Modal */}
+      <StockHistoryModal
+        isOpen={isHistoryModalOpen}
+        productId={historyProductId}
+        productName={historyProductName}
+        onClose={() => {
+          setIsHistoryModalOpen(false)
+          setHistoryProductId(undefined)
+          setHistoryProductName(undefined)
+        }}
+      />
+
+      {/* Edit Product Modal */}
+      <EditProductModal
+        isOpen={isEditModalOpen}
+        product={editingProduct}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setEditingProduct(null)
+        }}
+        onSuccess={() => loadProducts()}
+      />
+
+      {/* Product Details Modal */}
+      <ProductDetailsModal
+        isOpen={isDetailsModalOpen}
+        product={viewingProduct}
+        onClose={handleCloseDetails}
+        onStockIn={(prod) => {
+          handleCloseDetails()
+          handleOpenStockIn(prod.productName)
+        }}
+        onStockOut={(prod) => {
+          handleCloseDetails()
+          handleOpenStockOut(prod.productName)
+        }}
+        onHistory={(prod) => {
+          handleCloseDetails()
+          handleOpenHistory(prod)
+        }}
+        onEdit={(prod) => {
+          handleCloseDetails()
+          handleOpenEdit(prod)
+        }}
+      />
+    </div>
+  )
+}

@@ -7,10 +7,10 @@ import { AdminPanel } from '../admin/AdminPanel'
 export const Navbar: React.FC = () => {
   const {
     user,
-    shops,
-    activeShopId,
-    activeShop,
-    setActiveShopId,
+    stores,
+    activeStoreId,
+    activeStore,
+    setActiveStoreId,
     isAdmin,
     logout,
   } = useAuth()
@@ -22,7 +22,7 @@ export const Navbar: React.FC = () => {
   return (
     <header className="sticky top-0 z-30 w-full bg-card/95 backdrop-blur-sm border-b border-zinc-100/80 dark:border-zinc-800/80 shadow-xs no-print">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        {/* Account / shop / settings bar */}
+        {/* Account / store / settings bar */}
         <div className="flex items-center justify-between gap-2 h-12">
           {/* Left: Mobile Brand / Desktop Context */}
           <div className="flex items-center gap-2 min-w-0">
@@ -34,45 +34,45 @@ export const Navbar: React.FC = () => {
                 {t('Merkato Credit Record', 'መርካቶ የሂሳብ መዝገብ')}
               </span>
               <span className="text-[10px] text-muted-foreground hidden sm:block truncate">
-                {isAdmin ? t('Central Admin', 'ዋና አስተዳዳሪ') : activeShop?.name || t('Shop', 'ሱቅ')}
+                {isAdmin ? t('Central Admin', 'ዋና አስተዳዳሪ') : activeStore?.name || t('Store', 'ሱቅ')}
               </span>
             </div>
           </div>
 
-          {/* Right: Actions, Shop Selector, Language Switcher, Settings & Profile */}
+          {/* Right: Actions, Store Selector, Language Switcher, Settings & Profile */}
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-            {/* Shop Selector for Admin */}
-            {isAdmin && shops.length > 0 && (
+            {/* Store Selector for Admin */}
+            {isAdmin && stores.length > 0 && (
               <div className="flex items-center gap-1 min-w-0">
                 <Store size={14} className="text-muted-foreground hidden lg:inline" />
                 <select
-                  value={activeShopId || 'all'}
-                  onChange={(event) => setActiveShopId(event.target.value)}
+                  value={activeStoreId || 'all'}
+                  onChange={(event) => setActiveStoreId(event.target.value)}
                   className="h-8 max-w-[130px] sm:max-w-[200px] rounded-xl border border-input bg-background px-2 text-[11px] font-semibold text-foreground cursor-pointer"
-                  title={t('Select shop or combined view', 'ሱቅ ይምረጡ ወይም ሁሉንም ይመልከቱ')}
+                  title={t('Select store or combined view', 'ሱቅ ይምረጡ ወይም ሁሉንም ይመልከቱ')}
                 >
                   <option value="all">
-                    🌐 {t('All Shops (Combined)', 'ሁሉም ሱቆች')}
+                    🌐 {t('All Stores (Combined)', 'ሁሉም ሱቆች')}
                   </option>
-                  {shops.map((shop) => (
-                    <option key={shop.id} value={shop.id}>
-                      {shop.name}
+                  {stores.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
                     </option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Shopkeepers Button for Admin */}
+            {/* Storekeepers Button for Admin */}
             {isAdmin && (
               <button
                 type="button"
                 onClick={() => setIsAdminPanelOpen(true)}
                 className="h-8 px-2.5 rounded-xl bg-muted/60 hover:bg-muted text-[11px] font-semibold text-foreground inline-flex items-center gap-1 cursor-pointer transition-colors"
-                title={t('Create and assign shopkeeper accounts', 'ሱቅ ጠባቂዎችን ያስተዳድሩ')}
+                title={t('Create and assign storekeeper accounts', 'ሱቅ ጠባቂዎችን ያስተዳድሩ')}
               >
                 <Users size={14} />
-                <span className="hidden md:inline">{t('Shopkeepers', 'ሱቅ ጠባቂዎች')}</span>
+                <span className="hidden md:inline">{t('Storekeepers', 'ሱቅ ጠባቂዎች')}</span>
               </button>
             )}
 

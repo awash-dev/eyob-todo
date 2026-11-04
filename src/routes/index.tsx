@@ -1,4 +1,4 @@
-import { CircleX, FolderOpen, Menu, Plus, Search, Store } from 'lucide-react'
+import { CircleX, FolderOpen, Menu, Plus, Search } from 'lucide-react'
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { LedgerProvider, useLedger } from '../context/LedgerContext'
@@ -8,9 +8,11 @@ import { Sidebar } from '../components/layout/Sidebar'
 import { MobileBottomNav } from '../components/layout/MobileBottomNav'
 import { RecordCard } from '../components/ledger/RecordCard'
 import { RecordModal } from '../components/ledger/RecordModal'
+import { PaymentTransactionModal } from '../components/ledger/PaymentTransactionModal'
 import { PrintView } from '../components/ledger/PrintView'
 import { ToastContainer } from '../components/ledger/ToastContainer'
-import { DelalaSpreadsheet } from '../components/ledger/DelalaSpreadsheet'
+import { StockSpreadsheetView } from '../components/ledger/StockSpreadsheetView'
+import { TranslatorToolModal } from '../components/layout/TranslatorToolModal'
 import { Button } from '../components/ui/button'
 import { calculateItemTotal } from '../lib/formatters'
 
@@ -21,16 +23,18 @@ export const Route = createFileRoute('/')({
 })
 
 function AppContentWrapper() {
-  const { activeShopId } = useAuth()
+  const { activeStoreId, user } = useAuth()
+  const effectiveStoreId =
+    user?.role === 'storekeeper' ? user.storeId || activeStoreId : activeStoreId
   return (
-    <LedgerProvider key={activeShopId || 'no-shop'}>
+    <LedgerProvider key={effectiveStoreId || 'no-store'}>
       <MainAppView />
     </LedgerProvider>
   )
 }
 
 function MainAppView() {
-  const { activeShop } = useAuth()
+  const { user } = useAuth()
   const { t } = useLanguage()
   const [sortBy] = useState<
     'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
@@ -43,6 +47,7 @@ function MainAppView() {
     searchQuery,
     setSearchQuery,
     openCreateModal,
+    openPaymentModal,
   } = useLedger()
 
   // Sort filtered records
@@ -71,7 +76,7 @@ function MainAppView() {
     customer: t('customers', 'ደንበኞች'),
     supplier: t('suppliers', 'አቅራቢዎች'),
     stock: t('stock items', 'የመደብር ዕቃዎች'),
-    delala: t('delala brokers', 'ደላላ'),
+    delala: t('brokers', 'ደላላ'),
   }[activeTab]
 
   return (
@@ -81,42 +86,30 @@ function MainAppView() {
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col md:ml-64">
         {/* Main Container - Padded for mobile bottom nav bar */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-5 pb-24 md:pb-12 no-print">
 
-        {activeTab === 'delala' ? (
-          <DelalaSpreadsheet onOpenMobileMenu={() => setIsMobileSidebarOpen(true)} />
+        {user?.role === 'storekeeper' || activeTab === 'stock' ? (
+          <StockSpreadsheetView onOpenMobileMenu={() => setIsMobileSidebarOpen(true)} />
         ) : (
           <>
-            {activeTab === 'stock' && activeShop && (
-              <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 ring-1 ring-blue-200/60 dark:ring-blue-900/40 text-[11px]">
-                <Store size={14} className="text-blue-600 dark:text-blue-300" />
-                <span className="text-blue-800 dark:text-blue-200">
-                  {t('Store:', 'መደብር:')} <strong>{activeShop.name}</strong>
-                </span>
-                <span className="text-blue-600/70 dark:text-blue-300/70 ml-auto hidden sm:inline">
-                  {t('Stock products are saved to this shop only', 'የዕቃ ክምችቶች በዚህ ሱቅ ብቻ ይቀመጣሉ')}
-                </span>
-              </div>
-            )}
-
-            {/* Modern Unified Command & Action Bar */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 mb-4 p-1.5 sm:p-2 bg-card rounded-2xl shadow-xs ring-1 ring-zinc-950/5 dark:ring-white/5">
+            {/* Clean Command & Action Bar */}
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 mb-5 p-2 bg-white text-black rounded-lg border border-zinc-300 shadow-2xs">
               {/* Left: Mobile Menu Toggle + Clean Integrated Search */}
               <div className="flex items-center gap-2 flex-1">
                 <button
                   type="button"
                   onClick={() => setIsMobileSidebarOpen(true)}
-                  className="md:hidden p-2 rounded-xl bg-muted/60 hover:bg-muted text-foreground shrink-0 flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="md:hidden p-2 rounded bg-zinc-100 hover:bg-zinc-200 text-black shrink-0 flex items-center justify-center cursor-pointer border border-zinc-300"
                   title={t('Open menu', 'ሜኑ ክፈት')}
                 >
-                  <Menu size={18} />
+                  <Menu size={16} />
                 </button>
 
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none text-muted-foreground">
-                    <Search size={16} />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none text-zinc-500">
+                    <Search size={15} />
                   </span>
                   <input
                     type="text"
@@ -126,15 +119,15 @@ function MainAppView() {
                     )}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-transparent rounded-xl transition-colors focus:outline-none placeholder:text-muted-foreground/70"
+                    className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-white text-black rounded border border-zinc-300 focus:outline-none focus:ring-1 focus:ring-black placeholder:text-zinc-500"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded-md flex items-center justify-center cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-black p-1 rounded flex items-center justify-center cursor-pointer"
                       title={t('Clear search', 'ፍለጋውን አጽዳ')}
                     >
-                      <CircleX size={16} />
+                      <CircleX size={15} />
                     </button>
                   )}
                 </div>
@@ -143,16 +136,24 @@ function MainAppView() {
               {/* Right: Add Entry Button */}
               <div className="flex items-center gap-2 shrink-0">
                 <Button
-                  onClick={() => openCreateModal(activeTab)}
+                  onClick={() => {
+                    if (activeTab === 'customer' || activeTab === 'supplier' || activeTab === 'delala') {
+                      openPaymentModal(activeTab)
+                    } else {
+                      openCreateModal(activeTab)
+                    }
+                  }}
                   size="sm"
-                  className="text-xs font-semibold shadow-xs flex items-center gap-1.5 h-8 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+                  className="text-xs font-semibold shadow-2xs flex items-center gap-1.5 h-9 px-3.5 rounded bg-black hover:bg-zinc-800 text-white cursor-pointer"
                 >
-                  <Plus size={16} />
+                  <Plus size={15} />
                   <span>
                     {activeTab === 'customer'
-                      ? t('Add Customer Entry', 'አዲስ የደንበኛ መዝገብ')
+                      ? t('+ Record Credit / Payment', '+ የደንበኛ ሂሳብ / ክፍያ መዝግብ')
                       : activeTab === 'supplier'
-                      ? t('Add Supplier Entry', 'አዲስ የአቅራቢ መዝገብ')
+                      ? t('+ Record Purchase / Payment', '+ የአቅራቢ ሂሳብ / ክፍያ መዝግብ')
+                      : activeTab === 'delala'
+                      ? t('+ Record Broker Transaction', '+ የደላላ ሂሳብ / ክፍያ መዝግብ')
                       : t('Add Stock Entry', 'አዲስ የመደብር መዝገብ')}
                   </span>
                 </Button>
@@ -219,7 +220,13 @@ function MainAppView() {
                   ) : (
                     <Button
                       size="sm"
-                      onClick={() => openCreateModal(activeTab)}
+                      onClick={() => {
+                        if (activeTab === 'customer' || activeTab === 'supplier' || activeTab === 'delala') {
+                          openPaymentModal(activeTab)
+                        } else {
+                          openCreateModal(activeTab)
+                        }
+                      }}
                       className="font-semibold shadow-xs text-xs h-8 rounded-xl flex items-center gap-1.5"
                     >
                       <Plus size={16} />
@@ -238,7 +245,9 @@ function MainAppView() {
 
       {/* Modals & Portals */}
       <RecordModal />
+      <PaymentTransactionModal />
       <ToastContainer />
+      <TranslatorToolModal />
 
         {/* Print View (visible only during browser printing) */}
         <PrintView />

@@ -19,13 +19,37 @@ const sql = neon(url)
 const schema = readFileSync(join(here, 'schema.sql'), 'utf8')
 
 // Strip line comments, then run each statement separately.
-const statements = schema
-  .split('\n')
-  .filter((line) => !line.trimStart().startsWith('--'))
-  .join('\n')
-  .split(';')
-  .map((s) => s.trim())
-  .filter(Boolean)
+// Dollar-quoted bodies (DO $$ ... $$) may contain semicolons, so statement
+// splitting must ignore ";" while inside a $$ ... $$ block.
+function splitStatements(sqlText) {
+  const withoutComments = sqlText
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('--'))
+    .join('\n')
+
+  const statements = []
+  let current = ''
+  let inDollar = false
+  for (let i = 0; i < withoutComments.length; i++) {
+    const ch = withoutComments[i]
+    if (ch === '$' && withoutComments[i + 1] === '$') {
+      inDollar = !inDollar
+      current += '$$'
+      i++
+      continue
+    }
+    if (ch === ';' && !inDollar) {
+      if (current.trim()) statements.push(current.trim())
+      current = ''
+      continue
+    }
+    current += ch
+  }
+  if (current.trim()) statements.push(current.trim())
+  return statements
+}
+
+const statements = splitStatements(schema)
 
 try {
   for (const statement of statements) {

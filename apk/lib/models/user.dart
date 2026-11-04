@@ -3,9 +3,9 @@ class AppUser {
   final String name;
   final String? email;
   final String? phone; // login identifier (e.g. +2519...)
-  final String role; // 'admin' | 'shopkeeper'
-  final String? shopId;
-  final String? shopName;
+  final String role; // 'admin' | 'storekeeper'
+  final String? storeId;
+  final String? storeName;
   final bool active;
 
   AppUser({
@@ -14,13 +14,13 @@ class AppUser {
     this.email,
     this.phone,
     required this.role,
-    this.shopId,
-    this.shopName,
+    this.storeId,
+    this.storeName,
     this.active = true,
   });
 
   bool get isAdmin => role == 'admin';
-  bool get isShopkeeper => role == 'shopkeeper';
+  bool get isStorekeeper => role == 'storekeeper';
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
     return AppUser(
@@ -28,9 +28,9 @@ class AppUser {
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString(),
       phone: json['phone']?.toString(),
-      role: json['role']?.toString() ?? 'shopkeeper',
-      shopId: json['shopId']?.toString(),
-      shopName: json['shopName']?.toString(),
+      role: json['role']?.toString() ?? 'storekeeper',
+      storeId: json['storeId']?.toString(),
+      storeName: json['storeName']?.toString(),
       active: json['active'] != false,
     );
   }
@@ -42,8 +42,8 @@ class AppUser {
       'email': email,
       'phone': phone,
       'role': role,
-      'shopId': shopId,
-      'shopName': shopName,
+      'storeId': storeId,
+      'storeName': storeName,
       'active': active,
     };
   }

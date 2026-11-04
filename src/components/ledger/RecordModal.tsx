@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import React, { useState, useEffect, useRef } from 'react'
 import { useLedger } from '../../context/LedgerContext'
+import { useLanguage } from '../../context/LanguageContext'
 import type { LineItem, SignType } from '../../types/ledger'
 import { ETHIOPIAN_BANKS } from '../../lib/bankUtils'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
@@ -36,6 +37,7 @@ export const RecordModal: React.FC = () => {
     deleteRecord,
     formatCurrency,
   } = useLedger()
+  const { t } = useLanguage()
 
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
@@ -241,10 +243,10 @@ export const RecordModal: React.FC = () => {
         return {
           header:
             modalMode === 'create'
-              ? 'New Customer Entry'
-              : 'Edit Customer Entry',
+              ? t('New Customer Entry', 'አዲስ የደንበኛ መዝገብ')
+              : t('Edit Customer Entry', 'የደንበኛ መዝገብ አስተካክል'),
           placeholder: 'John Doe',
-          badge: 'Customer Credit',
+          badge: t('Customer Credit', 'የደንበኛ ሂሳብ'),
           badgeColor:
             'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
           Icon: Users,
@@ -253,10 +255,10 @@ export const RecordModal: React.FC = () => {
         return {
           header:
             modalMode === 'create'
-              ? 'New Supplier Entry'
-              : 'Edit Supplier Entry',
+              ? t('New Supplier Entry', 'አዲስ የአቅራቢ መዝገብ')
+              : t('Edit Supplier Entry', 'የአቅራቢ መዝገብ አስተካክል'),
           placeholder: 'John Doe',
-          badge: 'Supplier Credit',
+          badge: t('Supplier Credit', 'የአቅራቢ ሂሳብ'),
           badgeColor:
             'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
           Icon: Building2,
@@ -265,10 +267,10 @@ export const RecordModal: React.FC = () => {
         return {
           header:
             modalMode === 'create'
-              ? 'New Delala Entry'
-              : 'Edit Delala Entry',
-          placeholder: 'John Doe',
-          badge: 'Delala Credit',
+              ? t('New Delala Entry', 'አዲስ የደላላ መዝገብ')
+              : t('Edit Delala Entry', 'የደላላ መዝገብ አስተካክል'),
+          placeholder: t('Delala Name (e.g. Mohammed, Ahmed)', 'የደላላ ስም (ለምሳሌ፦ መሀመድ፣ አህመድ)'),
+          badge: t('Delala Credit', 'የደላላ ሂሳብ'),
           badgeColor:
             'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
           Icon: Handshake,
@@ -276,9 +278,11 @@ export const RecordModal: React.FC = () => {
       case 'stock':
         return {
           header:
-            modalMode === 'create' ? 'New Stock Entry' : 'Edit Stock Entry',
+            modalMode === 'create'
+              ? t('New Stock Entry', 'አዲስ የመደብር መዝገብ')
+              : t('Edit Stock Entry', 'የመደብር መዝገብ አስተካክል'),
           placeholder: 'Stock Lot / Account (e.g. KELIL AGINBI - Electrical & LED Lighting)',
-          badge: 'Stock & Inventory',
+          badge: t('Stock & Inventory', 'የመደብር ዕቃዎች'),
           badgeColor:
             'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
           Icon: Layers,
@@ -291,18 +295,18 @@ export const RecordModal: React.FC = () => {
   const isStockTab = activeTab === 'stock'
   const lineLabels = isStockTab
     ? {
-        type: 'Bank / Stock Type',
-        item: 'Item / Description',
-        unitPrice: 'Unit Cost',
-        quantity: 'Total Qty',
-        amount: 'Total Value',
+        type: t('Bank / Stock Type', 'ባንክ / አይነት'),
+        item: t('Item / Description', 'ዕቃ / ዝርዝር'),
+        unitPrice: t('Unit Cost', 'የአንዱ ዋጋ'),
+        quantity: t('Total Qty', 'ጠቅላላ ብዛት'),
+        amount: t('Total Value', 'ጠቅላላ ዋጋ'),
       }
     : {
-        type: 'Bank / Type',
-        item: 'Item / Description',
-        unitPrice: 'Unit Price',
-        quantity: 'Qty',
-        amount: 'Amount',
+        type: t('Bank / Type', 'ባንክ / አይነት'),
+        item: t('Item / Description', 'ዕቃ / ዝርዝር'),
+        unitPrice: t('Unit Price', 'የአንዱ ዋጋ'),
+        quantity: t('Qty', 'ብዛት'),
+        amount: t('Amount', 'መጠን'),
       }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -832,7 +836,7 @@ export const RecordModal: React.FC = () => {
                   onClick={() => {
                     if (
                       window.confirm(
-                        `Are you sure you want to delete "${editingRecord.title}"?`,
+                        t(`Are you sure you want to delete "${editingRecord.title}"?`, `እርግጠኛ ነዎት "${editingRecord.title}"ን መሰረዝ ይፈልጋሉ?`),
                       )
                     ) {
                       deleteRecord(editingRecord.id)
@@ -842,7 +846,7 @@ export const RecordModal: React.FC = () => {
                   className="text-xs h-8 px-2.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-700 cursor-pointer flex items-center gap-1"
                 >
                   <Trash2 size={13} />
-                  <span>Delete</span>
+                  <span>{t('Delete', 'ሰርዝ')}</span>
                 </Button>
               )}
               <Button
@@ -851,14 +855,16 @@ export const RecordModal: React.FC = () => {
                 onClick={closeModal}
                 className="text-xs h-8 px-3 rounded-lg cursor-pointer"
               >
-                Cancel
+                {t('Cancel', 'ተመለስ')}
               </Button>
               <Button
                 type="submit"
                 size="sm"
                 className="text-xs font-semibold h-8 px-4 rounded-lg shadow-xs cursor-pointer whitespace-nowrap"
               >
-                {modalMode === 'edit' ? 'Save Changes' : 'Create Entry'}
+                {modalMode === 'edit'
+                  ? t('Save Changes', 'ለውጦችን አስቀምጥ')
+                  : t('Create Entry', 'መዝገቡን ፍጠር')}
               </Button>
             </div>
           </div>

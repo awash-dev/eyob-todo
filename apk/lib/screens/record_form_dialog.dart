@@ -8,14 +8,14 @@ class RecordFormDialog extends StatefulWidget {
   final String activeTab; // 'customer' | 'supplier' | 'stock' | 'delala'
   final LedgerRecord? editingRecord;
   final List<LedgerRecord>? existingRecords;
-  final String? shopId;
+  final String? storeId;
 
   const RecordFormDialog({
     super.key,
     required this.activeTab,
     this.editingRecord,
     this.existingRecords,
-    this.shopId,
+    this.storeId,
   });
 
   @override
@@ -181,11 +181,33 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
   }
 
   Future<void> _pickDate() async {
+    FocusScope.of(context).unfocus();
+    DateTime initial = _selectedDate;
+    try {
+      final t = _dateController.text.trim();
+      final p1 = DateTime.tryParse(t);
+      if (p1 != null) {
+        initial = p1;
+      } else if (t.contains('/')) {
+        final parts = t.split('/');
+        if (parts.length == 3) {
+          final d = int.tryParse(parts[0]);
+          final m = int.tryParse(parts[1]);
+          final y = int.tryParse(parts[2]);
+          if (d != null && m != null && y != null && y >= 1970 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+            initial = DateTime(y, m, d);
+          }
+        }
+      }
+    } catch (_) {}
+    if (initial.isBefore(DateTime(1970)) || initial.isAfter(DateTime(2100))) {
+      initial = DateTime.now();
+    }
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2035),
+      initialDate: initial,
+      firstDate: DateTime(1970),
+      lastDate: DateTime(2100),
     );
     if (picked != null) {
       setState(() {
@@ -219,7 +241,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     double total = 0.0;
     for (final rec in widget.existingRecords!) {
       if (rec.type != 'stock') continue;
-      if (widget.shopId != null && rec.shopId != null && rec.shopId != widget.shopId) continue;
+      if (widget.storeId != null && rec.storeId != null && rec.storeId != widget.storeId) continue;
       for (final it in rec.items) {
         final name = (it.name.isNotEmpty ? it.name : rec.title).trim().toLowerCase();
         final matches = name == target ||
@@ -243,7 +265,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     double total = 0.0;
     for (final rec in widget.existingRecords!) {
       if (rec.type != 'stock') continue;
-      if (widget.shopId != null && rec.shopId != null && rec.shopId != widget.shopId) continue;
+      if (widget.storeId != null && rec.storeId != null && rec.storeId != widget.storeId) continue;
       for (final it in rec.items) {
         final name = (it.name.isNotEmpty ? it.name : rec.title).trim().toLowerCase();
         final matches = name == target ||
@@ -352,7 +374,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
       date: dateStr,
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       items: lineItems,
-      shopId: widget.shopId,
+      storeId: widget.storeId,
     );
 
     Navigator.of(context).pop(record);
@@ -755,7 +777,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                   ],
 
                   // 4A. Inventory fields (Goods). Shown for all debit records AND all stock records
-                  //     (stock-out keeps these fields so the shopkeeper records what left the store).
+                  //     (stock-out keeps these fields so the storekeeper records what left the store).
                   if (isDebit || isStock) ...[
                     // Item Field (Clean Single Label matching Stitch UI)
                     _buildFieldLabel('Item (የዕቃ ስም)', isDark),

@@ -1,6 +1,6 @@
 # Merkato Credit Record (መርካቶ የብድርና ክምችት መዝገብ)
 
-Lightweight multi-shop merchant credit & stock management system for Merkato traders.
+Lightweight multi-store merchant credit & stock management system for Merkato traders.
 
 ---
 
@@ -14,11 +14,11 @@ Directly available in the project root:
 
 ## 🏢 Business Structure & Credentials
 
-| Role | Email | Password | Assigned Shop | Access Scope |
+| Role | Email | Password | Assigned Store | Access Scope |
 | :--- | :--- | :--- | :--- | :--- |
-| **Admin** | `admin@click.et` | `Admin@123` | *All Shops (Central Store)* | Can view/switch Shop 1, Shop 2, or Combined view; manage shopkeepers, reset passwords, activate/deactivate accounts. |
-| **Shopkeeper 1** | `shop1@click.et` | `Shop@123` | **Shop 1 (Merkato)** | Strictly isolated to Shop 1 customer credit, supplier credit, and stock records. |
-| **Shopkeeper 2** | `shop2@click.et` | `Shop@123` | **Shop 2 (Bole)** | Strictly isolated to Shop 2 customer credit, supplier credit, and stock records. |
+| **Admin** | `admin@click.et` | `Admin@123` | *All Stores (Central Store)* | Can view/switch Store 1, Store 2, or Combined view; manage storekeepers, reset passwords, activate/deactivate accounts. |
+| **Storekeeper 1** | `store1@click.et` | `Store@123` | **Store 1 (Merkato)** | Strictly isolated to Store 1 customer credit, supplier credit, and stock records. |
+| **Storekeeper 2** | `store2@click.et` | `Store@123` | **Store 2 (Bole)** | Strictly isolated to Store 2 customer credit, supplier credit, and stock records. |
 
 ---
 

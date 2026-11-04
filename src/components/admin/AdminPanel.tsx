@@ -1,14 +1,14 @@
 import { CirclePlus, CircleX, RefreshCw, Store, Trash2, Users } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import type { Shopkeeper } from '../../lib/api'
+import type { Storekeeper } from '../../lib/api'
 import {
   createUser,
   getUsers,
   updateUser,
   deleteUser,
-  createShop,
-  deleteShop,
+  createStore,
+  deleteStore,
 } from '../../lib/api'
 import {
   Dialog,
@@ -29,22 +29,22 @@ const emptyForm = {
   name: '',
   phone: '',
   password: '',
-  shopId: '',
+  storeId: '',
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
-  const { shops, refreshShops, activeShopId, setActiveShopId } = useAuth()
-  const [users, setUsers] = useState<Shopkeeper[]>([])
+  const { stores, refreshStores, activeStoreId, setActiveStoreId } = useAuth()
+  const [users, setUsers] = useState<Storekeeper[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // New Shop Site State
-  const [showNewShop, setShowNewShop] = useState(false)
-  const [newShopName, setNewShopName] = useState('')
-  const [savingShop, setSavingShop] = useState(false)
+  // New Store Site State
+  const [showNewStore, setShowNewStore] = useState(false)
+  const [newStoreName, setNewStoreName] = useState('')
+  const [savingStore, setSavingStore] = useState(false)
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -58,10 +58,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     }
   }, [])
 
-  const handleDeleteUser = async (user: Shopkeeper) => {
+  const handleDeleteUser = async (user: Storekeeper) => {
     if (
       !window.confirm(
-        `Are you sure you want to permanently delete shopkeeper "${user.name}" (${user.phone || 'no phone'})?`,
+        `Are you sure you want to permanently delete storekeeper "${user.name}" (${user.phone || 'no phone'})?`,
       )
     ) {
       return
@@ -71,20 +71,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     try {
       await deleteUser(user.id)
       setUsers((prev) => prev.filter((item) => item.id !== user.id))
-      setMessage(`Shopkeeper account "${user.name}" deleted`)
+      setMessage(`Storekeeper account "${user.name}" deleted`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete shopkeeper')
+      setError(err instanceof Error ? err.message : 'Could not delete storekeeper')
     }
   }
 
-  const handleDeleteShop = async (shop: { id: string; name: string }) => {
-    if (shops.length <= 1) {
-      setError('Cannot delete the only remaining shop site')
+  const handleDeleteStore = async (store: { id: string; name: string }) => {
+    if (stores.length <= 1) {
+      setError('Cannot delete the only remaining store site')
       return
     }
     if (
       !window.confirm(
-        `Are you sure you want to delete shop site "${shop.name}"? Records belonging to this shop will also be removed.`,
+        `Are you sure you want to delete store site "${store.name}"? Records belonging to this store will also be removed.`,
       )
     ) {
       return
@@ -92,16 +92,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     setError(null)
     setMessage(null)
     try {
-      await deleteShop(shop.id)
-      await refreshShops()
-      if (activeShopId === shop.id) {
-        const remaining = shops.filter((s) => s.id !== shop.id)
-        if (remaining[0]) setActiveShopId(remaining[0].id)
+      await deleteStore(store.id)
+      await refreshStores()
+      if (activeStoreId === store.id) {
+        const remaining = stores.filter((s) => s.id !== store.id)
+        if (remaining[0]) setActiveStoreId(remaining[0].id)
       }
-      setMessage(`Shop site "${shop.name}" deleted`)
+      setMessage(`Store site "${store.name}" deleted`)
       await loadUsers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete shop site')
+      setError(err instanceof Error ? err.message : 'Could not delete store site')
     }
   }
 
@@ -111,10 +111,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     setError(null)
     setForm((prev) => ({
       ...prev,
-      shopId: prev.shopId || shops[0]?.id || '',
+      storeId: prev.storeId || stores[0]?.id || '',
     }))
     void loadUsers()
-  }, [isOpen, loadUsers, shops])
+  }, [isOpen, loadUsers, stores])
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -123,8 +123,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     setMessage(null)
     try {
       await createUser(form)
-      setMessage(`Shopkeeper account created for ${form.name.trim()}`)
-      setForm({ ...emptyForm, shopId: shops[0]?.id || '' })
+      setMessage(`Storekeeper account created for ${form.name.trim()}`)
+      setForm({ ...emptyForm, storeId: stores[0]?.id || '' })
       await loadUsers()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create account')
@@ -133,41 +133,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     }
   }
 
-  const handleCreateShop = async (event: React.FormEvent) => {
+  const handleCreateStore = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!newShopName.trim()) return
-    setSavingShop(true)
+    if (!newStoreName.trim()) return
+    setSavingStore(true)
     setError(null)
     setMessage(null)
     try {
-      const { shop } = await createShop(newShopName.trim())
-      await refreshShops()
-      setForm((prev) => ({ ...prev, shopId: shop.id }))
-      setNewShopName('')
-      setShowNewShop(false)
-      setMessage(`New shop site "${shop.name}" created and assigned!`)
+      const { store } = await createStore(newStoreName.trim())
+      await refreshStores()
+      setForm((prev) => ({ ...prev, storeId: store.id }))
+      setNewStoreName('')
+      setShowNewStore(false)
+      setMessage(`New store site "${store.name}" created and assigned!`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create shop site')
+      setError(err instanceof Error ? err.message : 'Could not create store site')
     } finally {
-      setSavingShop(false)
+      setSavingStore(false)
     }
   }
 
-  const handleShopChange = async (user: Shopkeeper, shopId: string) => {
+  const handleStoreChange = async (user: Storekeeper, storeId: string) => {
     setError(null)
     setMessage(null)
     try {
-      const { user: updated } = await updateUser(user.id, { shopId })
+      const { user: updated } = await updateUser(user.id, { storeId })
       setUsers((prev) =>
         prev.map((item) => (item.id === updated.id ? updated : item)),
       )
-      setMessage(`${updated.name} assigned to ${updated.shopName || shopId}`)
+      setMessage(`${updated.name} assigned to ${updated.storeName || storeId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update account')
     }
   }
 
-  const handleActiveToggle = async (user: Shopkeeper) => {
+  const handleActiveToggle = async (user: Storekeeper) => {
     setError(null)
     setMessage(null)
     try {
@@ -191,10 +191,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
         <DialogHeader className="text-left">
           <DialogTitle className="text-lg font-bold flex items-center gap-2">
             <Users size={20} className="text-primary" />
-            <span>Admin Shopkeepers &amp; Shop Sites</span>
+            <span>Admin Storekeepers &amp; Store Sites</span>
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            Manage your shopkeeper accounts and add new retail shop sites.
+            Manage your storekeeper accounts and add new retail store sites.
           </DialogDescription>
         </DialogHeader>
 
@@ -209,40 +209,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* Existing Shop Sites Summary */}
+        {/* Existing Store Sites Summary */}
         <div className="mt-3 p-3 rounded-xl bg-card border border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              Current Shop Sites ({shops.length})
+              Current Store Sites ({stores.length})
             </span>
             <button
               type="button"
-              onClick={() => setShowNewShop(!showNewShop)}
+              onClick={() => setShowNewStore(!showNewStore)}
               className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
-              {showNewShop ? (
+              {showNewStore ? (
                 <CircleX size={14} />
               ) : (
                 <CirclePlus size={14} />
               )}
-              <span>{showNewShop ? 'Cancel' : '+ Add New Shop Site'}</span>
+              <span>{showNewStore ? 'Cancel' : '+ Add New Store Site'}</span>
             </button>
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {shops.map((s) => (
+            {stores.map((s) => (
               <span
                 key={s.id}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-muted/60 text-foreground border border-zinc-200/80 dark:border-zinc-800"
               >
                 <Store size={12} className="text-blue-600" />
                 <span>{s.name}</span>
-                {shops.length > 1 && (
+                {stores.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => void handleDeleteShop(s)}
+                    onClick={() => void handleDeleteStore(s)}
                     className="text-muted-foreground hover:text-rose-600 p-0.5 rounded cursor-pointer transition-colors"
-                    title={`Delete shop site ${s.name}`}
+                    title={`Delete store site ${s.name}`}
                   >
                     <Trash2 size={11} />
                   </button>
@@ -251,13 +251,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
             ))}
           </div>
 
-          {/* New Shop Site Form */}
-          {showNewShop && (
-            <form onSubmit={handleCreateShop} className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
+          {/* New Store Site Form */}
+          {showNewStore && (
+            <form onSubmit={handleCreateStore} className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
               <Input
-                placeholder="New Shop Name (e.g. Shop 3 - Piassa)"
-                value={newShopName}
-                onChange={(e) => setNewShopName(e.target.value)}
+                placeholder="New Store Name (e.g. Store 3 - Piassa)"
+                value={newStoreName}
+                onChange={(e) => setNewStoreName(e.target.value)}
                 required
                 className="h-8 text-xs bg-background flex-1"
                 autoFocus
@@ -265,23 +265,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
               <Button
                 type="submit"
                 size="sm"
-                disabled={savingShop}
+                disabled={savingStore}
                 className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white shrink-0"
               >
-                {savingShop ? 'Adding...' : 'Add Site'}
+                {savingStore ? 'Adding...' : 'Add Site'}
               </Button>
             </form>
           )}
         </div>
 
-        {/* Create Shopkeeper Account */}
+        {/* Create Storekeeper Account */}
         <form
           onSubmit={handleCreate}
           className="mt-3 p-3 rounded-xl bg-muted/30 ring-1 ring-zinc-950/5 dark:ring-white/10 space-y-2.5"
         >
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              Create New Shopkeeper
+              Create New Storekeeper
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -317,17 +317,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
               className="h-9 text-xs bg-background"
             />
             <select
-              value={form.shopId}
+              value={form.storeId}
               onChange={(event) =>
-                setForm((prev) => ({ ...prev, shopId: event.target.value }))
+                setForm((prev) => ({ ...prev, storeId: event.target.value }))
               }
               required
               className="h-9 rounded-md border border-input bg-background px-2 text-xs"
             >
-              <option value="">Assign to Shop Site...</option>
-              {shops.map((shop) => (
-                <option key={shop.id} value={shop.id}>
-                  {shop.name}
+              <option value="">Assign to Store Site...</option>
+              {stores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
                 </option>
               ))}
             </select>
@@ -344,11 +344,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
           </div>
         </form>
 
-        {/* Existing Shopkeepers List */}
+        {/* Existing Storekeepers List */}
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              Current Shopkeepers ({users.length})
+              Current Storekeepers ({users.length})
             </p>
             <button
               type="button"
@@ -366,7 +366,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
             </p>
           ) : users.length === 0 ? (
             <p className="text-xs text-muted-foreground py-4 text-center">
-              No shopkeeper accounts yet.
+              No storekeeper accounts yet.
             </p>
           ) : (
             <div className="space-y-2">
@@ -389,15 +389,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                     </p>
                   </div>
                   <select
-                    value={u.shopId || ''}
+                    value={u.storeId || ''}
                     onChange={(event) =>
-                      void handleShopChange(u, event.target.value)
+                      void handleStoreChange(u, event.target.value)
                     }
                     className="h-8 rounded-md border border-input bg-background px-2 text-[11px]"
                   >
-                    {shops.map((shop) => (
-                      <option key={shop.id} value={shop.id}>
-                        {shop.name}
+                    {stores.map((store) => (
+                      <option key={store.id} value={store.id}>
+                        {store.name}
                       </option>
                     ))}
                   </select>
@@ -417,7 +417,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                       type="button"
                       onClick={() => void handleDeleteUser(u)}
                       className="h-8 px-2 rounded-md text-[11px] font-semibold cursor-pointer bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50 flex items-center gap-1"
-                      title={`Delete shopkeeper ${u.name}`}
+                      title={`Delete storekeeper ${u.name}`}
                     >
                       <Trash2 size={13} />
                       <span className="hidden sm:inline">Delete</span>

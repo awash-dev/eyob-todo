@@ -344,6 +344,63 @@ export function getItemBank(
 }
 
 /**
+ * Return localized bank name:
+ * When in Amharic -> Pure Amharic only (no English in parentheses)
+ * When in English -> Pure English only (no Amharic)
+ */
+export function getLocalizedBank(bank: string, isAmharic: boolean): string {
+  if (!bank) return ''
+  const lower = bank.trim().toLowerCase()
+
+  if (!isAmharic) {
+    // English mode: Pure English
+    if (lower.includes('cbe birr') || lower.includes('ሲቢኢ ብር')) return 'CBE Birr'
+    if (lower === 'cbe' || lower.includes('commercial bank') || lower.includes('ንግድ ባንክ')) return 'CBE'
+    if (lower.includes('telebirr') || lower.includes('ቴሌብር')) return 'Telebirr'
+    if (lower.includes('awash') || lower.includes('አዋሽ')) return 'Awash Bank'
+    if (lower.includes('dashen') || lower.includes('ዳሽን')) return 'Dashen Bank'
+    if (lower.includes('boa') || lower.includes('abyssinia') || lower.includes('አቢሲኒያ')) return 'BoA'
+    if (lower.includes('cash') || lower.includes('pawza') || lower.includes('ጥሬ ገንዘብ')) return 'Cash'
+    if (lower.includes('check') || lower.includes('ቼክ')) return 'Check'
+    if (lower.includes('oromia') || lower.includes('ኦሮሚያ')) return 'Oromia Bank'
+    if (lower.includes('coop') || lower.includes('ኅብረት ሥራ')) return 'Cooperative Bank'
+    if (lower.includes('hibret') || lower.includes('ኅብረት')) return 'Hibret Bank'
+    if (lower.includes('zemen') || lower.includes('ዘመን')) return 'Zemen Bank'
+    if (lower.includes('berhan') || lower.includes('ብርሃን')) return 'Berhan Bank'
+    if (lower.includes('nib') || lower.includes('ንብ')) return 'Nib Bank'
+    if (lower.includes('wegagen') || lower.includes('ወጋገን')) return 'Wegagen Bank'
+    if (lower.includes('abay') || lower.includes('አባይ')) return 'Abay Bank'
+    if (lower.includes('bunna') || lower.includes('ቡና')) return 'Bunna Bank'
+    if (lower.includes('enat') || lower.includes('እናት')) return 'Enat Bank'
+    if (lower.includes('sinqee') || lower.includes('ሲንቄ')) return 'Sinqee Bank'
+    // Strip any residual Amharic script or parentheses
+    return bank.replace(/[\u1200-\u137F]+/g, '').replace(/[()]/g, '').trim() || bank
+  }
+
+  // Amharic mode: Pure Amharic only
+  if (lower.includes('cbe birr') || lower.includes('ሲቢኢ ብር')) return 'ሲቢኢ ብር'
+  if (lower === 'cbe' || lower.includes('commercial bank') || lower.includes('ንግድ ባንክ')) return 'ንግድ ባንክ'
+  if (lower.includes('telebirr') || lower.includes('ቴሌብር')) return 'ቴሌብር'
+  if (lower.includes('awash') || lower.includes('አዋሽ')) return 'አዋሽ ባንክ'
+  if (lower.includes('dashen') || lower.includes('ዳሽን')) return 'ዳሽን ባንክ'
+  if (lower.includes('boa') || lower.includes('abyssinia') || lower.includes('አቢሲኒያ')) return 'አቢሲኒያ ባንክ'
+  if (lower.includes('cash') || lower.includes('pawza') || lower.includes('ጥሬ ገንዘብ')) return 'ጥሬ ገንዘብ'
+  if (lower.includes('check') || lower.includes('ቼክ')) return 'ቼክ'
+  if (lower.includes('oromia') || lower.includes('ኦሮሚያ')) return 'ኦሮሚያ ባንክ'
+  if (lower.includes('coop') || lower.includes('ኅብረት ሥራ')) return 'ኅብረት ሥራ ባንክ'
+  if (lower.includes('hibret') || lower.includes('ኅብረት')) return 'ኅብረት ባንክ'
+  if (lower.includes('zemen') || lower.includes('ዘመን')) return 'ዘመን ባንክ'
+  if (lower.includes('berhan') || lower.includes('ብርሃን')) return 'ብርሃን ባንክ'
+  if (lower.includes('nib') || lower.includes('ንብ')) return 'ንብ ባንክ'
+  if (lower.includes('wegagen') || lower.includes('ወጋገን')) return 'ወጋገን ባንክ'
+  if (lower.includes('abay') || lower.includes('አባይ')) return 'አባይ ባንክ'
+  if (lower.includes('bunna') || lower.includes('ቡና')) return 'ቡና ባንክ'
+  if (lower.includes('enat') || lower.includes('እናት')) return 'እናት ባንክ'
+  if (lower.includes('sinqee') || lower.includes('ሲንቄ')) return 'ሲንቄ ባንክ'
+  return bank
+}
+
+/**
  * Resolve the custom item type/category (Stock, Goods, Delivery, ...).
  * Additions default to "Stock" when no custom type was chosen.
  */

@@ -3,15 +3,20 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../models/user.dart';
-import '../models/shop.dart';
+import '../models/store.dart';
 import '../models/ledger_record.dart';
-import '../models/line_item.dart';
 import '../models/delala_entry.dart';
 import '../services/api_service.dart';
 import '../services/language_service.dart';
 import 'login_screen.dart';
 import 'record_form_dialog.dart';
 import 'statement_screen.dart';
+import '../models/inventory_product.dart';
+import 'new_product_dialog.dart';
+import 'stock_transaction_dialog.dart';
+import 'product_history_dialog.dart';
+import 'edit_product_dialog.dart';
+import 'admin_users_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final AppUser currentUser;
@@ -26,15 +31,15 @@ class _MainScreenState extends State<MainScreen> {
   final _currencyFormat = NumberFormat('#,##0.00', 'en_US');
 
   // Language / Translator state backed by LanguageService
-  String get _currentLanguage => LanguageService.currentLanguage.value;
   bool get _isAmharic => LanguageService.isAmharic;
 
   // Tabs: 0: Customer, 1: Supplier, 2: Delala, 3: Stocks
   int _currentTabIndex = 0;
-  List<Shop> _shops = [];
-  String? _selectedShopId;
+  List<Store> _stores = [];
+  String? _selectedStoreId;
   List<LedgerRecord> _records = [];
   List<DelalaEntry> _delalaEntries = [];
+  List<InventoryProduct> _inventoryProducts = [];
   bool _isLoading = true;
   String? _errorMessage;
   String _searchQuery = '';
@@ -55,18 +60,20 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
 
-    // All roles see the 4 tabs: Customer, Supplier, Delala, Store (opens on Customer)
-    _currentTabIndex = 0;
-    if (widget.currentUser.isShopkeeper) {
-      // The shop comes from the signed-in user row in the database; when it
-      // is missing we keep null instead of inventing a shop id.
-      _selectedShopId = widget.currentUser.shopId;
+    // Admin sees all 4 tabs: Customer, Supplier, Delala, Store (opens on Customer).
+    // Storekeepers only have store pages, so they open straight on the Store tab
+    // and the party/delala tabs are hidden from the bottom bar.
+    _currentTabIndex = widget.currentUser.isStorekeeper ? 3 : 0;
+    if (widget.currentUser.isStorekeeper) {
+      // The store comes from the signed-in user row in the database; when it
+      // is missing we keep null instead of inventing a store id.
+      _selectedStoreId = widget.currentUser.storeId;
     } else {
-      _selectedShopId = 'all';
+      _selectedStoreId = 'all';
     }
 
     _loadLanguagePreference();
-    _loadShopsAndRecords();
+    _loadStoresAndRecords();
   }
 
   Future<void> _loadLanguagePreference() async {
@@ -80,127 +87,6 @@ class _MainScreenState extends State<MainScreen> {
     return name
         .replaceFirst(RegExp(r'^(delala|ደላላ)\s+', caseSensitive: false), '')
         .trim();
-  }
-
-  Future<void> _openSettingsDialog() async {
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              title: Row(
-                children: [
-                  const Icon(Icons.settings_outlined, color: Color(0xFF2563EB), size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isAmharic ? 'ቅንብሮች (Settings)' : 'Settings (ቅንብሮች)',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _isAmharic ? 'ቋንቋ መተርጎሚያ (Translator / Language):' : 'Language / Translator (ቋንቋ መተርጎሚያ):',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 14),
-                  // English Option
-                  InkWell(
-                    onTap: () async {
-                      await LanguageService.setLanguage('en');
-                      setDialogState(() {});
-                      setState(() {});
-                      if (context.mounted) Navigator.pop(ctx);
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _currentLanguage == 'en'
-                            ? const Color(0xFFEFF6FF)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _currentLanguage == 'en'
-                              ? const Color(0xFF2563EB)
-                              : Colors.grey.shade300,
-                          width: _currentLanguage == 'en' ? 2 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Text('🇺🇸', style: TextStyle(fontSize: 18)),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              'English',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                          ),
-                          if (_currentLanguage == 'en')
-                            const Icon(Icons.check_circle, color: Color(0xFF2563EB), size: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  // Amharic Option
-                  InkWell(
-                    onTap: () async {
-                      await LanguageService.setLanguage('am');
-                      setDialogState(() {});
-                      setState(() {});
-                      if (context.mounted) Navigator.pop(ctx);
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _currentLanguage == 'am'
-                            ? const Color(0xFFEFF6FF)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _currentLanguage == 'am'
-                              ? const Color(0xFF2563EB)
-                              : Colors.grey.shade300,
-                          width: _currentLanguage == 'am' ? 2 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Text('🇪🇹', style: TextStyle(fontSize: 18)),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              'አማርኛ (Amharic)',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                          ),
-                          if (_currentLanguage == 'am')
-                            const Icon(Icons.check_circle, color: Color(0xFF2563EB), size: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(_isAmharic ? 'ዝጋ' : 'Close'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
   }
 
   @override
@@ -228,13 +114,13 @@ class _MainScreenState extends State<MainScreen> {
     if (_isAmharic) {
       switch (_currentTabIndex) {
         case 0:
-          return 'የደንበኛ ብድር (Customer)';
+          return 'የደንበኛ ብድር';
         case 1:
-          return 'የአቅራቢ ብድር (Supplier)';
+          return 'የአቅራቢ ብድር';
         case 2:
-          return 'የደላላ ሂሳብ (Delala)';
+          return 'የደላላ ሂሳብ';
         case 3:
-          return 'የመደብር እቃዎች (Store)';
+          return 'የመደብር እቃዎች';
         default:
           return 'የደንበኛ ብድር';
       }
@@ -253,36 +139,46 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  /// Shop name shown in the header. Resolved from the signed-in user row and
-  /// the `shops` table — never from a hardcoded shop list.
-  String get _activeShopLabel {
+  /// Store name shown in the header. Resolved from the signed-in user row and
+  /// the `stores` table — never from a hardcoded store list.
+  String get _activeStoreLabel {
     if (widget.currentUser.isAdmin) {
-      if (_selectedShopId == 'all') return 'All Shops (Central)';
-      final match = _shops.where((s) => s.id == _selectedShopId);
-      return match.isNotEmpty ? match.first.name : 'All Shops';
+      if (_selectedStoreId == 'all') return 'All Stores (Central)';
+      final match = _stores.where((s) => s.id == _selectedStoreId);
+      return match.isNotEmpty ? match.first.name : 'All Stores';
     }
 
-    final ownName = widget.currentUser.shopName;
+    final ownName = widget.currentUser.storeName;
     if (ownName != null && ownName.isNotEmpty) return ownName;
 
-    final match = _shops.where((s) => s.id == widget.currentUser.shopId);
-    return match.isNotEmpty ? match.first.name : 'No shop assigned';
+    final match = _stores.where((s) => s.id == widget.currentUser.storeId);
+    return match.isNotEmpty ? match.first.name : 'No store assigned';
   }
 
-  Future<void> _loadShopsAndRecords() async {
+  Future<void> _loadStoresAndRecords() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
     try {
-      final shops = await ApiService.getShops();
-      final records = await ApiService.getRecords(shopId: _selectedShopId);
-      final delalaEntries = await ApiService.getDelalaEntries(_selectedShopId);
+      final stores = await ApiService.getStores();
+      String? targetStoreId = _selectedStoreId;
+      if (widget.currentUser.isStorekeeper) {
+        targetStoreId = widget.currentUser.storeId ?? _selectedStoreId;
+        if ((targetStoreId == null || targetStoreId.isEmpty) && stores.isNotEmpty) {
+          targetStoreId = stores.first.id;
+        }
+        _selectedStoreId = targetStoreId;
+      }
+      final records = await ApiService.getRecords(storeId: targetStoreId);
+      final delalaEntries = await ApiService.getDelalaEntries(targetStoreId);
+      final inventoryProducts = await ApiService.getInventoryProducts(storeId: targetStoreId);
       if (mounted) {
         setState(() {
-          _shops = shops;
+          _stores = stores;
           _records = records;
           _delalaEntries = delalaEntries;
+          _inventoryProducts = inventoryProducts;
           _isLoading = false;
         });
       }
@@ -298,12 +194,22 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _reloadRecordsOnly() async {
     try {
-      final records = await ApiService.getRecords(shopId: _selectedShopId);
-      final delalaEntries = await ApiService.getDelalaEntries(_selectedShopId);
+      String? targetStoreId = _selectedStoreId;
+      if (widget.currentUser.isStorekeeper) {
+        targetStoreId = widget.currentUser.storeId ?? _selectedStoreId;
+        if ((targetStoreId == null || targetStoreId.isEmpty) && _stores.isNotEmpty) {
+          targetStoreId = _stores.first.id;
+        }
+        _selectedStoreId = targetStoreId;
+      }
+      final records = await ApiService.getRecords(storeId: targetStoreId);
+      final delalaEntries = await ApiService.getDelalaEntries(targetStoreId);
+      final inventoryProducts = await ApiService.getInventoryProducts(storeId: targetStoreId);
       if (mounted) {
         setState(() {
           _records = records;
           _delalaEntries = delalaEntries;
+          _inventoryProducts = inventoryProducts;
           _errorMessage = null;
         });
       }
@@ -319,10 +225,10 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  void _onShopChanged(String? newShopId) {
-    if (widget.currentUser.isShopkeeper) return;
+  void _onStoreChanged(String? newStoreId) {
+    if (widget.currentUser.isStorekeeper) return;
     setState(() {
-      _selectedShopId = newShopId;
+      _selectedStoreId = newStoreId;
     });
     _reloadRecordsOnly();
   }
@@ -330,12 +236,19 @@ class _MainScreenState extends State<MainScreen> {
   List<LedgerRecord> get _filteredRecords {
     final type = _currentTabType;
     return _records.where((r) {
-      if (r.type != type) return false;
-      if (_selectedShopId != null &&
-          _selectedShopId != 'all' &&
-          r.shopId != null &&
-          r.shopId != _selectedShopId) {
-        return false;
+      if (widget.currentUser.isStorekeeper) {
+        if (r.type != 'stock') return false;
+        if (_selectedStoreId != null && _selectedStoreId!.isNotEmpty && _selectedStoreId != 'all') {
+          if (r.storeId != null && r.storeId != _selectedStoreId) return false;
+        }
+      } else {
+        if (r.type != type) return false;
+        if (_selectedStoreId != null &&
+            _selectedStoreId != 'all' &&
+            r.storeId != null &&
+            r.storeId != _selectedStoreId) {
+          return false;
+        }
       }
       if (_searchQuery.trim().isNotEmpty) {
         final q = _searchQuery.toLowerCase();
@@ -356,25 +269,25 @@ class _MainScreenState extends State<MainScreen> {
       builder: (ctx) => RecordFormDialog(
         activeTab: _currentTabType,
         existingRecords: _records,
-        shopId: widget.currentUser.isShopkeeper
-            ? widget.currentUser.shopId
-            : (_selectedShopId == 'all'
-                  ? (_shops.isNotEmpty ? _shops.first.id : null)
-                  : _selectedShopId),
+        storeId: widget.currentUser.isStorekeeper
+            ? widget.currentUser.storeId
+            : (_selectedStoreId == 'all'
+                  ? (_stores.isNotEmpty ? _stores.first.id : null)
+                  : _selectedStoreId),
       ),
     );
 
     if (result != null) {
       try {
-        // Smart merge: if party ledger already exists in this shop, append the new transaction rows
+        // Smart merge: if party ledger already exists in this store, append the new transaction rows
         final existingIdx = _records.indexWhere(
           (r) =>
               r.type == result.type &&
               r.title.trim().toLowerCase() ==
                   result.title.trim().toLowerCase() &&
-              (r.shopId == result.shopId ||
-                  r.shopId == null ||
-                  result.shopId == null),
+              (r.storeId == result.storeId ||
+                  r.storeId == null ||
+                  result.storeId == null),
         );
 
         if (existingIdx >= 0 && result.type != 'stock') {
@@ -398,7 +311,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           );
         } else {
-          await ApiService.createRecord(result, shopId: result.shopId);
+          await ApiService.createRecord(result, storeId: result.storeId);
           _reloadRecordsOnly();
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -424,7 +337,7 @@ class _MainScreenState extends State<MainScreen> {
         activeTab: record.type,
         editingRecord: record,
         existingRecords: _records,
-        shopId: record.shopId,
+        storeId: record.storeId,
       ),
     );
 
@@ -486,7 +399,7 @@ class _MainScreenState extends State<MainScreen> {
         builder: (_) => StatementScreen(
           accountName: record.title,
           accountType: record.type,
-          shopId: record.shopId,
+          storeId: record.storeId,
         ),
       ),
     );
@@ -539,13 +452,7 @@ class _MainScreenState extends State<MainScreen> {
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.bold,
-                              color: record.balance >= 0
-                                  ? (isDark
-                                        ? const Color(0xFF93C5FD)
-                                        : const Color(0xFF2563EB))
-                                  : (isDark
-                                        ? const Color(0xFFFFB4AB)
-                                        : const Color(0xFFBA1A1A)),
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                         ],
@@ -708,13 +615,7 @@ class _MainScreenState extends State<MainScreen> {
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         letterSpacing: -0.2,
-                        color: netBalance >= 0
-                            ? (isDark
-                                  ? const Color(0xFF93C5FD)
-                                  : const Color(0xFF2563EB))
-                            : (isDark
-                                  ? const Color(0xFFFFB4AB)
-                                  : const Color(0xFFBA1A1A)),
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -1385,12 +1286,39 @@ class _MainScreenState extends State<MainScreen> {
                       const SizedBox(height: 4),
                       TextField(
                         controller: dateCtrl,
+                        keyboardType: TextInputType.datetime,
                         decoration: InputDecoration(
                           hintText: 'e.g. 02/11/2026 or 24/02/2018',
-                          helperText: _isAmharic ? 'ቀን በኢትዮጵያ አቆጣጠር (ምሳሌ፦ 02/11/2026)' : 'Accepts Ethiopian date text (e.g. 02/11/2026)',
+                          helperText: _isAmharic
+                              ? 'ቀን በኢትዮጵያ አቆጣጠር ወይም በምርጫ ያስገቡ'
+                              : 'Type date text or tap calendar icon',
                           helperStyle: const TextStyle(fontSize: 10, color: Colors.grey),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          suffixIcon: IconButton(
+                            icon: const Icon(
+                              Icons.calendar_month_outlined,
+                              size: 18,
+                              color: Color(0xFF2563EB),
+                            ),
+                            tooltip: _isAmharic ? 'ቀን ምረጥ' : 'Pick Date',
+                            onPressed: () async {
+                              FocusScope.of(context).unfocus();
+                              DateTime initial = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: initial,
+                                firstDate: DateTime(1970),
+                                lastDate: DateTime(2100),
+                              );
+                              if (picked != null) {
+                                final d = picked.day.toString().padLeft(2, '0');
+                                final m = picked.month.toString().padLeft(2, '0');
+                                final y = picked.year;
+                                dateCtrl.text = '$d/$m/$y';
+                              }
+                            },
+                          ),
                         ),
                       ),
                     ],
@@ -1448,7 +1376,7 @@ class _MainScreenState extends State<MainScreen> {
                           pieces: pcs,
                           sign: selectedSign,
                           transactionDate: date,
-                          storeId: _selectedShopId,
+                          storeId: _selectedStoreId,
                         );
                       } else {
                         await ApiService.createDelalaEntry(
@@ -1458,7 +1386,7 @@ class _MainScreenState extends State<MainScreen> {
                           pieces: pcs,
                           sign: selectedSign,
                           transactionDate: date,
-                          storeId: _selectedShopId,
+                          storeId: _selectedStoreId,
                         );
                       }
                       await _reloadRecordsOnly();
@@ -1526,638 +1454,676 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  /// Store Inventory on Hand View (Showing how much store items have, matching Storekeeper requirement)
-  Widget _buildStockInventorySheet(ThemeData theme, bool isDark) {
-    final gridBorderColor = isDark
-        ? const Color(0xFF2E384D)
-        : const Color(0xFFCBD5E1);
+  /* ------------------- Advanced Store Inventory Methods ------------------- */
 
-    // Filter stock records by shop and search query
-    final stockRecords = _records.where((r) {
-      if (r.type != 'stock') return false;
-      if (_selectedShopId != null &&
-          _selectedShopId != 'all' &&
-          r.shopId != null &&
-          r.shopId != _selectedShopId) {
-        return false;
-      }
-      if (_searchQuery.trim().isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        final matchTitle = r.title.toLowerCase().contains(q);
-        final matchNotes = r.notes?.toLowerCase().contains(q) ?? false;
-        final matchItems = r.items.any(
-          (it) => it.name.toLowerCase().contains(q),
-        );
-        if (!matchTitle && !matchNotes && !matchItems) return false;
-      }
-      return true;
-    }).toList();
+  Future<void> _openNewProductDialog() async {
+    final result = await showDialog<InventoryProduct>(
+      context: context,
+      builder: (ctx) => NewProductDialog(
+        currentUser: widget.currentUser,
+        activeStoreId: _selectedStoreId,
+        isAmharic: _isAmharic,
+      ),
+    );
 
-    // Flatten all items into Store Inventory items
-    final List<_StockInventoryItem> items = [];
-    for (final rec in stockRecords) {
-      if (rec.items.isEmpty) {
-        items.add(
-          _StockInventoryItem(
-            record: rec,
-            itemName: rec.title,
-            cartons: 0,
-            pcsPerCarton: 0,
-            totalQty: 1,
-            unitPrice: rec.totalAmount,
-            totalValue: rec.totalAmount,
-            packagingUnit: 'Pcs',
-            date: rec.date,
-            notes: rec.notes,
-            sign: '+',
+    if (result != null && mounted) {
+      await _reloadRecordsOnly();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isAmharic
+                ? '"${result.productName}" በተሳካ ሁኔታ ተመዝግቧል'
+                : 'Product "${result.productName}" registered successfully',
           ),
-        );
-      } else {
-        for (final item in rec.items) {
-          final ctns = item.cartons ?? 0.0;
-          final pcs = item.pcsPerCarton ?? 0.0;
-          final unit = item.packagingUnit ?? (ctns > 0 ? 'Carton' : 'Pcs');
-          double qty = item.quantity;
-          if (unit == 'Carton' && ctns > 0 && pcs > 0) {
-            qty = ctns * pcs;
-          }
-          final price = item.unitPrice;
-          double value = item.subtotal;
-          if (value <= 0) {
-            value = (unit == 'Carton' && ctns > 0 && pcs > 0)
-                ? (ctns * pcs * price)
-                : (qty * price);
-          }
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+    }
+  }
 
-          items.add(
-            _StockInventoryItem(
-              record: rec,
-              lineItem: item,
-              itemName: item.name.isNotEmpty ? item.name : rec.title,
-              cartons: ctns,
-              pcsPerCarton: pcs,
-              totalQty: qty,
-              unitPrice: price,
-              totalValue: value,
-              packagingUnit: unit,
-              date: item.date ?? rec.date,
-              notes: item.notes ?? rec.notes,
-              sign: item.sign,
+  Future<void> _openStockTransactionDialog([InventoryProduct? preselected, String initialType = 'IN']) async {
+    final result = await showDialog<InventoryProduct>(
+      context: context,
+      builder: (ctx) => StockTransactionDialog(
+        currentUser: widget.currentUser,
+        activeStoreId: _selectedStoreId,
+        availableProducts: _inventoryProducts,
+        preselectedProduct: preselected,
+        initialMovementType: initialType,
+        isAmharic: _isAmharic,
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _reloadRecordsOnly();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isAmharic
+                ? 'የክምችት ዝውውር በተሳካ ሁኔታ ተመዝግቧል'
+                : 'Stock movement recorded successfully',
+          ),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openProductHistoryDialog(InventoryProduct prod) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => ProductHistoryDialog(
+        product: prod,
+        isAmharic: _isAmharic,
+      ),
+    );
+  }
+
+  Future<void> _openEditProductDialog(InventoryProduct prod) async {
+    final result = await showDialog<InventoryProduct>(
+      context: context,
+      builder: (ctx) => EditProductDialog(
+        product: prod,
+        isAmharic: _isAmharic,
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _reloadRecordsOnly();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isAmharic ? 'የዕቃ መረጃ ተስተካክሏል' : 'Product updated successfully',
+          ),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteInventoryProduct(InventoryProduct prod) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_isAmharic ? 'ዕቃ መሰረዝ' : 'Delete Product'),
+        content: Text(
+          _isAmharic
+              ? 'እርግጠኛ ነዎት "${prod.productName}"ን መሰረዝ ይፈልጋሉ?'
+              : 'Are you sure you want to delete "${prod.productName}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(_isAmharic ? 'ይቅር' : 'Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(_isAmharic ? 'ሰርዝ' : 'Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await ApiService.deleteInventoryProduct(prod.id);
+        await _reloadRecordsOnly();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isAmharic ? 'ዕቃው ተሰርዟል' : 'Product deleted successfully',
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception:', '').trim()),
+              backgroundColor: const Color(0xFFBA1A1A),
             ),
           );
         }
       }
     }
+  }
 
-    final double totalValuation = items.fold(0.0, (s, i) => s + i.signedValue);
-    final double grossInValue = items
-        .where((i) => !i.isOut)
-        .fold(0.0, (s, i) => s + i.totalValue);
-    final double grossOutValue = items
-        .where((i) => i.isOut)
-        .fold(0.0, (s, i) => s + i.totalValue);
+  void _openSettingsModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final cardColor = isDark ? const Color(0xFF1B2234) : Colors.white;
+        return Container(
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _isAmharic ? 'ቅንብሮች' : 'Settings',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Language Switch Row
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF242C40) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isAmharic ? 'ቋንቋ (Language)' : 'Language',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              await LanguageService.setLanguage('en');
+                              if (mounted) setState(() {});
+                              if (ctx.mounted) Navigator.pop(ctx);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: !_isAmharic ? const Color(0xFF2563EB) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: !_isAmharic ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                'English',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: !_isAmharic ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              await LanguageService.setLanguage('am');
+                              if (mounted) setState(() {});
+                              if (ctx.mounted) Navigator.pop(ctx);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _isAmharic ? const Color(0xFF2563EB) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: _isAmharic ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                'አማርኛ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _isAmharic ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.currentUser.isAdmin) ...[
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.people_alt_outlined, color: Color(0xFF2563EB)),
+                  title: Text(
+                    _isAmharic ? 'የመደብር ሠራተኞች አስተዳደር' : 'Manage Storekeepers',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AdminUsersScreen()),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Advanced Mobile Store Inventory View (Real Inventory System)
+  Widget _buildStockInventorySheet(ThemeData theme, bool isDark) {
+    final gridBorderColor = isDark
+        ? const Color(0xFF2E384D)
+        : const Color(0xFFCBD5E1);
+
+    final query = _searchQuery.trim().toLowerCase();
+    final filteredProducts = _inventoryProducts.where((p) {
+      if (query.isEmpty) return true;
+      return p.productName.toLowerCase().contains(query) ||
+          (p.supplierName?.toLowerCase().contains(query) ?? false) ||
+          (p.description?.toLowerCase().contains(query) ?? false) ||
+          (p.category.toLowerCase().contains(query));
+    }).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 85),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Inventory Table or Empty State (Top On-Hand component removed as requested)
-          if (items.isEmpty)
+          // 1. Available Store Items Header Bar (Occupies space naturally below search)
+          Container(
+            margin: const EdgeInsets.fromLTRB(14, 2, 14, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF242C40) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(color: gridBorderColor, width: 1.0),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _isAmharic ? 'በመደብር ውስጥ ያሉ ዕቃዎች' : 'Available Store Items',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12.5,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                Text(
+                  _isAmharic
+                      ? '${filteredProducts.length} ዕቃዎች'
+                      : '${filteredProducts.length} Products',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          // 2. Products List or Empty State
+          if (filteredProducts.isEmpty)
             Container(
-              margin: const EdgeInsets.all(24),
-              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
               alignment: Alignment.center,
-              child: _errorMessage != null
-                  ? Column(
-                      children: [
-                        const Icon(
-                          Icons.cloud_off_rounded,
-                          size: 42,
-                          color: Color(0xFFBA1A1A),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _isAmharic ? 'የኢንተርኔት ግንኙነት ያስፈልጋል' : 'Online Connection Required',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _loadShopsAndRecords,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                          ),
-                          icon: const Icon(Icons.refresh, size: 16),
-                          label: Text(_isAmharic ? 'እንደገና ሞክር' : 'Retry Connection'),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        Icon(
-                          Icons.inventory_2_outlined,
-                          size: 48,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _isAmharic ? 'በመደብር ውስጥ ምንም ዕቃ የለም' : 'No items in store inventory',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _isAmharic
-                              ? 'ዕቃ ለመመዝገብ ከታች "+ መደብር" የሚለውን ይጫኑ'
-                              : 'Tap "+ Store" below to record items in store',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ],
-                    ),
-            )
-          else
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1B2234) : Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: gridBorderColor, width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
+                border: Border.all(color: gridBorderColor),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: 44,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    query.isNotEmpty
+                        ? (_isAmharic ? 'የሚዛመድ ዕቃ አልተገኘም' : 'No matching products found')
+                        : (_isAmharic ? 'በመደብር ውስጥ የተመዘገበ ዕቃ የለም' : 'No registered products yet'),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.5,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _isAmharic
+                        ? 'የመጀመሪያውን ዕቃ ለመመዝገብ ከታች "+ የመደብር መዝገብ" የሚለውን ይጫኑ'
+                        : 'Tap "+ Store Entry" below to record inventory',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: _openNewProductDialog,
+                    icon: const Icon(Icons.add_box_outlined, size: 16),
+                    label: Text(
+                      _isAmharic ? '+ አዲስ ምርት መዝግብ' : '+ Register New Product',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
                   ),
                 ],
               ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Table Header Bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
+                children: filteredProducts.map((prod) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF242C40)
-                          : const Color(0xFFF1F5F9),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(7),
-                      ),
-                      border: Border(
-                        bottom: BorderSide(color: gridBorderColor, width: 1.2),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _isAmharic
-                              ? 'በመደብር ውስጥ ያሉ ዕቃዎች (Store Items)'
-                              : 'Available Store Items',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 12.5,
-                            color: theme.colorScheme.onSurface,
-                          ),
-                        ),
-                        Text(
-                          _isAmharic ? '${items.length} ዕቃዎች' : '${items.length} items',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF64748B),
-                          ),
+                      color: isDark ? const Color(0xFF1B2234) : Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: gridBorderColor, width: 1.0),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
                         ),
                       ],
                     ),
-                  ),
-
-                  // Mobile-friendly item cards (clear display on phones — no squeeze)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
                     child: Column(
-                      children: items.asMap().entries.map((entry) {
-                        final idx = entry.key + 1;
-                        final it = entry.value;
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF161D2E)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isDark
-                                  ? const Color(0xFF2E384D)
-                                  : const Color(0xFFCBD5E1),
-                              width: 1.0,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Product Name Title Header (Bilingual)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 11, 14, 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // Header: Index + Item Name + Subtitle + Action buttons
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? const Color(0xFF1E293B)
-                                      : const Color(0xFFF8FAFC),
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(7),
+                              Expanded(
+                                child: Text(
+                                  LanguageService.translateProduct(prod.productName),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                    letterSpacing: 0.2,
+                                    color: theme.colorScheme.onSurface,
                                   ),
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: isDark
-                                          ? const Color(0xFF2E384D)
-                                          : const Color(0xFFE2E8F0),
-                                      width: 0.8,
-                                    ),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      '#$idx',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: isDark
-                                            ? const Color(0xFF94A3B8)
-                                            : const Color(0xFF64748B),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Flexible(
-                                                child: Text(
-                                                  it.itemName,
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.w800,
-                                                    fontSize: 13.5,
-                                                    color: theme
-                                                        .colorScheme
-                                                        .onSurface,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (it.isOut) ...[
-                                                const SizedBox(width: 6),
-                                                const Text(
-                                                  '(Stock Out)',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Color(0xFFBA1A1A),
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                          if (it.notes != null &&
-                                              it.notes!.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 2,
-                                              ),
-                                              child: Text(
-                                                it.notes!,
-                                                style: TextStyle(
-                                                  fontSize: 10.5,
-                                                  color: isDark
-                                                      ? const Color(0xFF94A3B8)
-                                                      : const Color(0xFF64748B),
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.edit_outlined,
-                                        size: 16,
-                                        color: isDark
-                                            ? const Color(0xFF94A3B8)
-                                            : const Color(0xFF475569),
-                                      ),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      tooltip: 'Edit Store',
-                                      onPressed: () =>
-                                          _openEditRecordDialog(it.record),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.delete_outline,
-                                        size: 16,
-                                        color: isDark
-                                            ? const Color(0xFF94A3B8)
-                                            : const Color(0xFF475569),
-                                      ),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      tooltip: 'Delete Store',
-                                      onPressed: () => _deleteRecord(it.record),
-                                    ),
-                                  ],
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-
-                              // Metric Cells (Cartons | Pcs/Ctn | Qty | Unit Price)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'ካርቶን (Cartons)',
-                                            style: TextStyle(
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: isDark
-                                                  ? const Color(0xFF94A3B8)
-                                                  : const Color(0xFF64748B),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            it.cartons > 0
-                                                ? '${it.cartons.toInt()}'
-                                                : '-',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'በካርቶን (Pcs/Ctn)',
-                                            style: TextStyle(
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: isDark
-                                                  ? const Color(0xFF94A3B8)
-                                                  : const Color(0xFF64748B),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            it.pcsPerCarton > 0
-                                                ? '${it.pcsPerCarton.toInt()}'
-                                                : '-',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'ብዛት (Qty)',
-                                            style: TextStyle(
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: isDark
-                                                  ? const Color(0xFF94A3B8)
-                                                  : const Color(0xFF64748B),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '${it.signedQty.toInt()} ${it.packagingUnit == "Carton" ? "pcs" : it.packagingUnit}',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            'ዋጋ (Unit)',
-                                            style: TextStyle(
-                                              fontSize: 9.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: isDark
-                                                  ? const Color(0xFF94A3B8)
-                                                  : const Color(0xFF64748B),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            _currencyFormat.format(
-                                              it.unitPrice,
-                                            ),
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              fontFamily: 'monospace',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // Bottom Bar: Date & Total Value
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? const Color(0xFF1E2638)
-                                      : const Color(0xFFF8FAFC),
-                                  borderRadius: const BorderRadius.vertical(
-                                    bottom: Radius.circular(7),
+                              if (prod.isOutOfStock)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFFFECACA)),
                                   ),
-                                  border: Border(
-                                    top: BorderSide(
-                                      color: isDark
-                                          ? const Color(0xFF2E384D)
-                                          : const Color(0xFFE2E8F0),
-                                      width: 0.8,
+                                  child: Text(
+                                    _isAmharic ? 'አልቋል' : 'Out of Stock',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFDC2626),
                                     ),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      it.date,
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontFamily: 'monospace',
-                                        color: isDark
-                                            ? const Color(0xFF94A3B8)
-                                            : const Color(0xFF64748B),
-                                      ),
-                                    ),
-                                    Row(
+                            ],
+                          ),
+                        ),
+                        Divider(height: 1, color: gridBorderColor),
+
+                        // Specifications Grid (Cartons | Pieces/Carton | Loose Pieces | Total Available | Unit Price)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'ድምር ዋጋ: ',
+                                          _isAmharic ? 'ካርቶን' : 'Cartons',
                                           style: TextStyle(
                                             fontSize: 10.5,
                                             fontWeight: FontWeight.w600,
-                                            color: isDark
-                                                ? const Color(0xFF94A3B8)
-                                                : const Color(0xFF475569),
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                           ),
                                         ),
+                                        const SizedBox(height: 2),
                                         Text(
-                                          'ETB ${_currencyFormat.format(it.signedValue)}',
+                                          '${prod.cartons}',
+                                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _isAmharic ? 'በካርቶን ፍሬ' : 'Pieces per Carton',
                                           style: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${prod.pcsPerCarton.toInt()}',
+                                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _isAmharic ? 'ተርፍ ፍሬ' : 'Loose Pieces',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${prod.loosePieces}',
+                                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _isAmharic ? 'ያለው ጠቅላላ' : 'Total Available',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _isAmharic
+                                              ? '${NumberFormat('#,##0').format(prod.totalPieces)} ፍሬ'
+                                              : '${NumberFormat('#,##0').format(prod.totalPieces)} Pieces',
+                                          style: TextStyle(
+                                            fontSize: 14,
                                             fontWeight: FontWeight.w900,
-                                            fontFamily: 'monospace',
-                                            color: it.isOut
-                                                ? const Color(0xFFBA1A1A)
-                                                : const Color(0xFF1D4ED8),
+                                            color: theme.colorScheme.onSurface,
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _isAmharic ? 'የአንዱ ዋጋ' : 'Unit Price',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${_currencyFormat.format(prod.unitPrice > 0 ? prod.unitPrice : prod.costPrice)} ETB',
+                                          style: TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w900,
+                                            color: theme.colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-
-                  // Table Footer Summary Bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF242C40)
-                          : const Color(0xFFE2E8F0),
-                      borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(7),
-                      ),
-                      border: Border(
-                        top: BorderSide(color: gridBorderColor, width: 1.2),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Store Net Value (ጠቅላላ ድምር)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 11.5,
-                          ),
                         ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              'Net: ETB ${_currencyFormat.format(totalValuation)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 11.5,
-                                color: totalValuation >= 0
-                                    ? const Color(0xFF2563EB)
-                                    : const Color(0xFFBA1A1A),
+                        Divider(height: 1, color: gridBorderColor),
+
+                        // Product Action Buttons: Add / Out | Edit | History | Delete
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: Row(
+                            children: [
+                              // 1. Add / Out
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _openStockTransactionDialog(prod),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                                    side: BorderSide(color: gridBorderColor),
+                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                  icon: const Icon(Icons.swap_horiz, size: 14),
+                                  label: Text(
+                                    _isAmharic ? 'ገቢ / ወጪ' : 'Add / Out',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              'In: ${_currencyFormat.format(grossInValue)}  ·  Out: ${_currencyFormat.format(grossOutValue)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 9.5,
-                                color: Color(0xFF64748B),
+                              const SizedBox(width: 6),
+                              // 2. Edit
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _openEditProductDialog(prod),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                                    side: BorderSide(color: gridBorderColor),
+                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                  icon: const Icon(Icons.edit_outlined, size: 14),
+                                  label: Text(
+                                    _isAmharic ? 'አስተካክል' : 'Edit',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              // 3. History
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _openProductHistoryDialog(prod),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                                    side: BorderSide(color: gridBorderColor),
+                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  ),
+                                  icon: const Icon(Icons.history, size: 14),
+                                  label: Text(
+                                    _isAmharic ? 'ታሪክ' : 'History',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              // 4. Delete
+                              OutlinedButton(
+                                onPressed: () => _deleteInventoryProduct(prod),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  side: BorderSide(color: gridBorderColor),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  minimumSize: const Size(36, 32),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                ),
+                                child: const Icon(Icons.delete_outline, size: 16),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                  );
+                }).toList(),
               ),
             ),
         ],
@@ -2168,22 +2134,6 @@ class _MainScreenState extends State<MainScreen> {
   /// Authentic Excel Spreadsheet Table View matching the User's Excel Ledger
   Widget _buildRecordTable(LedgerRecord rec, ThemeData theme, bool isDark) {
     final isExpanded = _expandedRecordIds.contains(rec.id);
-
-    // Type badge label (mirrors the web record card)
-    final String typeLabel = rec.type == 'customer'
-        ? 'Customer'
-        : rec.type == 'supplier'
-        ? 'Supplier'
-        : rec.type == 'delala'
-        ? 'Delala'
-        : 'Store';
-    final IconData typeIcon = rec.type == 'customer'
-        ? Icons.people_outline
-        : rec.type == 'supplier'
-        ? Icons.local_shipping_outlined
-        : rec.type == 'delala'
-        ? Icons.handshake_outlined
-        : Icons.inventory_2_outlined;
 
     // Grid border color for card separators
     final gridBorderColor = isDark
@@ -2236,68 +2186,28 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                   const SizedBox(width: 4),
 
-                  // Name, badge, date / notes
+                  // Name and date / notes (no type badge)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
-                                borderRadius: BorderRadius.circular(5),
-                                border: Border.all(
-                                  color: const Color(0xFFBFDBFE),
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    typeIcon,
-                                    size: 11,
-                                    color: const Color(0xFF2563EB),
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    typeLabel,
-                                    style: const TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF2563EB),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                        InkWell(
+                          onTap: () => _openStatement(rec),
+                          child: Text(
+                            rec.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: theme.colorScheme.onSurface,
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => _openStatement(rec),
-                                child: Text(
-                                  rec.title,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 14,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                          ],
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           rec.notes != null && rec.notes!.isNotEmpty
                               ? '${rec.date} · ${rec.notes}'
-                              : '${rec.items.length} ${rec.items.length == 1 ? "item" : "items"} · ${rec.date}',
+                              : rec.date,
                           style: TextStyle(
                             fontSize: 10.5,
                             color: isDark
@@ -2333,13 +2243,7 @@ class _MainScreenState extends State<MainScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
-                          color: rec.balance >= 0
-                              ? (isDark
-                                    ? const Color(0xFF93C5FD)
-                                    : const Color(0xFF2563EB))
-                              : (isDark
-                                    ? const Color(0xFFFFB4AB)
-                                    : const Color(0xFFBA1A1A)),
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -2710,9 +2614,7 @@ class _MainScreenState extends State<MainScreen> {
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
                                     fontFamily: 'monospace',
-                                    color: item.sign == '-'
-                                        ? const Color(0xFFBA1A1A)
-                                        : theme.colorScheme.onSurface,
+                                    color: theme.colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -2739,9 +2641,7 @@ class _MainScreenState extends State<MainScreen> {
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w800,
                                     fontFamily: 'monospace',
-                                    color: item.sign == '-'
-                                        ? const Color(0xFFBA1A1A)
-                                        : const Color(0xFF1D4ED8),
+                                    color: theme.colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -2780,9 +2680,7 @@ class _MainScreenState extends State<MainScreen> {
                               fontSize: 13,
                               fontWeight: FontWeight.w900,
                               fontFamily: 'monospace',
-                              color: rec.balance < 0
-                                  ? const Color(0xFFBA1A1A)
-                                  : const Color(0xFF1D4ED8),
+                              color: theme.colorScheme.onSurface,
                             ),
                           ),
                         ],
@@ -2824,11 +2722,11 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       Text(
                         'ETB ${_currencyFormat.format(rec.totalDebit)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 11.5,
                           fontFamily: 'monospace',
-                          color: Color(0xFF2563EB),
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -2849,11 +2747,11 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       Text(
                         'ETB ${_currencyFormat.format(rec.totalCredit)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 11.5,
                           fontFamily: 'monospace',
-                          color: Color(0xFFBA1A1A),
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -2875,9 +2773,7 @@ class _MainScreenState extends State<MainScreen> {
                           fontWeight: FontWeight.w900,
                           fontSize: 13,
                           fontFamily: 'monospace',
-                          color: rec.balance >= 0
-                              ? const Color(0xFF2563EB)
-                              : const Color(0xFFBA1A1A),
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -2937,9 +2833,9 @@ class _MainScreenState extends State<MainScreen> {
                     DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         value:
-                            (_selectedShopId == 'all' ||
-                                _shops.any((s) => s.id == _selectedShopId))
-                            ? _selectedShopId
+                            (_selectedStoreId == 'all' ||
+                                _stores.any((s) => s.id == _selectedStoreId))
+                            ? _selectedStoreId
                             : 'all',
                         isDense: true,
                         isExpanded: true,
@@ -2960,9 +2856,9 @@ class _MainScreenState extends State<MainScreen> {
                         items: [
                           const DropdownMenuItem(
                             value: 'all',
-                            child: Text('All Shops'),
+                            child: Text('All Stores'),
                           ),
-                          ..._shops.map(
+                          ..._stores.map(
                             (s) => DropdownMenuItem(
                               value: s.id,
                               child: Text(
@@ -2972,12 +2868,12 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                           ),
                         ],
-                        onChanged: _onShopChanged,
+                        onChanged: _onStoreChanged,
                       ),
                     )
                   else
                     Text(
-                      _activeShopLabel,
+                      _activeStoreLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -3003,14 +2899,18 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         actions: [
-          // Settings (Translator: Amharic & English)
+          // Settings icon
           IconButton(
-            icon: const Icon(Icons.settings_outlined, size: 20),
-            tooltip: _isAmharic ? 'ቅንብሮች (ቋንቋ)' : 'Settings (Language)',
-            onPressed: _openSettingsDialog,
+            icon: Icon(
+              Icons.settings_outlined,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF1E293B),
+              size: 20,
+            ),
+            tooltip: _isAmharic ? 'ቅንብሮች' : 'Settings',
+            onPressed: _openSettingsModal,
           ),
 
-          // Sign out
+          // Sign out / Logout icon
           IconButton(
             icon: const Icon(
               Icons.logout_rounded,
@@ -3023,62 +2923,64 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
 
-      // BOTTOM NAVIGATION TABS (Customer, Supplier, Delala, Store — visible for all roles)
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
-              width: 1,
+      // BOTTOM NAVIGATION TABS
+      // Admin: Customer, Supplier, Delala, Store. Storekeeper: Store only (no bottom bar needed).
+      bottomNavigationBar: widget.currentUser.isStorekeeper
+          ? null
+          : Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: BottomNavigationBar(
+                currentIndex: _currentTabIndex,
+                onTap: (index) {
+                  setState(() {
+                    _currentTabIndex = index;
+                  });
+                },
+                selectedItemColor: isDark
+                    ? const Color(0xFF93C5FD)
+                    : const Color(0xFF2563EB),
+                unselectedItemColor: isDark
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
+                selectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11.5,
+                ),
+                unselectedLabelStyle: const TextStyle(fontSize: 11),
+                type: BottomNavigationBarType.fixed,
+                backgroundColor: isDark ? const Color(0xFF182036) : Colors.white,
+                elevation: 6,
+                items: [
+                  BottomNavigationBarItem(
+                    icon: const Icon(Icons.people_outline),
+                    activeIcon: const Icon(Icons.people),
+                    label: _isAmharic ? 'ደንበኛ' : 'Customer',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: const Icon(Icons.business_outlined),
+                    activeIcon: const Icon(Icons.business),
+                    label: _isAmharic ? 'አቅራቢ' : 'Supplier',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: const Icon(Icons.handshake_outlined),
+                    activeIcon: const Icon(Icons.handshake),
+                    label: _isAmharic ? 'ደላላ' : 'Delala',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: const Icon(Icons.inventory_2_outlined),
+                    activeIcon: const Icon(Icons.inventory_2),
+                    label: _isAmharic ? 'መደብር' : 'Store',
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentTabIndex,
-          onTap: (index) {
-            setState(() {
-              _currentTabIndex = index;
-            });
-            
-          },
-          selectedItemColor: isDark
-              ? const Color(0xFF93C5FD)
-              : const Color(0xFF2563EB),
-          unselectedItemColor: isDark
-              ? const Color(0xFF94A3B8)
-              : const Color(0xFF64748B),
-          selectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 11.5,
-          ),
-          unselectedLabelStyle: const TextStyle(fontSize: 11),
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: isDark ? const Color(0xFF182036) : Colors.white,
-          elevation: 6,
-          items: [
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.people_outline),
-              activeIcon: const Icon(Icons.people),
-              label: _isAmharic ? 'ደንበኛ' : 'Customer',
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.business_outlined),
-              activeIcon: const Icon(Icons.business),
-              label: _isAmharic ? 'አቅራቢ' : 'Supplier',
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.handshake_outlined),
-              activeIcon: const Icon(Icons.handshake),
-              label: _isAmharic ? 'ደላላ' : 'Delala',
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.inventory_2_outlined),
-              activeIcon: const Icon(Icons.inventory_2),
-              label: _isAmharic ? 'መደብር' : 'Store',
-            ),
-          ],
-        ),
-      ),
 
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -3096,7 +2998,9 @@ class _MainScreenState extends State<MainScreen> {
                         color: theme.colorScheme.onSurface,
                       ),
                       decoration: InputDecoration(
-                        hintText: _currentTabIndex == 2
+                        hintText: _currentTabIndex == 3
+                            ? (_isAmharic ? 'የመደብር ዕቃዎችን በስም ወይም በዝርዝር ፈልግ...' : 'Search Store Inventory by name, item...')
+                            : _currentTabIndex == 2
                             ? (_isAmharic ? 'በስም ወይም በዕቃ ፈልግ...' : 'Search by name or product...')
                             : (_isAmharic ? 'በስም ወይም በማስታወሻ ፈልግ...' : 'Search $_currentTabLabel by name, item...'),
                         hintStyle: TextStyle(
@@ -3157,6 +3061,8 @@ class _MainScreenState extends State<MainScreen> {
                   if (_currentTabIndex != 3 && _currentTabIndex != 2)
                     _buildStatementSummary(theme, isDark),
 
+                  // Store summary card removed per requirements
+
                   // Content view: Store Inventory on Hand for Stock; Delala Ledger for Delala; Excel Ledgers for Parties
                   Expanded(
                     child: _currentTabIndex == 3
@@ -3198,7 +3104,7 @@ class _MainScreenState extends State<MainScreen> {
                                               ),
                                               const SizedBox(height: 16),
                                               ElevatedButton.icon(
-                                                onPressed: _loadShopsAndRecords,
+                                                onPressed: _loadStoresAndRecords,
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: const Color(
                                                     0xFF2563EB,
@@ -3269,68 +3175,29 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
 
-      // Floating Add Transaction Entry Button
+      // Floating Add Transaction / Store Entry Button
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF2563EB), // Primary Blue
         foregroundColor: Colors.white,
         elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         icon: const Icon(Icons.add, size: 18),
         label: Text(
           _currentTabIndex == 3
               ? (_isAmharic ? 'የመደብር መዝገብ' : 'Store Entry')
               : _currentTabIndex == 2
-              ? (_isAmharic ? 'አዲስ መዝገብ' : 'Delala Entry')
+              ? (_isAmharic ? 'የደላላ መዝገብ' : 'Broker Entry')
               : _currentTabIndex == 1
               ? (_isAmharic ? 'የአቅራቢ መዝገብ' : 'Supplier Entry')
               : (_isAmharic ? 'የደንበኛ መዝገብ' : 'Customer Entry'),
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
-        onPressed: _currentTabIndex == 2
+        onPressed: _currentTabIndex == 3
+            ? () => _openStockTransactionDialog()
+            : _currentTabIndex == 2
             ? () => _openDelalaEntryDialog()
             : _openCreateRecordDialog,
       ),
     );
   }
-}
-
-/// Helper model for Stock Inventory On Hand Table
-class _StockInventoryItem {
-  final LedgerRecord record;
-  final LineItem? lineItem;
-  final String itemName;
-  final double cartons;
-  final double pcsPerCarton;
-  final double totalQty;
-  final double unitPrice;
-  final double totalValue;
-  final String packagingUnit;
-  final String date;
-  final String? notes;
-  final String sign; // '+' = Stock In (increment), '-' = Stock Out (decrement)
-
-  _StockInventoryItem({
-    required this.record,
-    this.lineItem,
-    required this.itemName,
-    required this.cartons,
-    required this.pcsPerCarton,
-    required this.totalQty,
-    required this.unitPrice,
-    required this.totalValue,
-    required this.packagingUnit,
-    required this.date,
-    this.notes,
-    this.sign = '+',
-  });
-
-  bool get isOut => sign == '-';
-
-  /// Signed contribution to on-hand quantity (negative when stock out)
-  double get signedQty => isOut ? -totalQty : totalQty;
-
-  /// Signed contribution to on-hand cartons (negative when stock out)
-  double get signedCartons => isOut ? -cartons : cartons;
-
-  /// Signed contribution to total valuation (negative when stock out)
-  double get signedValue => isOut ? -totalValue : totalValue;
 }

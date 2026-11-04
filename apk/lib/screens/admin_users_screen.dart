@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
-import '../models/shop.dart';
+import '../models/store.dart';
 import '../services/api_service.dart';
 
 class AdminUsersScreen extends StatefulWidget {
@@ -12,7 +12,7 @@ class AdminUsersScreen extends StatefulWidget {
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
   List<AppUser> _users = [];
-  List<Shop> _shops = [];
+  List<Store> _stores = [];
   bool _isLoading = true;
   String? _error;
 
@@ -29,12 +29,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     });
     try {
       // Both lists come straight from the database.
-      final users = await ApiService.getShopkeepers();
-      final shops = await ApiService.getShops();
+      final users = await ApiService.getStorekeepers();
+      final stores = await ApiService.getStores();
       if (mounted) {
         setState(() {
           _users = users;
-          _shops = shops;
+          _stores = stores;
           _isLoading = false;
         });
       }
@@ -53,10 +53,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Future<void> _showCreateUserDialog() async {
-    if (_shops.isEmpty) {
+    if (_stores.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No shops exist in the database yet — create a shop first'),
+          content: Text('No stores exist in the database yet — create a store first'),
         ),
       );
       return;
@@ -65,14 +65,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     final passCtrl = TextEditingController();
-    String selectedShopId = _shops.first.id;
+    String selectedStoreId = _stores.first.id;
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlgState) {
           return AlertDialog(
-            title: const Text('Create Shopkeeper Account'),
+            title: const Text('Create Storekeeper Account'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -94,15 +94,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   ),
                   const SizedBox(height: 14),
                   DropdownButtonFormField<String>(
-                    initialValue: selectedShopId,
-                    decoration: const InputDecoration(labelText: 'Assign Retail Shop'),
+                    initialValue: selectedStoreId,
+                    decoration: const InputDecoration(labelText: 'Assign Retail Store'),
                     items: [
-                      for (final shop in _shops)
-                        DropdownMenuItem(value: shop.id, child: Text(shop.name)),
+                      for (final store in _stores)
+                        DropdownMenuItem(value: store.id, child: Text(store.name)),
                     ],
                     onChanged: (val) {
                       if (val != null) {
-                        setDlgState(() => selectedShopId = val);
+                        setDlgState(() => selectedStoreId = val);
                       }
                     },
                   ),
@@ -131,16 +131,16 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   }
                   Navigator.pop(ctx);
                   try {
-                    await ApiService.createShopkeeper(
+                    await ApiService.createStorekeeper(
                       name: name,
                       phone: phone,
                       password: pass,
-                      shopId: selectedShopId,
+                      storeId: selectedStoreId,
                     );
                     _fetchUsers();
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Created shopkeeper account for $name')),
+                      SnackBar(content: Text('Created storekeeper account for $name')),
                     );
                   } catch (e) {
                     if (!mounted) return;
@@ -162,10 +162,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final nameCtrl = TextEditingController(text: user.name);
     final phoneCtrl = TextEditingController(text: user.phone ?? '');
     final passCtrl = TextEditingController();
-    final shopIds = _shops.map((s) => s.id).toSet();
-    String selectedShopId = (user.shopId != null && shopIds.contains(user.shopId))
-        ? user.shopId!
-        : (_shops.isNotEmpty ? _shops.first.id : '');
+    final storeIds = _stores.map((s) => s.id).toSet();
+    String selectedStoreId = (user.storeId != null && storeIds.contains(user.storeId))
+        ? user.storeId!
+        : (_stores.isNotEmpty ? _stores.first.id : '');
     bool active = user.active;
 
     await showDialog(
@@ -193,15 +193,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
-                    initialValue: selectedShopId.isEmpty ? null : selectedShopId,
-                    decoration: const InputDecoration(labelText: 'Assigned Shop'),
+                    initialValue: selectedStoreId.isEmpty ? null : selectedStoreId,
+                    decoration: const InputDecoration(labelText: 'Assigned Store'),
                     items: [
-                      for (final shop in _shops)
-                        DropdownMenuItem(value: shop.id, child: Text(shop.name)),
+                      for (final store in _stores)
+                        DropdownMenuItem(value: store.id, child: Text(store.name)),
                     ],
                     onChanged: (val) {
                       if (val != null) {
-                        setDlgState(() => selectedShopId = val);
+                        setDlgState(() => selectedStoreId = val);
                       }
                     },
                   ),
@@ -238,11 +238,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                 onPressed: () async {
                   Navigator.pop(ctx);
                   try {
-                    await ApiService.updateShopkeeper(
+                    await ApiService.updateStorekeeper(
                       user.id,
                       name: nameCtrl.text.trim(),
                       phone: phoneCtrl.text.trim(),
-                      shopId: selectedShopId.isEmpty ? null : selectedShopId,
+                      storeId: selectedStoreId.isEmpty ? null : selectedStoreId,
                       active: active,
                       password: passCtrl.text.isNotEmpty ? passCtrl.text : null,
                     );
@@ -272,14 +272,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Shopkeeper Accounts'),
+        title: const Text('Storekeeper Accounts'),
         backgroundColor: Colors.white,
         elevation: 0.5,
         foregroundColor: const Color(0xFF0F172A),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_add_alt_1_outlined),
-            tooltip: 'Add Shopkeeper',
+            tooltip: 'Add Storekeeper',
             onPressed: _showCreateUserDialog,
           ),
         ],
@@ -289,14 +289,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           : _error != null
               ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
               : _users.isEmpty
-                  ? const Center(child: Text('No shopkeeper accounts found'))
+                  ? const Center(child: Text('No storekeeper accounts found'))
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),
                       itemCount: _users.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (ctx, index) {
                         final u = _users[index];
-                        final shopLabel = u.shopName ?? 'No shop assigned';
+                        final storeLabel = u.storeName ?? 'No store assigned';
                         return Card(
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -338,7 +338,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                     ),
                                   ),
                                   child: Text(
-                                    shopLabel,
+                                    storeLabel,
                                     style: const TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,

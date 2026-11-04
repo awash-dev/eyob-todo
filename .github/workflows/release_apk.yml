@@ -98,7 +98,7 @@ jobs:
           body: |
             ## 📱 Merkato Credit Record Android Release (${{ steps.prepare_release.outputs.tag }})
 
-            Android application release for multi-shop credit and stock ledger.
+            Android application release for multi-store credit and stock ledger.
 
             ### ✨ Highlights in this release:
             - **DELALA External Broker Ledger**: Complete spreadsheet-style broker ledger with positive (+) and negative (-) signed totals and real-time balance.

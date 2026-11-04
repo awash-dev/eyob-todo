@@ -38,12 +38,12 @@ async function run() {
     // Row 1: Ahmed | 12W Safari | 65 | 10 | -1 | -650 | 02/11/2026
     await sql`
       INSERT INTO delala_entries (delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id)
-      VALUES ('Ahmed', '12W Safari', 65.00, 10.000, -1, -650.00, '02/11/2026', 'shop_1');
+      VALUES ('Ahmed', '12W Safari', 65.00, 10.000, -1, -650.00, '02/11/2026', 'store_1');
     `;
     // Row 2: Mohammed | Product B | 100 | 5 | +1 | +500 | 02/11/2026
     await sql`
       INSERT INTO delala_entries (delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id)
-      VALUES ('Mohammed', 'Product B', 100.00, 5.000, 1, 500.00, '02/11/2026', 'shop_1');
+      VALUES ('Mohammed', 'Product B', 100.00, 5.000, 1, 500.00, '02/11/2026', 'store_1');
     `;
     console.log('✓ Seeded sample rows successfully!');
   } else {

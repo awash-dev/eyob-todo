@@ -11,13 +11,13 @@ import '../services/language_service.dart';
 class StatementScreen extends StatefulWidget {
   final String accountName;
   final String accountType; // 'customer' | 'supplier'
-  final String? shopId;
+  final String? storeId;
 
   const StatementScreen({
     super.key,
     required this.accountName,
     required this.accountType,
-    this.shopId,
+    this.storeId,
   });
 
   @override
@@ -47,7 +47,7 @@ class _StatementScreenState extends State<StatementScreen> {
       final st = await ApiService.getStatement(
         name: widget.accountName,
         type: widget.accountType,
-        shopId: widget.shopId,
+        storeId: widget.storeId,
       );
       if (mounted) {
         setState(() {
@@ -95,9 +95,9 @@ class _StatementScreenState extends State<StatementScreen> {
                     ),
                     pw.SizedBox(height: 3),
                     pw.Text(
-                      st.shopName.isEmpty
+                      st.storeName.isEmpty
                           ? 'Account Statement'
-                          : '${st.shopName} - Account Statement',
+                          : '${st.storeName} - Account Statement',
                       style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
                     ),
                     pw.SizedBox(height: 2),
@@ -268,14 +268,6 @@ class _StatementScreenState extends State<StatementScreen> {
     final isDelala = st.accountType == 'delala';
     final isStock = st.accountType == 'stock';
 
-    final String typeTitle = isStock
-        ? (_isAmharic ? 'የመደብር እቃዎች' : 'Store Inventory')
-        : isCustomer
-            ? (_isAmharic ? 'የደንበኛ ብድር' : 'Customer Credit')
-            : isDelala
-                ? (_isAmharic ? 'ደላላ' : 'Delala (Broker)')
-                : (_isAmharic ? 'የአቅራቢ ብድር' : 'Supplier Credit');
-
     final formulaText = isStock
         ? (_isAmharic ? 'በመደብር ያለው = ገቢ (+) - ወጪ (-)' : 'Store On Hand = Stock In (+) - Stock Out (-)')
         : isCustomer
@@ -315,52 +307,18 @@ class _StatementScreenState extends State<StatementScreen> {
                         softWrap: true,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isCustomer
-                            ? (isDark ? const Color(0xFF1E1B4B) : const Color(0xFFEEF2FF))
-                            : (isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF)),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: isCustomer
-                              ? (isDark ? const Color(0xFF4F46E5) : const Color(0xFFC7D2FE))
-                              : (isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE)),
-                        ),
-                      ),
-                      child: Text(
-                        typeTitle,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isCustomer
-                              ? (isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5))
-                              : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
-                        ),
+                    Text(
+                      _currencyFormat.format(st.totals.outstanding),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Shop: ${st.shopName}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                    Text(
-                      '${st.entries.length} transactions',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 1),
                 const SizedBox(height: 2),
                 Text(
                   formulaText,
@@ -480,7 +438,7 @@ class _StatementScreenState extends State<StatementScreen> {
                             : (_isAmharic ? 'ተከፋይ (-)' : 'Credit (-)'),
                         textAlign: TextAlign.right,
                         style: TextStyle(
-                          color: isDark ? const Color(0xFFFEF08A) : const Color(0xFF854D0E),
+                          color: isDark ? Colors.white : const Color(0xFF1E293B),
                           fontSize: 10.5,
                           fontWeight: FontWeight.bold,
                         ),
@@ -518,14 +476,11 @@ class _StatementScreenState extends State<StatementScreen> {
               ),
               itemBuilder: (context, index) {
                 final entry = st.entries[index];
-                final isPayment = entry.credit > 0;
                 final isEven = index % 2 == 0;
 
-                final rowBg = isPayment
-                    ? (isDark ? const Color(0xFF3B2A06) : const Color(0xFFFEFCE8)) // Light yellow highlight for payment
-                    : (isEven
-                        ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
-                        : (isDark ? const Color(0xFF18181B) : const Color(0xFFF8FAFC)));
+                final rowBg = isEven
+                    ? (isDark ? const Color(0xFF1E1E1E) : Colors.white)
+                    : (isDark ? const Color(0xFF18181B) : const Color(0xFFF8FAFC));
 
                 return Container(
                   color: rowBg,
@@ -570,9 +525,7 @@ class _StatementScreenState extends State<StatementScreen> {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: isPayment
-                                      ? (isDark ? const Color(0xFFFDE047) : const Color(0xFF854D0E))
-                                      : theme.colorScheme.onSurface,
+                                  color: theme.colorScheme.onSurface,
                                   height: 1.25,
                                 ),
                                 softWrap: true, // FULL NAME ALWAYS VISIBLE
@@ -596,7 +549,7 @@ class _StatementScreenState extends State<StatementScreen> {
                                     style: TextStyle(
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
-                                      color: isDark ? const Color(0xFFFDE047) : const Color(0xFF854D0E),
+                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                     ),
                                   ),
                                 ),
@@ -642,11 +595,8 @@ class _StatementScreenState extends State<StatementScreen> {
                           alignment: Alignment.centerRight,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: entry.credit > 0
-                                  ? (isDark ? const Color(0xFF854D0E).withValues(alpha: 0.4) : const Color(0xFFFEF08A))
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.transparent,
                             ),
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
@@ -657,7 +607,7 @@ class _StatementScreenState extends State<StatementScreen> {
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w900,
                                   color: entry.credit > 0
-                                      ? (isDark ? const Color(0xFFFEF08A) : const Color(0xFF713F12))
+                                      ? theme.colorScheme.onSurface
                                       : (isDark ? Colors.grey.shade700 : Colors.grey.shade400),
                                 ),
                               ),
@@ -680,9 +630,7 @@ class _StatementScreenState extends State<StatementScreen> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: entry.balance >= 0
-                                    ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB))
-                                    : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
                           ),
@@ -756,7 +704,7 @@ class _StatementScreenState extends State<StatementScreen> {
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 11,
-                            color: isDark ? const Color(0xFFFEF08A) : const Color(0xFF854D0E),
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -774,9 +722,7 @@ class _StatementScreenState extends State<StatementScreen> {
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 11.5,
-                            color: st.totals.outstanding >= 0
-                                ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB))
-                                : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -829,18 +775,11 @@ class _StatementScreenState extends State<StatementScreen> {
                 isStock
                     ? (_isAmharic ? 'ጠቅላላ ወጪ ዕቃ፦' : 'Total Stock Out:')
                     : (_isAmharic ? 'ጠቅላላ ተከፋይ (ክፍያዎች)፦' : 'Total Credit (Payments):'),
-                style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFDE047) : const Color(0xFF854D0E)),
+                style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF08A),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'ETB ${_currencyFormat.format(st.totals.totalCredit)}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF713F12)),
-                ),
+              Text(
+                'ETB ${_currencyFormat.format(st.totals.totalCredit)}',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
               ),
             ],
           ),
@@ -859,9 +798,7 @@ class _StatementScreenState extends State<StatementScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
-                  color: st.totals.outstanding >= 0
-                      ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB))
-                      : (isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
             ],

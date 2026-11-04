@@ -1,7 +1,6 @@
 import {
   BookOpen,
   Building2,
-  Globe,
   Handshake,
   Layers,
   LogOut,
@@ -28,14 +27,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { activeTab, setActiveTab, tabRecordCounts } = useLedger()
   const {
     user,
-    shops,
-    activeShopId,
-    activeShop,
-    setActiveShopId,
+    stores,
+    activeStoreId,
+    activeStore,
+    setActiveStoreId,
     isAdmin,
     logout,
   } = useAuth()
-  const { t, isAmharic, toggleLanguage } = useLanguage()
+  const { t, language, setLanguage } = useLanguage()
 
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false)
 
@@ -62,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'delala',
-      label: t('Delala Credit', 'የደላላ ሂሳብ'),
+      label: t('Broker Credit', 'የደላላ ሂሳብ'),
       Icon: Handshake,
       activeClass:
         'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
@@ -96,7 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Responsive Sidebar (docked on desktop, slide-out drawer on mobile) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-zinc-200/80 dark:border-zinc-800/80 flex flex-col h-screen no-print transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 h-[100dvh] bg-card border-r border-zinc-200/80 dark:border-zinc-800/80 flex flex-col max-md:overflow-y-auto md:overflow-hidden no-print transition-transform duration-200 ease-in-out md:translate-x-0 ${
           isMobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
         }`}
       >
@@ -111,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {t('Merkato Ledger', 'መርካቶ የሂሳብ መዝገብ')}
               </p>
               <p className="text-[10px] text-muted-foreground truncate">
-                {isAdmin ? t('Central Admin', 'ዋና አስተዳዳሪ') : activeShop?.name || t('Shop', 'ሱቅ')}
+                {isAdmin ? t('Central Admin', 'ዋና አስተዳዳሪ') : activeStore?.name || t('Store', 'ሱቅ')}
               </p>
             </div>
           </div>
@@ -127,25 +126,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Shop selector for Admin */}
-        {isAdmin && shops.length > 0 && (
+        {/* Store selector for Admin */}
+        {isAdmin && stores.length > 0 && (
           <div className="px-4 pt-3">
             <label
-              htmlFor="sidebar-shop"
+              htmlFor="sidebar-store"
               className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
             >
-              {t('Active Shop', 'የተመረጠ ሱቅ')}
+              {t('Active Store', 'የተመረጠ ሱቅ')}
             </label>
             <select
-              id="sidebar-shop"
-              value={activeShopId || 'all'}
-              onChange={(event) => setActiveShopId(event.target.value)}
+              id="sidebar-store"
+              value={activeStoreId || 'all'}
+              onChange={(event) => setActiveStoreId(event.target.value)}
               className="mt-1 w-full h-8 rounded-xl border border-input bg-background px-2 text-[11px] font-semibold text-foreground cursor-pointer"
             >
-              <option value="all">🌐 {t('All Shops (Combined)', 'ሁሉም ሱቆች')}</option>
-              {shops.map((shop) => (
-                <option key={shop.id} value={shop.id}>
-                  {shop.name}
+              <option value="all">🌐 {t('All Stores (Combined)', 'ሁሉም ሱቆች')}</option>
+              {stores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
                 </option>
               ))}
             </select>
@@ -153,11 +152,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* Navigation Tabs */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-3 space-y-1">
           <p className="px-2 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            {user?.role === 'shopkeeper' ? t('Store', 'መደብር') : t('Ledger', 'የሂሳብ መዝገቦች')}
+            {user?.role === 'storekeeper' ? t('Store', 'መደብር') : t('Ledger', 'የሂሳብ መዝገቦች')}
           </p>
-          {(user?.role === 'shopkeeper'
+          {(user?.role === 'storekeeper'
             ? tabs.filter((t) => t.id === 'stock')
             : tabs
           ).map((tab) => {
@@ -206,17 +205,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </>
           )}
 
-          {/* Direct Language Switcher in Sidebar (No setting icon) */}
+          {/* Language Chooser Dropdown */}
           <div className="pt-4 px-1">
-            <button
-              type="button"
-              onClick={toggleLanguage}
-              className="w-full py-2 px-3 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/70 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/70 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-2xs"
-              title={isAmharic ? 'Switch to English' : 'ወደ አማርኛ ቀይር'}
+            <label
+              htmlFor="sidebar-language"
+              className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
             >
-              <Globe size={14} className="shrink-0" />
-              <span>{isAmharic ? '🇬🇧 English' : '🇪🇹 አማርኛ'}</span>
-            </button>
+              {t('Language', 'ቋንቋ')}
+            </label>
+            <select
+              id="sidebar-language"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as 'en' | 'am')}
+              className="mt-1 w-full h-8 rounded-xl border border-input bg-background px-2 text-[11px] font-semibold text-foreground cursor-pointer"
+            >
+              <option value="en">🇬🇧 English</option>
+              <option value="am">🇪🇹 አማርኛ (Amharic)</option>
+            </select>
           </div>
         </nav>
 
@@ -253,4 +258,3 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </>
   )
 }
-

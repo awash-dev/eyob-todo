@@ -46,25 +46,25 @@ async function runVerification() {
     process.exit(1);
   }
 
-  // STEP 2: Inspect Shops & Users
-  console.log('\n--- TEST 2: Inspect Shops & Users in DB ---');
-  const shops = await sql`SELECT * FROM shops ORDER BY id`;
-  console.log(`Found ${shops.length} shops:`);
-  shops.forEach(s => console.log(`  - [${s.id}] ${s.name} (Code: ${s.code})`));
+  // STEP 2: Inspect Stores & Users
+  console.log('\n--- TEST 2: Inspect Stores & Users in DB ---');
+  const stores = await sql`SELECT * FROM stores ORDER BY id`;
+  console.log(`Found ${stores.length} stores:`);
+  stores.forEach(s => console.log(`  - [${s.id}] ${s.name} (Code: ${s.code})`));
 
   const users = await sql`
-    SELECT u.id, u.name, u.phone, u.role, u.shop_id, u.password_hash, sh.name AS shop_name
+    SELECT u.id, u.name, u.phone, u.role, u.store_id, u.password_hash, sh.name AS store_name
     FROM users u
-    LEFT JOIN shops sh ON sh.id = u.shop_id
+    LEFT JOIN stores sh ON sh.id = u.store_id
     ORDER BY u.id
   `;
   console.log(`Found ${users.length} users:`);
-  users.forEach(u => console.log(`  - [${u.id}] ${u.name} | Phone: ${u.phone} | Role: ${u.role} | Assigned Shop: ${u.shop_name || 'All Shops (' + (u.shop_id || 'none') + ')'}`));
+  users.forEach(u => console.log(`  - [${u.id}] ${u.name} | Phone: ${u.phone} | Role: ${u.role} | Assigned Store: ${u.store_name || 'All Stores (' + (u.store_id || 'none') + ')'}`));
 
   // STEP 3: Test Login Logic (Web and Mobile match)
   console.log('\n--- TEST 3: Login Verification (Password & Live DB Required) ---');
   for (const user of users) {
-    const testPassword = user.role === 'admin' ? 'Admin@123' : 'Shop@123';
+    const testPassword = user.role === 'admin' ? 'Admin@123' : 'Store@123';
     const isValid = verifyPassword(testPassword, user.password_hash);
     console.log(`  Checking login for ${user.name} (${user.phone}) with '${testPassword}': ${isValid ? '✅ SUCCESS' : '⚠️ Password mismatch'}`);
 
@@ -75,21 +75,21 @@ async function runVerification() {
 
   // STEP 4: Storekeeper Role & Assignment Check
   console.log('\n--- TEST 4: Storekeeper Assignment Check ---');
-  const storekeepers = users.filter(u => u.role === 'shopkeeper' || u.role === 'storekeeper');
+  const storekeepers = users.filter(u => u.role === 'storekeeper' || u.role === 'storekeeper');
   console.log(`Found ${storekeepers.length} storekeepers:`);
   for (const sk of storekeepers) {
-    if (!sk.shop_id) {
-      console.error(`  ❌ Error: ${sk.name} has no shop_id assigned!`);
+    if (!sk.store_id) {
+      console.error(`  ❌ Error: ${sk.name} has no store_id assigned!`);
       process.exit(1);
     } else {
-      console.log(`  ✅ ${sk.name} is successfully assigned to shop '${sk.shop_id}' (${sk.shop_name})`);
+      console.log(`  ✅ ${sk.name} is successfully assigned to store '${sk.store_id}' (${sk.store_name})`);
     }
   }
 
   // STEP 5: Store Creation & Retrieval
   console.log('\n--- TEST 5: Store Item Record Creation & DB Persistence ---');
   const testStockId = 'test-stock-' + Date.now();
-  const testShopId = 'shop-1';
+  const testStoreId = 'store-1';
   const testLineItems = [
     {
       id: 'item-test-1',
@@ -103,10 +103,10 @@ async function runVerification() {
     }
   ];
 
-  console.log(`Creating test store item: "${testLineItems[0].name}" in ${testShopId}...`);
+  console.log(`Creating test store item: "${testLineItems[0].name}" in ${testStoreId}...`);
   await sql`
     INSERT INTO ledger_records (
-      id, type, title, date, notes, exchange_rate, items, shop_id, created_at, updated_at
+      id, type, title, date, notes, exchange_rate, items, store_id, created_at, updated_at
     ) VALUES (
       ${testStockId},
       'stock',
@@ -115,7 +115,7 @@ async function runVerification() {
       'E2E automated store item creation test',
       198,
       ${JSON.stringify(testLineItems)},
-      ${testShopId},
+      ${testStoreId},
       ${Date.now()},
       ${Date.now()}
     )
@@ -131,47 +131,47 @@ async function runVerification() {
     process.exit(1);
   }
   console.log(`✅ Successfully retrieved created store record from DB:`);
-  console.log(`   ID: ${createdRow.id} | Title: ${createdRow.title} | Shop: ${createdRow.shop_id}`);
+  console.log(`   ID: ${createdRow.id} | Title: ${createdRow.title} | Store: ${createdRow.store_id}`);
   const parsedItems = parseJsonField(createdRow.items, []);
   console.log(`   Item Details: ${parsedItems[0]?.name} | Qty: ${parsedItems[0]?.quantity} ${parsedItems[0]?.packaging} | PPC: ${parsedItems[0]?.piecesPerCarton}`);
 
-  // STEP 6: Storekeeper Shop Isolation vs Admin All Shops View
-  console.log('\n--- TEST 6: Shop Isolation & Single Shop View Verification ---');
-  // Shopkeeper 1 query (shop-1)
-  const shop1Records = await sql`
-    SELECT id, title, shop_id FROM ledger_records
-    WHERE type = 'stock' AND shop_id = 'shop-1'
+  // STEP 6: Storekeeper Store Isolation vs Admin All Stores View
+  console.log('\n--- TEST 6: Store Isolation & Single Store View Verification ---');
+  // Storekeeper 1 query (store-1)
+  const store1Records = await sql`
+    SELECT id, title, store_id FROM ledger_records
+    WHERE type = 'stock' AND store_id = 'store-1'
   `;
-  console.log(`Shopkeeper 1 (Merkato) sees ${shop1Records.length} store records for shop-1.`);
-  const shop1HasTest = shop1Records.some(r => r.id === testStockId);
-  console.log(`  - Shopkeeper 1 sees the test store record: ${shop1HasTest ? '✅ YES' : '❌ NO'}`);
+  console.log(`Storekeeper 1 (Merkato) sees ${store1Records.length} store records for store-1.`);
+  const store1HasTest = store1Records.some(r => r.id === testStockId);
+  console.log(`  - Storekeeper 1 sees the test store record: ${store1HasTest ? '✅ YES' : '❌ NO'}`);
 
-  // Shopkeeper 2 query (shop-2)
-  const shop2Records = await sql`
-    SELECT id, title, shop_id FROM ledger_records
-    WHERE type = 'stock' AND shop_id = 'shop-2'
+  // Storekeeper 2 query (store-2)
+  const store2Records = await sql`
+    SELECT id, title, store_id FROM ledger_records
+    WHERE type = 'stock' AND store_id = 'store-2'
   `;
-  console.log(`Shopkeeper 2 (Bole) sees ${shop2Records.length} store records for shop-2.`);
-  const shop2HasTest = shop2Records.some(r => r.id === testStockId);
-  console.log(`  - Shopkeeper 2 does NOT see shop-1 record (Strict Isolation): ${!shop2HasTest ? '✅ SECURE' : '❌ LEAK'}`);
+  console.log(`Storekeeper 2 (Bole) sees ${store2Records.length} store records for store-2.`);
+  const store2HasTest = store2Records.some(r => r.id === testStockId);
+  console.log(`  - Storekeeper 2 does NOT see store-1 record (Strict Isolation): ${!store2HasTest ? '✅ SECURE' : '❌ LEAK'}`);
 
-  // Admin query (all shops combined)
+  // Admin query (all stores combined)
   const allStoreRecords = await sql`
-    SELECT r.id, r.title, r.shop_id, s.name as shop_name
+    SELECT r.id, r.title, r.store_id, s.name as store_name
     FROM ledger_records r
-    LEFT JOIN shops s ON s.id = r.shop_id
+    LEFT JOIN stores s ON s.id = r.store_id
     WHERE r.type = 'stock'
   `;
   console.log(`Admin sees all store records combined: Total ${allStoreRecords.length} records`);
   const adminHasTest = allStoreRecords.some(r => r.id === testStockId);
-  console.log(`  - Admin sees shop-1 records and shop-2 records in combination: ${adminHasTest ? '✅ YES' : '❌ NO'}`);
+  console.log(`  - Admin sees store-1 records and store-2 records in combination: ${adminHasTest ? '✅ YES' : '❌ NO'}`);
 
   // STEP 7: Store Counters Verification
   console.log('\n--- TEST 7: Store Counters Verification ---');
-  for (const shop of shops) {
+  for (const store of stores) {
     const rawStock = await sql`
-      SELECT id, title, items, shop_id, date FROM ledger_records
-      WHERE type = 'stock' AND shop_id = ${shop.id}
+      SELECT id, title, items, store_id, date FROM ledger_records
+      WHERE type = 'stock' AND store_id = ${store.id}
     `;
 
     // Group items and calculate counters exactly as Flutter & Web do
@@ -208,7 +208,7 @@ async function runVerification() {
     const totalPiecesOnHand = items.reduce((sum, i) => sum + Math.max(0, i.pieces), 0);
     const storeInventoryValue = items.reduce((sum, i) => sum + Math.max(0, i.totalValue), 0);
 
-    console.log(`📊 Counters for ${shop.name} (${shop.id}):`);
+    console.log(`📊 Counters for ${store.name} (${store.id}):`);
     console.log(`   - Products in Store: ${productsInStore} items`);
     console.log(`   - Cartons on Hand:   ${cartonsOnHand} cartons`);
     console.log(`   - Total Pieces:      ${totalPiecesOnHand} pcs`);

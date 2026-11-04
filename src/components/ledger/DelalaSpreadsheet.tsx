@@ -5,9 +5,6 @@ import {
   Trash2,
   Edit2,
   RefreshCw,
-  TrendingUp,
-  TrendingDown,
-  Scale,
   Calendar,
   X,
   Check,
@@ -44,8 +41,8 @@ export function DelalaSpreadsheet({
 }: {
   onOpenMobileMenu?: () => void
 } = {}) {
-  const { activeShop, activeShopId } = useAuth()
-  const { t, isAmharic } = useLanguage()
+  const { activeStore, activeStoreId } = useAuth()
+  const { t } = useLanguage()
   const [entries, setEntries] = useState<DelalaEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -73,8 +70,8 @@ export function DelalaSpreadsheet({
     try {
       setLoading(true)
       setError(null)
-      const shopId = !activeShopId || activeShopId === 'all' ? undefined : activeShopId
-      const data = await getDelalaEntries(shopId)
+      const storeId = !activeStoreId || activeStoreId === 'all' ? undefined : activeStoreId
+      const data = await getDelalaEntries(storeId)
       setEntries(data)
     } catch (err: any) {
       console.error('Failed to load Delala entries:', err)
@@ -86,11 +83,11 @@ export function DelalaSpreadsheet({
 
   useEffect(() => {
     loadData()
-  }, [activeShopId, activeShop?.id])
+  }, [activeStoreId, activeStore?.id])
 
 
   // Summary stats
-  const { totalPositive, totalNegative, finalBalance } = useMemo(() => {
+  const { finalBalance } = useMemo(() => {
     let pos = 0
     let neg = 0
     for (const e of entries) {
@@ -192,7 +189,7 @@ export function DelalaSpreadsheet({
           pieces: livePieces,
           sign,
           transactionDate: transactionDate.trim(),
-          storeId: activeShop?.id,
+          storeId: activeStore?.id,
         })
         setEntries((prev) => [...prev, created])
       }

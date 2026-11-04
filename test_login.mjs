@@ -23,9 +23,9 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 async function testLogin(phone, password) {
   try {
     const rows = await sql`
-      SELECT u.*, sh.name AS shop_name
+      SELECT u.*, sh.name AS store_name
       FROM users u
-      LEFT JOIN shops sh ON sh.id = u.shop_id
+      LEFT JOIN stores sh ON sh.id = u.store_id
       WHERE u.phone = ${phone}
       LIMIT 1
     `;
@@ -49,5 +49,5 @@ async function testLogin(phone, password) {
   }
 }
 
-testLogin('+251922222222', 'Shop@123');
+testLogin('+251922222222', 'Store@123');
 

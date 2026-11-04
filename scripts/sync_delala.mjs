@@ -20,7 +20,7 @@ async function syncDelalaData() {
       sign: -1,
       total: -650.00,
       transaction_date: '02/11/2026',
-      store_id: 'shop_1'
+      store_id: 'store_1'
     },
     {
       delala_name: 'Mohammed',
@@ -30,7 +30,7 @@ async function syncDelalaData() {
       sign: 1,
       total: 500.00,
       transaction_date: '02/11/2026',
-      store_id: 'shop_1'
+      store_id: 'store_1'
     },
     {
       delala_name: 'Mohammed',
@@ -40,7 +40,7 @@ async function syncDelalaData() {
       sign: 1,
       total: 13450.00,
       transaction_date: '02/11/2026',
-      store_id: 'shop_1'
+      store_id: 'store_1'
     },
     {
       delala_name: 'Mohammed',
@@ -50,7 +50,7 @@ async function syncDelalaData() {
       sign: -1,
       total: -2000.00,
       transaction_date: '02/11/2026',
-      store_id: 'shop_1'
+      store_id: 'store_1'
     },
     {
       delala_name: 'Mohammed',
@@ -60,7 +60,7 @@ async function syncDelalaData() {
       sign: -1,
       total: -5000.00,
       transaction_date: '02/11/2026',
-      store_id: 'shop_1'
+      store_id: 'store_1'
     }
   ];
 

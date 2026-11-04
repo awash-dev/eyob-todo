@@ -13,7 +13,9 @@ import {
   deleteRecord as apiDeleteRecord,
   getRecords as apiGetRecords,
   updateRecord as apiUpdateRecord,
+  recordCreditTransaction as apiRecordCreditTransaction,
 } from '../lib/api'
+import type { CreditTransactionParams } from '../lib/creditAccounting'
 import { useAuth } from './AuthContext'
 
 interface ToastState {
@@ -54,6 +56,17 @@ interface LedgerContextType {
   toasts: ToastState[]
   showToast: (message: string, type?: 'success' | 'info' | 'error') => void
   removeToast: (id: number) => void
+  isPaymentModalOpen: boolean
+  paymentTargetType: 'customer' | 'supplier' | 'delala'
+  paymentTargetParty: string | null
+  paymentTargetCategory: CreditTransactionParams['transactionCategory'] | null
+  openPaymentModal: (
+    type?: 'customer' | 'supplier' | 'delala',
+    partyName?: string,
+    category?: CreditTransactionParams['transactionCategory'],
+  ) => void
+  closePaymentModal: () => void
+  recordCreditTx: (params: CreditTransactionParams) => Promise<void>
 }
 
 const LedgerContext = createContext<LedgerContextType | undefined>(undefined)
@@ -61,33 +74,22 @@ const LedgerContext = createContext<LedgerContextType | undefined>(undefined)
 export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { activeShopId, user, shops } = useAuth()
+  const { activeStoreId, user, stores } = useAuth()
+
+  // For storekeepers, always prioritize their assigned store even if activeStoreId hasn't synced yet
+  const effectiveStoreId = useMemo(() => {
+    if (user?.role === 'storekeeper') {
+      return user.storeId || activeStoreId || stores[0]?.id || null
+    }
+    return activeStoreId
+  }, [user?.role, user?.storeId, activeStoreId, stores])
 
   // Records are always fetched from the database — there is no local cache
   // and no seeded/demo data to fall back on.
   const [records, setRecords] = useState<LedgerRecord[]>([])
 
-  const [activeTab, setActiveTabState] = useState<TabType>(() =>
-    user?.role === 'shopkeeper' ? 'stock' : 'customer',
-  )
-
-  const setActiveTab = useCallback(
-    (tab: TabType) => {
-      if (user?.role === 'shopkeeper') {
-        setActiveTabState('stock')
-        return
-      }
-      setActiveTabState(tab)
-    },
-    [user?.role],
-  )
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
-  const [editingRecord, setEditingRecord] = useState<LedgerRecord | null>(null)
+  // Toast notifications state & handlers (declared first so all callbacks can use them)
   const [toasts, setToasts] = useState<ToastState[]>([])
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('syncing')
-  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null)
 
   const showToast = useCallback(
     (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -104,8 +106,107 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
     setToasts((prev) => prev.filter((toast) => toast.id !== id))
   }, [])
 
-  const syncWithNeon = useCallback(async () => {
-    if (!activeShopId) {
+  // Sync state
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('syncing')
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null)
+
+  // Tab & Search state
+  const [activeTab, setActiveTabState] = useState<TabType>(() =>
+    user?.role === 'storekeeper' ? 'stock' : 'customer',
+  )
+
+  // Ensure storekeepers are locked to 'stock' tab whenever user is loaded
+  useEffect(() => {
+    if (user?.role === 'storekeeper' && activeTab !== 'stock') {
+      setActiveTabState('stock')
+    }
+  }, [user?.role, activeTab])
+
+  const setActiveTab = useCallback(
+    (tab: TabType) => {
+      if (user?.role === 'storekeeper') {
+        setActiveTabState('stock')
+        return
+      }
+      setActiveTabState(tab)
+    },
+    [user?.role],
+  )
+
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Edit / Create Record Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
+  const [editingRecord, setEditingRecord] = useState<LedgerRecord | null>(null)
+
+  // Credit & Payment Transaction Modal state
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [paymentTargetType, setPaymentTargetType] = useState<'customer' | 'supplier' | 'delala'>('customer')
+  const [paymentTargetParty, setPaymentTargetParty] = useState<string | null>(null)
+  const [paymentTargetCategory, setPaymentTargetCategory] = useState<
+    CreditTransactionParams['transactionCategory'] | null
+  >(null)
+
+  const openPaymentModal = useCallback(
+    (
+      type?: 'customer' | 'supplier' | 'delala',
+      partyName?: string,
+      category?: CreditTransactionParams['transactionCategory'],
+    ) => {
+      setPaymentTargetType(type || (activeTab === 'supplier' ? 'supplier' : activeTab === 'delala' ? 'delala' : 'customer'))
+      setPaymentTargetParty(partyName || null)
+      setPaymentTargetCategory(category || null)
+      setIsPaymentModalOpen(true)
+    },
+    [activeTab],
+  )
+
+  const closePaymentModal = useCallback(() => {
+    setIsPaymentModalOpen(false)
+    setPaymentTargetParty(null)
+    setPaymentTargetCategory(null)
+  }, [])
+
+  const recordCreditTx = useCallback(
+    async (params: CreditTransactionParams) => {
+      const resolvedStoreId =
+        effectiveStoreId && effectiveStoreId !== 'all' ? effectiveStoreId : stores[0]?.id
+      if (!resolvedStoreId) {
+        showToast('No active store selected', 'error')
+        throw new Error('No active store selected')
+      }
+
+      setSyncStatus('syncing')
+      try {
+        const { record } = await apiRecordCreditTransaction(params, resolvedStoreId)
+        setRecords((prev) => {
+          const index = prev.findIndex((r) => r.id === record.id)
+          if (index >= 0) {
+            const next = [...prev]
+            next[index] = record
+            return next
+          }
+          return [record, ...prev]
+        })
+        setSyncStatus('synced')
+        setLastSyncedAt(new Date())
+        showToast(
+          `Transaction saved: ${params.partyName} (${params.amount.toLocaleString()} ETB)`,
+          'success',
+        )
+      } catch (err) {
+        setSyncStatus('offline')
+        const message = err instanceof Error ? err.message : 'Failed to record transaction'
+        showToast(message, 'error')
+        throw err
+      }
+    },
+    [effectiveStoreId, stores, showToast],
+  )
+
+    const syncWithNeon = useCallback(async () => {
+    if (!effectiveStoreId) {
       setRecords([])
       setSyncStatus('synced')
       return
@@ -114,7 +215,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       setSyncStatus('syncing')
       const { records: nextRecords } = await apiGetRecords(
         undefined,
-        activeShopId,
+        effectiveStoreId,
       )
       setRecords(nextRecords)
       setSyncStatus('synced')
@@ -125,11 +226,11 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       setRecords([])
       setSyncStatus('offline')
     }
-  }, [activeShopId])
+  }, [effectiveStoreId])
 
-  // Automatically fetch records & sync on initial mount and whenever active shop changes
+  // Automatically fetch records & sync on initial mount and whenever active store changes
   useEffect(() => {
-    if (!activeShopId) {
+    if (!effectiveStoreId) {
       setRecords([])
       setSyncStatus('synced')
       return
@@ -138,7 +239,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
     let isCancelled = false
     setRecords([])
     setSyncStatus('syncing')
-    apiGetRecords(undefined, activeShopId)
+    apiGetRecords(undefined, effectiveStoreId)
       .then(({ records: liveRecords }) => {
         if (!isCancelled) {
           setRecords(liveRecords)
@@ -157,12 +258,12 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       isCancelled = true
     }
-  }, [activeShopId])
+  }, [effectiveStoreId])
 
   // Automatically sync when window gains focus
   useEffect(() => {
     const handleFocus = () => {
-      if (activeShopId && document.visibilityState === 'visible') {
+      if (effectiveStoreId && document.visibilityState === 'visible') {
         void syncWithNeon()
       }
     }
@@ -172,7 +273,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       window.removeEventListener('visibilitychange', handleFocus)
       window.removeEventListener('focus', handleFocus)
     }
-  }, [activeShopId, syncWithNeon])
+  }, [effectiveStoreId, syncWithNeon])
 
   const openCreateModal = useCallback((defaultTab?: TabType) => {
     if (defaultTab) setActiveTab(defaultTab)
@@ -194,13 +295,13 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const addRecord = useCallback(
     (data: Omit<LedgerRecord, 'id' | 'createdAt' | 'updatedAt'>) => {
-      // Never invent a shop id: use the selected shop, or the first shop
+      // Never invent a store id: use the selected store, or the first store
       // that actually exists in the database.
-      const resolvedShopId =
-        activeShopId && activeShopId !== 'all' ? activeShopId : shops[0]?.id
-      if (!resolvedShopId) {
+      const resolvedStoreId =
+        effectiveStoreId && effectiveStoreId !== 'all' ? effectiveStoreId : stores[0]?.id
+      if (!resolvedStoreId) {
         showToast(
-          'No shop exists in the database yet — create a shop first',
+          'No store exists in the database yet — create a store first',
           'error',
         )
         return
@@ -210,7 +311,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       const optimistic: LedgerRecord = {
         ...data,
         id: tempId,
-        shopId: resolvedShopId,
+        storeId: resolvedStoreId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }
@@ -218,7 +319,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       showToast(`Added: "${data.title}"`, 'success')
 
       setSyncStatus('syncing')
-      apiCreateRecord(data, resolvedShopId)
+      apiCreateRecord(data, resolvedStoreId)
         .then(({ record }) => {
           setRecords((prev) =>
             prev.map((item) => (item.id === tempId ? record : item)),
@@ -235,7 +336,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
           )
         })
     },
-    [activeShopId, shops, showToast],
+    [effectiveStoreId, stores, showToast],
   )
 
   const updateRecord = useCallback(
@@ -272,7 +373,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
           )
         })
     },
-    [activeShopId, records, showToast],
+    [records, showToast],
   )
 
   const deleteRecord = useCallback(
@@ -298,13 +399,13 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
           )
         })
     },
-    [activeShopId, records, showToast],
+    [records, showToast],
   )
 
   const clearAll = useCallback(() => {
     const current = [...records]
     setRecords([])
-    showToast('All records in this shop cleared', 'info')
+    showToast('All records in this store cleared', 'info')
     Promise.all(current.map((record) => apiDeleteRecord(record.id))).catch(
       (err) => {
         console.warn('Could not clear all records:', err)
@@ -320,8 +421,8 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
         showToast('Invalid data format. Expected an array of records.', 'error')
         return false
       }
-      if (!activeShopId) {
-        showToast('Select a shop before importing records', 'error')
+      if (!effectiveStoreId) {
+        showToast('Select a store before importing records', 'error')
         return false
       }
       showToast(`Importing ${imported.length} records...`, 'info')
@@ -336,7 +437,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
               exchangeRate: record.exchangeRate,
               items: record.items,
             },
-            activeShopId,
+            effectiveStoreId,
           ),
         ),
       )
@@ -353,7 +454,7 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
         })
       return true
     },
-    [activeShopId, showToast],
+    [effectiveStoreId, showToast],
   )
 
   const currentTabRecords = useMemo(
@@ -417,6 +518,13 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       toasts,
       showToast,
       removeToast,
+      isPaymentModalOpen,
+      paymentTargetType,
+      paymentTargetParty,
+      paymentTargetCategory,
+      openPaymentModal,
+      closePaymentModal,
+      recordCreditTx,
     }),
     [
       records,
@@ -443,6 +551,13 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       toasts,
       showToast,
       removeToast,
+      isPaymentModalOpen,
+      paymentTargetType,
+      paymentTargetParty,
+      paymentTargetCategory,
+      openPaymentModal,
+      closePaymentModal,
+      recordCreditTx,
     ],
   )
 
