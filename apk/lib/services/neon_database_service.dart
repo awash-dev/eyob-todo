@@ -36,7 +36,9 @@ class NeonDatabaseService {
     final list = <String>[];
     try {
       if (dotenv.isInitialized) {
-        final proxy = dotenv.env['NEON_PROXY_ENDPOINT'] ?? dotenv.env['PROXY_SQL_ENDPOINT'];
+        final proxy =
+            dotenv.env['NEON_PROXY_ENDPOINT'] ??
+            dotenv.env['PROXY_SQL_ENDPOINT'];
         if (proxy != null && proxy.isNotEmpty) {
           list.add(proxy);
         }
@@ -55,7 +57,9 @@ class NeonDatabaseService {
 
     // Clean standard serverless endpoint
     list.add('https://ep-red-sea-b5yphk96.c-7.us-east-2.aws.neon.tech/sql');
-    list.add('https://ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/sql');
+    list.add(
+      'https://ep-red-sea-b5yphk96-pooler.c-7.us-east-2.aws.neon.tech/sql',
+    );
 
     // Remove duplicates while preserving order
     final seen = <String>{};
@@ -149,13 +153,17 @@ class NeonDatabaseService {
       }
     }
 
-    if (response != null && response.statusCode >= 200 && response.statusCode < 300) {
+    if (response != null &&
+        response.statusCode >= 200 &&
+        response.statusCode < 300) {
       final decoded = jsonDecode(response.body);
       return _parseNeonRows(decoded);
     }
 
     if (response != null) {
-      throw Exception('Server error (${response.statusCode}): ${response.body}');
+      throw Exception(
+        'Server error (${response.statusCode}): ${response.body}',
+      );
     }
 
     // Clean user-friendly network error translation
@@ -324,7 +332,9 @@ class NeonDatabaseService {
   /// Resolves the store a record belongs to: the given store, or the first store
   /// in the database. Throws when the database has no store at all.
   static Future<String> resolveStoreId(String? storeId) async {
-    if (storeId != null && storeId.isNotEmpty && storeId != 'all') return storeId;
+    if (storeId != null && storeId.isNotEmpty && storeId != 'all') {
+      return storeId;
+    }
     final first = await _firstStoreId();
     if (first == null) {
       throw Exception(
@@ -450,8 +460,11 @@ class NeonDatabaseService {
           }
 
           final mergedItems = [...existingItems, ...record.items];
-          final mergedItemsJson = jsonEncode(mergedItems.map((i) => i.toJson()).toList());
-          final mergedNotes = (record.notes != null && record.notes!.trim().isNotEmpty)
+          final mergedItemsJson = jsonEncode(
+            mergedItems.map((i) => i.toJson()).toList(),
+          );
+          final mergedNotes =
+              (record.notes != null && record.notes!.trim().isNotEmpty)
               ? record.notes!.trim()
               : (existing['notes']?.toString() ?? '');
 
@@ -578,12 +591,21 @@ class NeonDatabaseService {
     String? code,
   }) async {
     if (name != null) {
-      await executeSql('UPDATE stores SET name = \$1 WHERE id = \$2', [name, storeId]);
+      await executeSql('UPDATE stores SET name = \$1 WHERE id = \$2', [
+        name,
+        storeId,
+      ]);
     }
     if (code != null) {
-      await executeSql('UPDATE stores SET code = \$1 WHERE id = \$2', [code, storeId]);
+      await executeSql('UPDATE stores SET code = \$1 WHERE id = \$2', [
+        code,
+        storeId,
+      ]);
     }
-    final rows = await executeSql('SELECT id, name, code FROM stores WHERE id = \$1', [storeId]);
+    final rows = await executeSql(
+      'SELECT id, name, code FROM stores WHERE id = \$1',
+      [storeId],
+    );
     if (rows.isNotEmpty) {
       return Store(
         id: rows[0]['id'].toString(),
@@ -821,7 +843,9 @@ class NeonDatabaseService {
     String? notes,
     String? storeId,
   }) async {
-    final cleanName = fullName.trim().isEmpty ? 'Delala Broker' : fullName.trim();
+    final cleanName = fullName.trim().isEmpty
+        ? 'Delala Broker'
+        : fullName.trim();
     final inserted = await executeSql(
       'INSERT INTO brokers (full_name, phone, alternative_phone, business_name, '
       'location, website, reference_number, notes, store_id, status) '
@@ -920,7 +944,9 @@ class NeonDatabaseService {
   }
 
   /// Fetch all transactions for a broker
-  static Future<List<DelalaTransaction>> getDelalaTransactionsDirect([String? brokerId]) async {
+  static Future<List<DelalaTransaction>> getDelalaTransactionsDirect([
+    String? brokerId,
+  ]) async {
     List<Map<String, dynamic>> rows;
     if (brokerId != null && brokerId.isNotEmpty) {
       rows = await executeSql(
@@ -1063,7 +1089,11 @@ class NeonDatabaseService {
           effect = -1;
           break;
         default:
-          effect = int.tryParse(existing.first['accounting_effect']?.toString() ?? '1') ?? 1;
+          effect =
+              int.tryParse(
+                existing.first['accounting_effect']?.toString() ?? '1',
+              ) ??
+              1;
       }
     }
 
@@ -1133,19 +1163,25 @@ class NeonDatabaseService {
   }
 
   /// Fetch Delala spreadsheet entries from Neon PostgreSQL
-  static Future<List<DelalaEntry>> getDelalaEntriesDirect([String? storeId]) async {
+  static Future<List<DelalaEntry>> getDelalaEntriesDirect([
+    String? storeId,
+  ]) async {
     final query = (storeId != null && storeId.isNotEmpty && storeId != 'all')
         ? 'SELECT id, delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id, created_at, updated_at '
-          'FROM delala_entries WHERE store_id = \$1 OR store_id IS NULL ORDER BY created_at ASC'
+              'FROM delala_entries WHERE store_id = \$1 OR store_id IS NULL ORDER BY created_at ASC'
         : 'SELECT id, delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id, created_at, updated_at '
-          'FROM delala_entries ORDER BY created_at ASC';
+              'FROM delala_entries ORDER BY created_at ASC';
 
-    final params = (storeId != null && storeId.isNotEmpty && storeId != 'all') ? [storeId] : null;
+    final params = (storeId != null && storeId.isNotEmpty && storeId != 'all')
+        ? [storeId]
+        : null;
 
     final rows = await executeSql(query, params);
     return rows.map((r) {
       final map = Map<String, dynamic>.from(r);
-      map['delala_name'] = cleanDelalaName(map['delala_name']?.toString() ?? '');
+      map['delala_name'] = cleanDelalaName(
+        map['delala_name']?.toString() ?? '',
+      );
       return DelalaEntry.fromMap(map);
     }).toList();
   }
@@ -1160,10 +1196,16 @@ class NeonDatabaseService {
     required String transactionDate,
     String? storeId,
   }) async {
-    final cleanName = cleanDelalaName(delalaName).isEmpty ? 'Mohammed' : cleanDelalaName(delalaName);
-    final cleanProduct = productName.trim().isEmpty ? 'Item' : productName.trim();
+    final cleanName = cleanDelalaName(delalaName).isEmpty
+        ? 'Mohammed'
+        : cleanDelalaName(delalaName);
+    final cleanProduct = productName.trim().isEmpty
+        ? 'Item'
+        : productName.trim();
     final int finalSign = sign == -1 ? -1 : 1;
-    final double calculatedTotal = double.parse((unitPrice * pieces * finalSign).toStringAsFixed(2));
+    final double calculatedTotal = double.parse(
+      (unitPrice * pieces * finalSign).toStringAsFixed(2),
+    );
 
     final inserted = await executeSql(
       'INSERT INTO delala_entries ('
@@ -1202,11 +1244,20 @@ class NeonDatabaseService {
     if (existing.isEmpty) return;
     final cur = existing.first;
 
-    final double curPrice = unitPrice ?? (cur['unit_price'] is num ? (cur['unit_price'] as num).toDouble() : 0.0);
-    final double curPieces = pieces ?? (cur['pieces'] is num ? (cur['pieces'] as num).toDouble() : 0.0);
-    final int curSign = sign ?? (cur['sign'] is num ? (cur['sign'] as num).toInt() : 1);
+    final double curPrice =
+        unitPrice ??
+        (cur['unit_price'] is num
+            ? (cur['unit_price'] as num).toDouble()
+            : 0.0);
+    final double curPieces =
+        pieces ??
+        (cur['pieces'] is num ? (cur['pieces'] as num).toDouble() : 0.0);
+    final int curSign =
+        sign ?? (cur['sign'] is num ? (cur['sign'] as num).toInt() : 1);
     final int finalSign = curSign == -1 ? -1 : 1;
-    final double finalTotal = double.parse((curPrice * curPieces * finalSign).toStringAsFixed(2));
+    final double finalTotal = double.parse(
+      (curPrice * curPieces * finalSign).toStringAsFixed(2),
+    );
 
     await executeSql(
       'UPDATE delala_entries SET '
@@ -1241,7 +1292,9 @@ class NeonDatabaseService {
   /* ------------------- Store Inventory & Stock Movements ------------------- */
 
   /// Fetch products from store_inventory table directly from Neon
-  static Future<List<InventoryProduct>> getInventoryProductsDirect({String? storeId}) async {
+  static Future<List<InventoryProduct>> getInventoryProductsDirect({
+    String? storeId,
+  }) async {
     List<Map<String, dynamic>> rows;
     if (storeId != null && storeId.isNotEmpty && storeId != 'all') {
       rows = await executeSql(
@@ -1254,19 +1307,20 @@ class NeonDatabaseService {
         [storeId],
       );
     } else {
-      rows = await executeSql(
-        '''
+      rows = await executeSql('''
         SELECT * FROM store_inventory
         WHERE (is_deleted IS NULL OR is_deleted = FALSE)
         ORDER BY product_name ASC
-        ''',
-      );
+        ''');
     }
     return rows.map((r) => InventoryProduct.fromJson(r)).toList();
   }
 
   /// Check whether a product with this name already exists in the given store
-  static Future<bool> checkProductExistsDirect(String productName, String? storeId) async {
+  static Future<bool> checkProductExistsDirect(
+    String productName,
+    String? storeId,
+  ) async {
     final clean = productName.trim().toLowerCase();
     List<Map<String, dynamic>> rows;
     if (storeId != null && storeId.isNotEmpty && storeId != 'all') {
@@ -1316,11 +1370,13 @@ class NeonDatabaseService {
       throw Exception('Quantity and price values cannot be negative');
     }
     final pcsPerCtn = pcsPerCarton > 0 ? pcsPerCarton : 1.0;
-    final totalInitialPieces = (openingCartons * pcsPerCtn) + openingLoosePieces;
+    final totalInitialPieces =
+        (openingCartons * pcsPerCtn) + openingLoosePieces;
     final txnDate = (date != null && date.trim().isNotEmpty)
         ? date.trim()
         : DateTime.now().toIso8601String().split('T')[0];
-    final sku = 'SKU-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+    final sku =
+        'SKU-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
     final pCost = costPrice > 0 ? costPrice : unitPrice;
     final totalValue = totalInitialPieces * unitPrice;
 
@@ -1439,18 +1495,22 @@ class NeonDatabaseService {
         ? (prod['current_quantity'] as num).toDouble()
         : double.tryParse(prod['current_quantity']?.toString() ?? '0') ?? 0.0;
     final productName = prod['product_name']?.toString() ?? '';
-    final prodStoreId = (storeId != null && storeId.isNotEmpty && storeId != 'all')
+    final prodStoreId =
+        (storeId != null && storeId.isNotEmpty && storeId != 'all')
         ? storeId
         : prod['store_id']?.toString();
 
-    final txnDate = (transactionDate != null && transactionDate.trim().isNotEmpty)
+    final txnDate =
+        (transactionDate != null && transactionDate.trim().isNotEmpty)
         ? transactionDate.trim()
         : DateTime.now().toIso8601String().split('T')[0];
 
     final totalPrice = double.parse((qty * unitPrice).toStringAsFixed(2));
     final conversion = pcsPerCarton > 0
         ? pcsPerCarton
-        : ((prod['pcs_per_carton'] is num) ? (prod['pcs_per_carton'] as num).toDouble() : 1.0);
+        : ((prod['pcs_per_carton'] is num)
+              ? (prod['pcs_per_carton'] as num).toDouble()
+              : 1.0);
 
     // 2. Strict Stock Out Check before DB write
     if (isOut && qty > currentQty) {
@@ -1493,11 +1553,14 @@ class NeonDatabaseService {
 
     if (updatedRows.isEmpty) {
       if (isOut) {
-        final freshRows = await executeSql('SELECT current_quantity FROM store_inventory WHERE id = \$1', [productId]);
+        final freshRows = await executeSql(
+          'SELECT current_quantity FROM store_inventory WHERE id = \$1',
+          [productId],
+        );
         final freshQty = freshRows.isNotEmpty
             ? ((freshRows.first['current_quantity'] is num)
-                ? (freshRows.first['current_quantity'] as num).toDouble()
-                : 0.0)
+                  ? (freshRows.first['current_quantity'] as num).toDouble()
+                  : 0.0)
             : 0.0;
         throw Exception(
           'Insufficient stock! Available quantity: ${freshQty.toInt()} pieces.',
@@ -1509,7 +1572,9 @@ class NeonDatabaseService {
     final updatedProd = InventoryProduct.fromJson(updatedRows.first);
     final prevStock = (updatedRows.first['previous_qty'] is num)
         ? (updatedRows.first['previous_qty'] as num).toDouble()
-        : (isOut ? updatedProd.currentQuantity + qty : updatedProd.currentQuantity - qty);
+        : (isOut
+              ? updatedProd.currentQuantity + qty
+              : updatedProd.currentQuantity - qty);
 
     // 4. Insert into stock_movements (immutable audit trail)
     try {
@@ -1566,7 +1631,8 @@ class NeonDatabaseService {
         'pcsPerCarton': conversion,
         'packagingUnit': cartons > 0 ? 'Carton' : 'Pcs',
         'date': txnDate,
-        'notes': note ?? (isOut ? 'Stock Out (Outgoing)' : 'Stock In (Incoming)'),
+        'notes':
+            note ?? (isOut ? 'Stock Out (Outgoing)' : 'Stock In (Incoming)'),
       };
       final ledgerNotes = party != null && party.isNotEmpty
           ? (isOut ? 'Destination: $party' : 'Supplier: $party')
@@ -1598,7 +1664,9 @@ class NeonDatabaseService {
   }
 
   /// Get transaction history (stock movements) for a specific product
-  static Future<List<StockMovement>> getProductStockMovementsDirect(String productId) async {
+  static Future<List<StockMovement>> getProductStockMovementsDirect(
+    String productId,
+  ) async {
     final rows = await executeSql(
       '''
       SELECT sm.*, u.name AS user_name
@@ -1627,7 +1695,8 @@ class NeonDatabaseService {
     String? updatedBy,
     bool? isActive,
   }) async {
-    if ((unitPrice ?? 0) < 0 || (costPrice ?? 0) < 0 ||
+    if ((unitPrice ?? 0) < 0 ||
+        (costPrice ?? 0) < 0 ||
         (pcsPerCarton ?? 1) <= 0 ||
         (quantityCartons ?? 0) < 0 ||
         (minimumStock ?? 0) < 0) {
@@ -1673,11 +1742,11 @@ class NeonDatabaseService {
         unitPrice,
         costPrice,
         pcsPerCarton,
-          effectiveCartons,
-          minimumStock,
-          category,
-          supplierName,
-          description,
+        effectiveCartons,
+        minimumStock,
+        category,
+        supplierName,
+        description,
         id,
         updatedBy,
         isActive,

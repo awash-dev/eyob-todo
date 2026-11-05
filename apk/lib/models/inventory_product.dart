@@ -127,7 +127,9 @@ class InventoryProduct {
       createdBy: json['created_by']?.toString(),
       updatedBy: json['updated_by']?.toString(),
       isDeleted: parseBool(json['is_deleted']),
-      isActive: json['is_active'] == null ? !parseBool(json['is_deleted']) : parseBool(json['is_active']),
+      isActive: json['is_active'] == null
+          ? !parseBool(json['is_deleted'])
+          : parseBool(json['is_active']),
       createdAt: parseDate(json['created_at']),
       updatedAt: parseDate(json['updated_at']),
     );

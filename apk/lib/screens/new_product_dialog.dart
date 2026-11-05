@@ -83,10 +83,16 @@ class _NewProductDialogState extends State<NewProductDialog> {
         final storeId = widget.currentUser.isStorekeeper
             ? (widget.currentUser.storeId ?? widget.activeStoreId)
             : (widget.activeStoreId == 'all' ? null : widget.activeStoreId);
-        final products = await ApiService.getInventoryProducts(storeId: storeId);
+        final products = await ApiService.getInventoryProducts(
+          storeId: storeId,
+        );
         if (!mounted) return;
-        final matches = products.where((p) =>
-            p.productName.toLowerCase().contains(query.toLowerCase())).take(8).toList();
+        final matches = products
+            .where(
+              (p) => p.productName.toLowerCase().contains(query.toLowerCase()),
+            )
+            .take(8)
+            .toList();
         setState(() => _suggestions = matches);
       } catch (_) {
         if (mounted) setState(() => _suggestions = []);
@@ -111,8 +117,11 @@ class _NewProductDialogState extends State<NewProductDialog> {
 
   void _selectSuggestion(InventoryProduct product) {
     _nameController.text = product.productName;
-    _pcsPerCartonController.text = '${product.pcsPerCarton > 0 ? product.pcsPerCarton : 1}';
-    _unitPriceController.text = product.unitPrice > 0 ? '${product.unitPrice}' : '';
+    _pcsPerCartonController.text =
+        '${product.pcsPerCarton > 0 ? product.pcsPerCarton : 1}';
+    _unitPriceController.text = product.unitPrice > 0
+        ? '${product.unitPrice}'
+        : '';
     _minStockController.text = '${product.minimumStock}';
     setState(() => _suggestions = []);
   }
@@ -126,7 +135,10 @@ class _NewProductDialogState extends State<NewProductDialog> {
       _selectedDate.month,
       _selectedDate.day,
     );
-    return EthiopianCalendar.formatDisplay(eth, lang: widget.isAmharic ? 'am' : 'en');
+    return EthiopianCalendar.formatDisplay(
+      eth,
+      lang: widget.isAmharic ? 'am' : 'en',
+    );
   }
 
   Future<void> _pickDate() async {
@@ -150,9 +162,11 @@ class _NewProductDialogState extends State<NewProductDialog> {
 
     final name = _nameController.text.trim();
     if (_openingCartons < 0 || _unitPrice < 0) {
-      setState(() => _errorMessage = widget.isAmharic
-          ? 'መጠንና ዋጋ አሉታዊ መሆን አይችሉም'
-          : 'Quantities and prices cannot be negative');
+      setState(
+        () => _errorMessage = widget.isAmharic
+            ? 'መጠንና ዋጋ አሉታዊ መሆን አይችሉም'
+            : 'Quantities and prices cannot be negative',
+      );
       return;
     }
     final targetStoreId = widget.currentUser.isStorekeeper
@@ -168,9 +182,9 @@ class _NewProductDialogState extends State<NewProductDialog> {
       // Duplicate check
       final exists = await ApiService.checkProductExists(name, targetStoreId);
       if (exists && mounted) {
-        throw Exception(widget.isAmharic
-            ? 'ይህ ምርት ቀድሞ ተመዝግቧል። ከዝርዝሩ ይምረጡ ወይም ስሙን ያርሙ።'
-            : 'This product already exists. Select it from suggestions or edit its saved details.');
+        throw Exception(
+          widget.isAmharic ? 'ይህ ምርት ቀድሞ ተመዝግቧል። ከዝርዝሩ ይምረጡ ወይም ስሙን ያርሙ።' : 'This product already exists. Select it from suggestions or edit its saved details.',
+        );
       }
 
       final product = await ApiService.registerProduct(
@@ -234,7 +248,9 @@ class _NewProductDialogState extends State<NewProductDialog> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            widget.isAmharic ? 'አዲስ ምርት መመዝገቢያ' : 'New Product Registration',
+                            widget.isAmharic
+                                ? 'አዲስ ምርት መመዝገቢያ'
+                                : 'New Product Registration',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -274,14 +290,23 @@ class _NewProductDialogState extends State<NewProductDialog> {
                   TextFormField(
                     controller: _nameController,
                     decoration: InputDecoration(
-                      labelText: widget.isAmharic ? 'የዕቃ ስም *' : 'Product Name *',
+                      labelText: widget.isAmharic
+                          ? 'የዕቃ ስም *'
+                          : 'Product Name *',
                       hintText: widget.isAmharic ? 'ምሳሌ፦ ወረቀት' : 'e.g. Paper',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
                     ),
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
-                        return widget.isAmharic ? 'እባክዎ የምርቱን ስም ያስገቡ' : 'Please enter product name';
+                        return widget.isAmharic
+                            ? 'እባክዎ የምርቱን ስም ያስገቡ'
+                            : 'Please enter product name';
                       }
                       return null;
                     },
@@ -298,7 +323,7 @@ class _NewProductDialogState extends State<NewProductDialog> {
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: _suggestions.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (context, index) {
                           final product = _suggestions[index];
                           return ListTile(
@@ -327,9 +352,16 @@ class _NewProductDialogState extends State<NewProductDialog> {
                             decimal: true,
                           ),
                           decoration: InputDecoration(
-                            labelText: widget.isAmharic ? 'ፍሬ በካርቶን' : 'Pieces / Carton',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            labelText: widget.isAmharic
+                                ? 'ፍሬ በካርቶን'
+                                : 'Pieces / Carton',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
                           ),
                           validator: (v) {
                             final n = double.tryParse(v?.trim() ?? '');
@@ -365,7 +397,9 @@ class _NewProductDialogState extends State<NewProductDialog> {
                           validator: (v) {
                             final n = double.tryParse(v?.trim() ?? '');
                             if (n == null || n < 0) {
-                              return widget.isAmharic ? 'አሉታዊ ሊሆን አይችልም' : 'Cannot be negative';
+                              return widget.isAmharic
+                                  ? 'አሉታዊ ሊሆን አይችልም'
+                                  : 'Cannot be negative';
                             }
                             return null;
                           },
@@ -446,22 +480,37 @@ class _NewProductDialogState extends State<NewProductDialog> {
                       Expanded(
                         child: TextFormField(
                           controller: _unitPriceController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: InputDecoration(
-                            labelText: widget.isAmharic ? 'የአንዱ ዋጋ (ብር)' : 'Unit Price (ETB)',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            labelText: widget.isAmharic
+                                ? 'የአንዱ ዋጋ (ብር)'
+                                : 'Unit Price (ETB)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
                           ),
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) {
-                              return widget.isAmharic ? 'ዋጋ ያስፈልጋል' : 'Price required';
+                              return widget.isAmharic
+                                  ? 'ዋጋ ያስፈልጋል'
+                                  : 'Price required';
                             }
                             final price = double.tryParse(v.trim());
                             if (price == null) {
-                              return widget.isAmharic ? 'ትክክለኛ ቁጥር ያስገቡ' : 'Invalid number';
+                              return widget.isAmharic
+                                  ? 'ትክክለኛ ቁጥር ያስገቡ'
+                                  : 'Invalid number';
                             }
                             if (price < 0) {
-                              return widget.isAmharic ? 'አሉታዊ ሊሆን አይችልም' : 'Cannot be negative';
+                              return widget.isAmharic
+                                  ? 'አሉታዊ ሊሆን አይችልም'
+                                  : 'Cannot be negative';
                             }
                             return null;
                           },
@@ -516,8 +565,13 @@ class _NewProductDialogState extends State<NewProductDialog> {
                     child: InputDecorator(
                       decoration: InputDecoration(
                         labelText: widget.isAmharic ? 'ቀን' : 'Date',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                       ),
                       child: Text(
                         _displayDate,
@@ -535,9 +589,7 @@ class _NewProductDialogState extends State<NewProductDialog> {
                         onPressed: _isSaving
                             ? null
                             : () => Navigator.pop(context),
-                        child: Text(
-                          widget.isAmharic ? 'ይቅር' : 'Cancel',
-                        ),
+                        child: Text(widget.isAmharic ? 'ይቅር' : 'Cancel'),
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
@@ -565,9 +617,16 @@ class _NewProductDialogState extends State<NewProductDialog> {
                             : const Icon(Icons.check, size: 16),
                         label: Text(
                           _isSaving
-                              ? (widget.isAmharic ? 'በመመዝገብ ላይ...' : 'Saving...')
-                              : (widget.isAmharic ? 'ምርት መዝግብ' : 'Register Product'),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ? (widget.isAmharic
+                                    ? 'በመመዝገብ ላይ...'
+                                    : 'Saving...')
+                              : (widget.isAmharic
+                                    ? 'ምርት መዝግብ'
+                                    : 'Register Product'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],

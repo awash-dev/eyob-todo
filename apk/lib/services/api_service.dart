@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/user.dart';
 import '../models/store.dart';
 import '../models/ledger_record.dart';
@@ -135,10 +137,14 @@ class ApiService {
   /// Resolves a store's display name straight from the stores table.
   /// There is no hardcoded store name: an unknown id simply has no name.
   static Future<String> _storeNameFromDb(String? storeId) async {
-    if (storeId == null || storeId.isEmpty || storeId == 'all') return 'All Stores';
+    if (storeId == null || storeId.isEmpty || storeId == 'all') {
+      return 'All Stores';
+    }
     final stores = await getStores();
     for (final store in stores) {
-      if (store.id == storeId) return store.name;
+      if (store.id == storeId) {
+        return store.name;
+      }
     }
     return '';
   }
@@ -188,14 +194,8 @@ class ApiService {
   }
 
   /* ------------------- Store Admin Management (Online Neon) ------------------- */
-  static Future<Store> createStore({
-    required String name,
-    String? code,
-  }) async {
-    return await NeonDatabaseService.createStoreDirect(
-      name,
-      code,
-    );
+  static Future<Store> createStore({required String name, String? code}) async {
+    return await NeonDatabaseService.createStoreDirect(name, code);
   }
 
   static Future<Store> updateStore(
@@ -276,7 +276,9 @@ class ApiService {
     await NeonDatabaseService.deleteBrokerDirect(id);
   }
 
-  static Future<List<DelalaTransaction>> getDelalaTransactions([String? brokerId]) async {
+  static Future<List<DelalaTransaction>> getDelalaTransactions([
+    String? brokerId,
+  ]) async {
     return await NeonDatabaseService.getDelalaTransactionsDirect(brokerId);
   }
 
@@ -388,7 +390,9 @@ class ApiService {
 
         final desc = item.name.isNotEmpty
             ? item.name
-            : (rec.title.isNotEmpty ? rec.title : (isDebit ? 'Goods' : 'Payment'));
+            : (rec.title.isNotEmpty
+                  ? rec.title
+                  : (isDebit ? 'Goods' : 'Payment'));
 
         entries.add({
           'id': item.id,
@@ -454,14 +458,16 @@ class ApiService {
       entries: computedEntries,
       payments: computedEntries
           .where((e) => type == 'customer' ? e.credit > 0 : e.debit > 0)
-          .map((e) => StatementPayment(
-                date: e.date,
-                amount: type == 'customer' ? e.credit : e.debit,
-                paymentMethod: e.paymentMethod,
-                reference: e.reference,
-                notes: e.notes,
-                description: e.description,
-              ))
+          .map(
+            (e) => StatementPayment(
+              date: e.date,
+              amount: type == 'customer' ? e.credit : e.debit,
+              paymentMethod: e.paymentMethod,
+              reference: e.reference,
+              notes: e.notes,
+              description: e.description,
+            ),
+          )
           .toList(),
       totals: StatementTotals(
         totalDebit: totalDebit,
@@ -528,12 +534,22 @@ class ApiService {
 
   /* ------------------- Store Inventory & Stock Movements ------------------- */
 
-  static Future<List<InventoryProduct>> getInventoryProducts({String? storeId}) async {
-    return await NeonDatabaseService.getInventoryProductsDirect(storeId: storeId);
+  static Future<List<InventoryProduct>> getInventoryProducts({
+    String? storeId,
+  }) async {
+    return await NeonDatabaseService.getInventoryProductsDirect(
+      storeId: storeId,
+    );
   }
 
-  static Future<bool> checkProductExists(String productName, String? storeId) async {
-    return await NeonDatabaseService.checkProductExistsDirect(productName, storeId);
+  static Future<bool> checkProductExists(
+    String productName,
+    String? storeId,
+  ) async {
+    return await NeonDatabaseService.checkProductExistsDirect(
+      productName,
+      storeId,
+    );
   }
 
   static Future<InventoryProduct> registerProduct({
@@ -598,7 +614,9 @@ class ApiService {
     );
   }
 
-  static Future<List<StockMovement>> getProductStockMovements(String productId) async {
+  static Future<List<StockMovement>> getProductStockMovements(
+    String productId,
+  ) async {
     return await NeonDatabaseService.getProductStockMovementsDirect(productId);
   }
 
@@ -635,5 +653,4 @@ class ApiService {
   static Future<void> deleteInventoryProduct(String id) async {
     await NeonDatabaseService.deleteInventoryProductDirect(id);
   }
-
 }

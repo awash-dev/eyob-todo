@@ -176,14 +176,17 @@ class _MainScreenState extends State<MainScreen> {
       String? targetStoreId = _selectedStoreId;
       if (widget.currentUser.isStorekeeper) {
         targetStoreId = widget.currentUser.storeId ?? _selectedStoreId;
-        if ((targetStoreId == null || targetStoreId.isEmpty) && stores.isNotEmpty) {
+        if ((targetStoreId == null || targetStoreId.isEmpty) &&
+            stores.isNotEmpty) {
           targetStoreId = stores.first.id;
         }
         _selectedStoreId = targetStoreId;
       }
       final records = await ApiService.getRecords(storeId: targetStoreId);
       final delalaEntries = await ApiService.getDelalaEntries(targetStoreId);
-      final inventoryProducts = await ApiService.getInventoryProducts(storeId: targetStoreId);
+      final inventoryProducts = await ApiService.getInventoryProducts(
+        storeId: targetStoreId,
+      );
       if (mounted) {
         setState(() {
           _stores = stores;
@@ -208,14 +211,17 @@ class _MainScreenState extends State<MainScreen> {
       String? targetStoreId = _selectedStoreId;
       if (widget.currentUser.isStorekeeper) {
         targetStoreId = widget.currentUser.storeId ?? _selectedStoreId;
-        if ((targetStoreId == null || targetStoreId.isEmpty) && _stores.isNotEmpty) {
+        if ((targetStoreId == null || targetStoreId.isEmpty) &&
+            _stores.isNotEmpty) {
           targetStoreId = _stores.first.id;
         }
         _selectedStoreId = targetStoreId;
       }
       final records = await ApiService.getRecords(storeId: targetStoreId);
       final delalaEntries = await ApiService.getDelalaEntries(targetStoreId);
-      final inventoryProducts = await ApiService.getInventoryProducts(storeId: targetStoreId);
+      final inventoryProducts = await ApiService.getInventoryProducts(
+        storeId: targetStoreId,
+      );
       if (mounted) {
         setState(() {
           _records = records;
@@ -249,7 +255,9 @@ class _MainScreenState extends State<MainScreen> {
     return _records.where((r) {
       if (widget.currentUser.isStorekeeper) {
         if (r.type != 'stock') return false;
-        if (_selectedStoreId != null && _selectedStoreId!.isNotEmpty && _selectedStoreId != 'all') {
+        if (_selectedStoreId != null &&
+            _selectedStoreId!.isNotEmpty &&
+            _selectedStoreId != 'all') {
           if (r.storeId != null && r.storeId != _selectedStoreId) return false;
         }
       } else {
@@ -562,10 +570,14 @@ class _MainScreenState extends State<MainScreen> {
                             text: TextSpan(
                               children: [
                                 TextSpan(
-                                  text: _isAmharic ? 'ድምር ዋጋ: ' : 'Stock Value: ',
+                                  text: _isAmharic
+                                      ? 'ድምር ዋጋ: '
+                                      : 'Stock Value: ',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
                                   ),
                                 ),
                                 TextSpan(
@@ -573,7 +585,9 @@ class _MainScreenState extends State<MainScreen> {
                                   style: TextStyle(
                                     fontSize: 9.5,
                                     fontWeight: FontWeight.w600,
-                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
                                   ),
                                 ),
                                 TextSpan(
@@ -581,7 +595,9 @@ class _MainScreenState extends State<MainScreen> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface,
                                   ),
                                 ),
                               ],
@@ -595,11 +611,10 @@ class _MainScreenState extends State<MainScreen> {
               ),
               const Divider(height: 16),
               ListTile(
-                leading: const Icon(
-                  Icons.history,
-                  color: Color(0xFF2563EB),
+                leading: const Icon(Icons.history, color: Color(0xFF2563EB)),
+                title: Text(
+                  _isAmharic ? 'የዕቃ እንቅስቃሴ ታሪክ' : 'View Stock History',
                 ),
-                title: Text(_isAmharic ? 'የዕቃ እንቅስቃሴ ታሪክ' : 'View Stock History'),
                 onTap: () {
                   Navigator.pop(ctx);
                   _openProductHistoryDialog(prod);
@@ -929,19 +944,25 @@ class _MainScreenState extends State<MainScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.table_chart_outlined, size: 40, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.table_chart_outlined,
+                        size: 40,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(height: 10),
                       Text(
                         _searchQuery.isNotEmpty
                             ? (_isAmharic
-                                ? '"$_searchQuery" ጋር የሚዛመድ የደላላ መዝገብ አልተገኘም'
-                                : 'No Delala entries match "$_searchQuery"')
+                                  ? '"$_searchQuery" ጋር የሚዛመድ የደላላ መዝገብ አልተገኘም'
+                                  : 'No Delala entries match "$_searchQuery"')
                             : (_isAmharic
-                                ? 'ምንም የደላላ መዝገብ አልተመዘገበም'
-                                : 'No Delala entries recorded yet'),
+                                  ? 'ምንም የደላላ መዝገብ አልተመዘገበም'
+                                  : 'No Delala entries recorded yet'),
                         style: TextStyle(
                           fontSize: 13,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -950,10 +971,14 @@ class _MainScreenState extends State<MainScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2563EB),
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                         icon: const Icon(Icons.add, size: 16),
-                        label: Text(_isAmharic ? 'አዲስ መዝግብ' : 'Add First Entry'),
+                        label: Text(
+                          _isAmharic ? 'አዲስ መዝግብ' : 'Add First Entry',
+                        ),
                       ),
                     ],
                   ),
@@ -980,11 +1005,23 @@ class _MainScreenState extends State<MainScreen> {
                       children: [
                         // Spreadsheet Table Header Bar (Fits screen width - Zero X scrolling)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 9,
+                          ),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF172033) : const Color(0xFFF1F5F9),
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-                            border: Border(bottom: BorderSide(color: gridBorderColor, width: 1.2)),
+                            color: isDark
+                                ? const Color(0xFF172033)
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(11),
+                            ),
+                            border: Border(
+                              bottom: BorderSide(
+                                color: gridBorderColor,
+                                width: 1.2,
+                              ),
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -992,14 +1029,22 @@ class _MainScreenState extends State<MainScreen> {
                                 width: 28,
                                 child: Text(
                                   _isAmharic ? 'ተ.ቁ' : '#',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
                               Expanded(
                                 flex: 5,
                                 child: Text(
-                                  _isAmharic ? 'ስም & የዕቃ ዓይነት' : 'Name & Product',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                                  _isAmharic
+                                      ? 'ስም & የዕቃ ዓይነት'
+                                      : 'Name & Product',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
                               Expanded(
@@ -1007,7 +1052,10 @@ class _MainScreenState extends State<MainScreen> {
                                 child: Text(
                                   _isAmharic ? 'ዋጋ × ብዛት' : 'Price × Pcs',
                                   textAlign: TextAlign.right,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
                               Expanded(
@@ -1015,7 +1063,10 @@ class _MainScreenState extends State<MainScreen> {
                                 child: Text(
                                   _isAmharic ? 'ድምር & እርምጃ' : 'Total & Action',
                                   textAlign: TextAlign.right,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1027,18 +1078,29 @@ class _MainScreenState extends State<MainScreen> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: filtered.length,
-                          separatorBuilder: (_, index) => Divider(height: 1, thickness: 0.8, color: gridBorderColor),
+                          separatorBuilder: (_, index) => Divider(
+                            height: 1,
+                            thickness: 0.8,
+                            color: gridBorderColor,
+                          ),
                           itemBuilder: (context, idx) {
                             final row = filtered[idx];
                             final isNeg = row.sign == -1;
                             final rowBg = idx % 2 == 1
-                                ? (isDark ? const Color(0xFF161F30) : const Color(0xFFF8FAFC))
-                                : (isDark ? const Color(0xFF1E293B) : Colors.white);
+                                ? (isDark
+                                      ? const Color(0xFF161F30)
+                                      : const Color(0xFFF8FAFC))
+                                : (isDark
+                                      ? const Color(0xFF1E293B)
+                                      : Colors.white);
 
                             return Container(
                               color: rowBg,
                               constraints: const BoxConstraints(minHeight: 64),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
@@ -1048,16 +1110,24 @@ class _MainScreenState extends State<MainScreen> {
                                     height: 26,
                                     alignment: Alignment.center,
                                     decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF242C40) : const Color(0xFFF1F5F9),
+                                      color: isDark
+                                          ? const Color(0xFF242C40)
+                                          : const Color(0xFFF1F5F9),
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: gridBorderColor.withValues(alpha: 0.5)),
+                                      border: Border.all(
+                                        color: gridBorderColor.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                      ),
                                     ),
                                     child: Text(
                                       '${idx + 1}',
                                       style: TextStyle(
                                         fontSize: 10.5,
                                         fontWeight: FontWeight.bold,
-                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                        color: isDark
+                                            ? const Color(0xFF94A3B8)
+                                            : const Color(0xFF64748B),
                                       ),
                                     ),
                                   ),
@@ -1067,8 +1137,10 @@ class _MainScreenState extends State<MainScreen> {
                                   Expanded(
                                     flex: 5,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Row(
                                           children: [
@@ -1078,22 +1150,33 @@ class _MainScreenState extends State<MainScreen> {
                                                 style: TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 13,
-                                                  color: theme.colorScheme.onSurface,
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurface,
                                                 ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                             const SizedBox(width: 5),
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 5,
+                                                    vertical: 1.5,
+                                                  ),
                                               decoration: BoxDecoration(
-                                                color: isNeg ? const Color(0xFFFFE4E6) : const Color(0xFFD1FAE5),
-                                                borderRadius: BorderRadius.circular(4),
+                                                color: isNeg
+                                                    ? const Color(0xFFFFE4E6)
+                                                    : const Color(0xFFD1FAE5),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
                                               ),
                                               child: Text(
                                                 isNeg ? '-1' : '+1',
                                                 style: TextStyle(
-                                                  color: isNeg ? const Color(0xFFE11D48) : const Color(0xFF059669),
+                                                  color: isNeg
+                                                      ? const Color(0xFFE11D48)
+                                                      : const Color(0xFF059669),
                                                   fontWeight: FontWeight.w900,
                                                   fontSize: 9.5,
                                                 ),
@@ -1107,14 +1190,19 @@ class _MainScreenState extends State<MainScreen> {
                                           style: TextStyle(
                                             fontSize: 11.5,
                                             fontWeight: FontWeight.w500,
-                                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                            color: isDark
+                                                ? const Color(0xFFCBD5E1)
+                                                : const Color(0xFF334155),
                                           ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 1),
                                         Text(
                                           row.transactionDate,
-                                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -1125,8 +1213,10 @@ class _MainScreenState extends State<MainScreen> {
                                   Expanded(
                                     flex: 3,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           _currencyFormat.format(row.unitPrice),
@@ -1154,8 +1244,10 @@ class _MainScreenState extends State<MainScreen> {
                                   Expanded(
                                     flex: 4,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Text(
                                           '${row.total >= 0 ? '+' : ''}${_currencyFormat.format(row.total)} ETB',
@@ -1172,19 +1264,39 @@ class _MainScreenState extends State<MainScreen> {
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             IconButton(
-                                              icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF2563EB)),
-                                              tooltip: _isAmharic ? 'አርትዕ' : 'Edit entry',
+                                              icon: const Icon(
+                                                Icons.edit_outlined,
+                                                size: 16,
+                                                color: Color(0xFF2563EB),
+                                              ),
+                                              tooltip: _isAmharic
+                                                  ? 'አርትዕ'
+                                                  : 'Edit entry',
                                               padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                                              onPressed: () => _openDelalaEntryDialog(row),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 26,
+                                                minHeight: 26,
+                                              ),
+                                              onPressed: () =>
+                                                  _openDelalaEntryDialog(row),
                                             ),
                                             const SizedBox(width: 4),
                                             IconButton(
-                                              icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFE11D48)),
-                                              tooltip: _isAmharic ? 'አጥፋ' : 'Delete entry',
+                                              icon: const Icon(
+                                                Icons.delete_outline,
+                                                size: 16,
+                                                color: Color(0xFFE11D48),
+                                              ),
+                                              tooltip: _isAmharic
+                                                  ? 'አጥፋ'
+                                                  : 'Delete entry',
                                               padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                                              onPressed: () => _deleteDelalaEntry(row),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 26,
+                                                minHeight: 26,
+                                              ),
+                                              onPressed: () =>
+                                                  _deleteDelalaEntry(row),
                                             ),
                                           ],
                                         ),
@@ -1199,11 +1311,23 @@ class _MainScreenState extends State<MainScreen> {
 
                         // Final Total Row (pinned at bottom of spreadsheet, zero X scrolling)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 11,
+                          ),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF131D31) : const Color(0xFFF1F5F9),
-                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
-                            border: Border(top: BorderSide(color: gridBorderColor, width: 1.2)),
+                            color: isDark
+                                ? const Color(0xFF131D31)
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(11),
+                            ),
+                            border: Border(
+                              top: BorderSide(
+                                color: gridBorderColor,
+                                width: 1.2,
+                              ),
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1223,7 +1347,10 @@ class _MainScreenState extends State<MainScreen> {
                                     _isAmharic
                                         ? 'ጠቅላላ ፍሬ፦ ${totalPieces.toStringAsFixed(totalPieces.truncateToDouble() == totalPieces ? 0 : 2)} ፍሬ'
                                         : 'Total Pieces: ${totalPieces.toStringAsFixed(totalPieces.truncateToDouble() == totalPieces ? 0 : 2)} pcs',
-                                    style: const TextStyle(fontSize: 10.5, color: Colors.grey),
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      color: Colors.grey,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1251,8 +1378,12 @@ class _MainScreenState extends State<MainScreen> {
 
   /// Open Add / Edit Delala Entry Dialog
   Future<void> _openDelalaEntryDialog([DelalaEntry? existing]) async {
-    final nameCtrl = TextEditingController(text: existing != null ? cleanDelalaName(existing.delalaName) : '');
-    final productCtrl = TextEditingController(text: existing?.productName ?? '');
+    final nameCtrl = TextEditingController(
+      text: existing != null ? cleanDelalaName(existing.delalaName) : '',
+    );
+    final productCtrl = TextEditingController(
+      text: existing?.productName ?? '',
+    );
     final priceCtrl = TextEditingController(
       text: existing != null ? existing.unitPrice.toString() : '',
     );
@@ -1272,19 +1403,30 @@ class _MainScreenState extends State<MainScreen> {
           builder: (dialogCtx, setDialogState) {
             final p = double.tryParse(priceCtrl.text.trim()) ?? 0.0;
             final pcs = double.tryParse(piecesCtrl.text.trim()) ?? 0.0;
-            final total = double.parse((p * pcs * selectedSign).toStringAsFixed(2));
+            final total = double.parse(
+              (p * pcs * selectedSign).toStringAsFixed(2),
+            );
 
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
               title: Row(
                 children: [
-                  const Icon(Icons.table_chart, color: Color(0xFF2563EB), size: 20),
+                  const Icon(
+                    Icons.table_chart,
+                    color: Color(0xFF2563EB),
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     existing == null
                         ? (_isAmharic ? 'አዲስ መዝገብ' : 'New Entry')
                         : (_isAmharic ? 'መዝገብ አርትዕ' : 'Edit Entry'),
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1298,15 +1440,23 @@ class _MainScreenState extends State<MainScreen> {
                       // Name (No prefix)
                       Text(
                         _isAmharic ? '1. ስም *' : '1. Name *',
-                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       TextField(
                         controller: nameCtrl,
                         decoration: InputDecoration(
                           hintText: _isAmharic ? 'ምሳሌ፡ አህመድ' : 'John Doe',
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1314,15 +1464,23 @@ class _MainScreenState extends State<MainScreen> {
                       // Product
                       Text(
                         _isAmharic ? '2. የዕቃ ዓይነት *' : '2. Item / Product *',
-                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       TextField(
                         controller: productCtrl,
                         decoration: InputDecoration(
                           hintText: 'e.g. 12W Safari / 2.5 bmt',
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1335,18 +1493,31 @@ class _MainScreenState extends State<MainScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _isAmharic ? '3. ዋጋ (ብር) *' : '3. Unit Price (ETB) *',
-                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                  _isAmharic
+                                      ? '3. ዋጋ (ብር) *'
+                                      : '3. Unit Price (ETB) *',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 TextField(
                                   controller: priceCtrl,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                   onChanged: (_) => setDialogState(() {}),
                                   decoration: InputDecoration(
                                     hintText: '65',
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1359,17 +1530,28 @@ class _MainScreenState extends State<MainScreen> {
                               children: [
                                 Text(
                                   _isAmharic ? '4. ብዛት *' : '4. Pieces *',
-                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 TextField(
                                   controller: piecesCtrl,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                   onChanged: (_) => setDialogState(() {}),
                                   decoration: InputDecoration(
                                     hintText: '10',
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1382,29 +1564,41 @@ class _MainScreenState extends State<MainScreen> {
                       // Sign Selector (+ / -)
                       Text(
                         _isAmharic ? '5. ምልክት *' : '5. Sign *',
-                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
                           Expanded(
                             child: InkWell(
-                              onTap: () => setDialogState(() => selectedSign = 1),
+                              onTap: () =>
+                                  setDialogState(() => selectedSign = 1),
                               borderRadius: BorderRadius.circular(10),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 9,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: selectedSign == 1 ? const Color(0xFF059669) : Colors.transparent,
+                                  color: selectedSign == 1
+                                      ? const Color(0xFF059669)
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: selectedSign == 1 ? const Color(0xFF059669) : Colors.grey.shade400,
+                                    color: selectedSign == 1
+                                        ? const Color(0xFF059669)
+                                        : Colors.grey.shade400,
                                   ),
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   _isAmharic ? '+ ተቀባይ (+)' : '+ Positive (+)',
                                   style: TextStyle(
-                                    color: selectedSign == 1 ? Colors.white : Colors.grey.shade700,
+                                    color: selectedSign == 1
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
@@ -1415,22 +1609,31 @@ class _MainScreenState extends State<MainScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: InkWell(
-                              onTap: () => setDialogState(() => selectedSign = -1),
+                              onTap: () =>
+                                  setDialogState(() => selectedSign = -1),
                               borderRadius: BorderRadius.circular(10),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 9),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 9,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: selectedSign == -1 ? const Color(0xFFE11D48) : Colors.transparent,
+                                  color: selectedSign == -1
+                                      ? const Color(0xFFE11D48)
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: selectedSign == -1 ? const Color(0xFFE11D48) : Colors.grey.shade400,
+                                    color: selectedSign == -1
+                                        ? const Color(0xFFE11D48)
+                                        : Colors.grey.shade400,
                                   ),
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   _isAmharic ? '- ተከፋይ (-)' : '- Negative (-)',
                                   style: TextStyle(
-                                    color: selectedSign == -1 ? Colors.white : Colors.grey.shade700,
+                                    color: selectedSign == -1
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
@@ -1455,7 +1658,11 @@ class _MainScreenState extends State<MainScreen> {
                           children: [
                             Text(
                               _isAmharic ? '6. ጠቅላላ ድምር:' : '6. Total:',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF334155),
+                              ),
                             ),
                             Text(
                               '${total >= 0 ? '+' : ''}${_currencyFormat.format(total)} ${_isAmharic ? "ብር" : "ETB"}',
@@ -1477,7 +1684,10 @@ class _MainScreenState extends State<MainScreen> {
                       // Ethiopian Date Text Input
                       Text(
                         _isAmharic ? '7. ቀን *' : '7. Date *',
-                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       TextField(
@@ -1485,8 +1695,13 @@ class _MainScreenState extends State<MainScreen> {
                         keyboardType: TextInputType.datetime,
                         decoration: InputDecoration(
                           hintText: 'e.g. 02/11/2026 or 24/02/2018',
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ],
@@ -1502,7 +1717,9 @@ class _MainScreenState extends State<MainScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2563EB),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   onPressed: () async {
                     final name = cleanDelalaName(nameCtrl.text.trim());
@@ -1510,25 +1727,47 @@ class _MainScreenState extends State<MainScreen> {
                     final date = dateCtrl.text.trim();
                     if (name.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(_isAmharic ? 'እባክዎ ስም ያስገቡ' : 'Please enter Name')),
+                        SnackBar(
+                          content: Text(
+                            _isAmharic ? 'እባክዎ ስም ያስገቡ' : 'Please enter Name',
+                          ),
+                        ),
                       );
                       return;
                     }
                     if (prod.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(_isAmharic ? 'እባክዎ የዕቃ ዓይነት ያስገቡ' : 'Please enter Item/Product name')),
+                        SnackBar(
+                          content: Text(
+                            _isAmharic
+                                ? 'እባክዎ የዕቃ ዓይነት ያስገቡ'
+                                : 'Please enter Item/Product name',
+                          ),
+                        ),
                       );
                       return;
                     }
                     if (p <= 0) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(_isAmharic ? 'እባክዎ ትክክለኛ ዋጋ ያስገቡ' : 'Please enter valid unit price')),
+                        SnackBar(
+                          content: Text(
+                            _isAmharic
+                                ? 'እባክዎ ትክክለኛ ዋጋ ያስገቡ'
+                                : 'Please enter valid unit price',
+                          ),
+                        ),
                       );
                       return;
                     }
                     if (pcs <= 0) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(_isAmharic ? 'እባክዎ ትክክለኛ ብዛት ያስገቡ' : 'Please enter valid pieces')),
+                        SnackBar(
+                          content: Text(
+                            _isAmharic
+                                ? 'እባክዎ ትክክለኛ ብዛት ያስገቡ'
+                                : 'Please enter valid pieces',
+                          ),
+                        ),
                       );
                       return;
                     }
@@ -1561,7 +1800,15 @@ class _MainScreenState extends State<MainScreen> {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(existing == null ? (_isAmharic ? 'መዝገቡ ተመዝግቧል!' : 'Entry saved successfully!') : (_isAmharic ? 'መዝገቡ ታድሷል!' : 'Entry updated!')),
+                            content: Text(
+                              existing == null
+                                  ? (_isAmharic
+                                        ? 'መዝገቡ ተመዝግቧል!'
+                                        : 'Entry saved successfully!')
+                                  : (_isAmharic
+                                        ? 'መዝገቡ ታድሷል!'
+                                        : 'Entry updated!'),
+                            ),
                             backgroundColor: const Color(0xFF059669),
                           ),
                         );
@@ -1569,12 +1816,24 @@ class _MainScreenState extends State<MainScreen> {
                     } catch (err) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(err.toString().replaceAll('Exception:', '').trim()), backgroundColor: const Color(0xFFBA1A1A)),
+                          SnackBar(
+                            content: Text(
+                              err
+                                  .toString()
+                                  .replaceAll('Exception:', '')
+                                  .trim(),
+                            ),
+                            backgroundColor: const Color(0xFFBA1A1A),
+                          ),
                         );
                       }
                     }
                   },
-                  child: Text(existing == null ? (_isAmharic ? 'መዝግብ' : 'Save Entry') : (_isAmharic ? 'አድስ' : 'Update Entry')),
+                  child: Text(
+                    existing == null
+                        ? (_isAmharic ? 'መዝግብ' : 'Save Entry')
+                        : (_isAmharic ? 'አድስ' : 'Update Entry'),
+                  ),
                 ),
               ],
             );
@@ -1590,12 +1849,25 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(_isAmharic ? 'መዝገቡ ይጥፋ?' : 'Delete Entry?', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        content: Text(_isAmharic ? 'እርግጠኛ ነዎት የ${entry.delalaName} - ${entry.productName} መዝገብ እንዲሰረዝ ይፈልጋሉ?' : 'Are you sure you want to delete ${entry.delalaName} - ${entry.productName}?'),
+        title: Text(
+          _isAmharic ? 'መዝገቡ ይጥፋ?' : 'Delete Entry?',
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          _isAmharic
+              ? 'እርግጠኛ ነዎት የ${entry.delalaName} - ${entry.productName} መዝገብ እንዲሰረዝ ይፈልጋሉ?'
+              : 'Are you sure you want to delete ${entry.delalaName} - ${entry.productName}?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_isAmharic ? 'ይቅር' : 'Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(_isAmharic ? 'ይቅር' : 'Cancel'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE11D48),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(_isAmharic ? 'ሰርዝ' : 'Delete'),
           ),
@@ -1609,13 +1881,19 @@ class _MainScreenState extends State<MainScreen> {
         await _reloadRecordsOnly();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Entry deleted'), backgroundColor: Color(0xFF059669)),
+            const SnackBar(
+              content: Text('Entry deleted'),
+              backgroundColor: Color(0xFF059669),
+            ),
           );
         }
       } catch (err) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(err.toString().replaceAll('Exception:', '').trim()), backgroundColor: const Color(0xFFBA1A1A)),
+            SnackBar(
+              content: Text(err.toString().replaceAll('Exception:', '').trim()),
+              backgroundColor: const Color(0xFFBA1A1A),
+            ),
           );
         }
       }
@@ -1650,7 +1928,10 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<void> _openStockTransactionDialog([InventoryProduct? preselected, String initialType = 'IN']) async {
+  Future<void> _openStockTransactionDialog([
+    InventoryProduct? preselected,
+    String initialType = 'IN',
+  ]) async {
     final result = await showDialog<InventoryProduct>(
       context: context,
       builder: (ctx) => StockTransactionDialog(
@@ -1682,10 +1963,8 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _openProductHistoryDialog(InventoryProduct prod) async {
     await showDialog(
       context: context,
-      builder: (ctx) => ProductHistoryDialog(
-        product: prod,
-        isAmharic: _isAmharic,
-      ),
+      builder: (ctx) =>
+          ProductHistoryDialog(product: prod, isAmharic: _isAmharic),
     );
   }
 
@@ -1800,7 +2079,10 @@ class _MainScreenState extends State<MainScreen> {
                 children: [
                   Text(
                     _isAmharic ? 'ቅንብሮች' : 'Settings',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, size: 20),
@@ -1813,10 +2095,14 @@ class _MainScreenState extends State<MainScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF242C40) : const Color(0xFFF8FAFC),
+                  color: isDark
+                      ? const Color(0xFF242C40)
+                      : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0),
+                    color: isDark
+                        ? const Color(0xFF2E384D)
+                        : const Color(0xFFE2E8F0),
                   ),
                 ),
                 child: Column(
@@ -1824,7 +2110,10 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     Text(
                       _isAmharic ? 'ቋንቋ' : 'Language',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -1839,10 +2128,14 @@ class _MainScreenState extends State<MainScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: !_isAmharic ? const Color(0xFF2563EB) : Colors.transparent,
+                                color: !_isAmharic
+                                    ? const Color(0xFF2563EB)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
-                                  color: !_isAmharic ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+                                  color: !_isAmharic
+                                      ? const Color(0xFF2563EB)
+                                      : const Color(0xFFCBD5E1),
                                 ),
                               ),
                               alignment: Alignment.center,
@@ -1851,7 +2144,11 @@ class _MainScreenState extends State<MainScreen> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: !_isAmharic ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                                  color: !_isAmharic
+                                      ? Colors.white
+                                      : (isDark
+                                            ? Colors.white70
+                                            : const Color(0xFF334155)),
                                 ),
                               ),
                             ),
@@ -1868,10 +2165,14 @@ class _MainScreenState extends State<MainScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: _isAmharic ? const Color(0xFF2563EB) : Colors.transparent,
+                                color: _isAmharic
+                                    ? const Color(0xFF2563EB)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
-                                  color: _isAmharic ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+                                  color: _isAmharic
+                                      ? const Color(0xFF2563EB)
+                                      : const Color(0xFFCBD5E1),
                                 ),
                               ),
                               alignment: Alignment.center,
@@ -1880,7 +2181,11 @@ class _MainScreenState extends State<MainScreen> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: _isAmharic ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                                  color: _isAmharic
+                                      ? Colors.white
+                                      : (isDark
+                                            ? Colors.white70
+                                            : const Color(0xFF334155)),
                                 ),
                               ),
                             ),
@@ -1895,17 +2200,25 @@ class _MainScreenState extends State<MainScreen> {
                 const SizedBox(height: 12),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.people_alt_outlined, color: Color(0xFF2563EB)),
+                  leading: const Icon(
+                    Icons.people_alt_outlined,
+                    color: Color(0xFF2563EB),
+                  ),
                   title: Text(
                     _isAmharic ? 'የመደብር ሠራተኞች አስተዳደር' : 'Manage Storekeepers',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   trailing: const Icon(Icons.chevron_right, size: 20),
                   onTap: () {
                     Navigator.pop(ctx);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const AdminUsersScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const AdminUsersScreen(),
+                      ),
                     );
                   },
                 ),
@@ -1961,15 +2274,58 @@ class _MainScreenState extends State<MainScreen> {
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
-                Text(
-                  _isAmharic
-                      ? '${filteredProducts.length} ዕቃዎች'
-                      : '${filteredProducts.length} Products',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isAmharic
+                          ? '${filteredProducts.length} ዕቃዎች'
+                          : '${filteredProducts.length} Products',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                      ),
+                    ),
+                    if (!widget.currentUser.isAdmin) ...[
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: _openNewProductDialog,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2563EB),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.add,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                _isAmharic ? 'አዲስ ምርት' : 'Add Item',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -1997,32 +2353,34 @@ class _MainScreenState extends State<MainScreen> {
                   const SizedBox(height: 12),
                   Text(
                     query.isNotEmpty
-                        ? (_isAmharic ? 'የሚዛመድ ዕቃ አልተገኘም' : 'No matching products found')
-                        : (_isAmharic ? 'በመደብር ውስጥ የተመዘገበ ዕቃ የለም' : 'No registered products yet'),
+                        ? (_isAmharic
+                              ? 'የሚዛመድ ዕቃ አልተገኘም'
+                              : 'No matching products found')
+                        : (_isAmharic
+                              ? 'በመደብር ውስጥ የተመዘገበ ዕቃ የለም'
+                              : 'No registered products yet'),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13.5,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
                     ),
                   ),
-                  if (widget.currentUser.isAdmin) ...[
+                  if (!widget.currentUser.isAdmin) ...[
                     const SizedBox(height: 10),
                     TextButton.icon(
                       onPressed: _openNewProductDialog,
                       icon: const Icon(Icons.add_box_outlined, size: 16),
                       label: Text(
-                        _isAmharic ? '+ አዲስ ምርት መዝግብ' : '+ Register New Product',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        _isAmharic
+                            ? '+ አዲስ ምርት መዝግብ'
+                            : '+ Register New Product',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      _isAmharic
-                          ? 'የመጀመሪያውን ዕቃ ለመመዝገብ ከታች "+ የመደብር መዝገብ" የሚለውን ይጫኑ'
-                          : 'Tap "+ Store Entry" below to record inventory',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
                     ),
                   ],
                 ],
@@ -2054,13 +2412,19 @@ class _MainScreenState extends State<MainScreen> {
       0.0,
       (sum, p) => sum + p.currentQuantity,
     );
-    final totalValuation = _inventoryProducts.fold<double>(
-      0.0,
-      (sum, p) {
-        final price = p.unitPrice > 0 ? p.unitPrice : p.costPrice;
-        return sum + (p.currentQuantity * price);
-      },
-    );
+    final totalCartons = _inventoryProducts.fold<double>(0.0, (sum, p) {
+      final pcsPerCarton = p.quantityPerCarton > 0
+          ? p.quantityPerCarton
+          : p.pcsPerCarton;
+      final cartons = p.quantityCartons > 0
+          ? p.quantityCartons
+          : (pcsPerCarton > 0 ? p.currentQuantity / pcsPerCarton : 0);
+      return sum + cartons;
+    });
+    final totalValuation = _inventoryProducts.fold<double>(0.0, (sum, p) {
+      final price = p.unitPrice > 0 ? p.unitPrice : p.costPrice;
+      return sum + (p.currentQuantity * price);
+    });
 
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 2, 14, 8),
@@ -2086,12 +2450,14 @@ class _MainScreenState extends State<MainScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _isAmharic ? 'ያሉ ምርቶች ጠቅላላ' : 'TOTAL PRODUCTS',
+                  _isAmharic ? 'ያሉ ምርቶች ጠቅላላ' : 'TOTAL ITEMS',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -2108,12 +2474,14 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       TextSpan(
                         text: _isAmharic
-                            ? 'አይነት (${NumberFormat(\'#,##0\').format(totalPieces)} ፍሬ)'
-                            : 'items (${NumberFormat(\'#,##0\').format(totalPieces)} pcs)',
+                            ? "እቃ  · ${NumberFormat('#,##0.##').format(totalCartons)} ካርቶን  · ${NumberFormat('#,##0.##').format(totalPieces)} ፍሬ"
+                            : "items · ${NumberFormat('#,##0.##').format(totalCartons)} cartons · ${NumberFormat('#,##0.##').format(totalPieces)} pcs",
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -2140,7 +2508,9 @@ class _MainScreenState extends State<MainScreen> {
                     fontSize: 9.5,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -2152,7 +2522,9 @@ class _MainScreenState extends State<MainScreen> {
                         style: TextStyle(
                           fontSize: 9.5,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
                         ),
                       ),
                       TextSpan(
@@ -2176,7 +2548,11 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   /// Product Table card identical to Customer & Supplier table style
-  Widget _buildProductTable(InventoryProduct prod, ThemeData theme, bool isDark) {
+  Widget _buildProductTable(
+    InventoryProduct prod,
+    ThemeData theme,
+    bool isDark,
+  ) {
     final isExpanded = _expandedProductIds.contains(prod.id);
     final gridBorderColor = isDark
         ? const Color(0xFF2E384D)
@@ -2254,9 +2630,11 @@ class _MainScreenState extends State<MainScreen> {
                             color: prod.isOutOfStock
                                 ? const Color(0xFFDC2626)
                                 : (isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF64748B)),
-                            fontWeight: prod.isOutOfStock ? FontWeight.bold : FontWeight.normal,
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B)),
+                            fontWeight: prod.isOutOfStock
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -2308,7 +2686,9 @@ class _MainScreenState extends State<MainScreen> {
                       minHeight: 26,
                     ),
                     splashRadius: 16,
-                    tooltip: _isAmharic ? 'የዕቃ እንቅስቃሴ ታሪክ' : 'View Stock History',
+                    tooltip: _isAmharic
+                        ? 'የዕቃ እንቅስቃሴ ታሪክ'
+                        : 'View Stock History',
                     onPressed: () => _openProductHistoryDialog(prod),
                   ),
 
@@ -2346,10 +2726,20 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     // Table Header Row: # | ካርቶን | በካርቶን | ተርፍ | ጠቅላላ ፍሬ | የአንዱ ዋጋ | ድምር
                     Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                        border: Border(bottom: BorderSide(color: gridBorderColor, width: 1.0)),
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFF1F5F9),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: gridBorderColor,
+                            width: 1.0,
+                          ),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -2361,11 +2751,17 @@ class _MainScreenState extends State<MainScreen> {
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : const Color(0xFF334155),
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 16,
+                            color: gridBorderColor,
+                          ),
                           Expanded(
                             flex: 6,
                             child: Text(
@@ -2374,11 +2770,17 @@ class _MainScreenState extends State<MainScreen> {
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : const Color(0xFF334155),
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 16,
+                            color: gridBorderColor,
+                          ),
                           Expanded(
                             flex: 6,
                             child: Text(
@@ -2387,11 +2789,17 @@ class _MainScreenState extends State<MainScreen> {
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : const Color(0xFF334155),
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 16,
+                            color: gridBorderColor,
+                          ),
                           Expanded(
                             flex: 5,
                             child: Text(
@@ -2400,11 +2808,17 @@ class _MainScreenState extends State<MainScreen> {
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : const Color(0xFF334155),
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 16,
+                            color: gridBorderColor,
+                          ),
                           Expanded(
                             flex: 8,
                             child: Text(
@@ -2413,38 +2827,56 @@ class _MainScreenState extends State<MainScreen> {
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.bold,
-                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                color: isDark
+                                    ? const Color(0xFFCBD5E1)
+                                    : const Color(0xFF334155),
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 16,
+                            color: gridBorderColor,
+                          ),
                           Expanded(
                             flex: 8,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                               child: Text(
                                 _isAmharic ? 'የአንዱ ዋጋ' : 'Unit Price',
                                 textAlign: TextAlign.right,
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
-                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                  color: isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : const Color(0xFF334155),
                                 ),
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 16,
+                            color: gridBorderColor,
+                          ),
                           Expanded(
                             flex: 9,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                               child: Text(
                                 _isAmharic ? 'ድምር ዋጋ' : 'Total Value',
                                 textAlign: TextAlign.right,
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.bold,
-                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                  color: isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : const Color(0xFF334155),
                                 ),
                               ),
                             ),
@@ -2455,10 +2887,18 @@ class _MainScreenState extends State<MainScreen> {
 
                     // Table Data Row
                     Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF161D2E) : Colors.white,
-                        border: Border(bottom: BorderSide(color: gridBorderColor, width: 0.8)),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: gridBorderColor,
+                            width: 0.8,
+                          ),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -2471,11 +2911,17 @@ class _MainScreenState extends State<MainScreen> {
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w600,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 22, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 22,
+                            color: gridBorderColor,
+                          ),
 
                           // ካርቶን
                           Expanded(
@@ -2491,7 +2937,11 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 22, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 22,
+                            color: gridBorderColor,
+                          ),
 
                           // በካርቶን
                           Expanded(
@@ -2507,7 +2957,11 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 22, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 22,
+                            color: gridBorderColor,
+                          ),
 
                           // ተርፍ
                           Expanded(
@@ -2523,13 +2977,18 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 22, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 22,
+                            color: gridBorderColor,
+                          ),
 
                           // ጠቅላላ ፍሬ
                           Expanded(
                             flex: 8,
                             child: Text(
-                              NumberFormat('#,##0').format(prod.currentQuantity.round()),
+                              NumberFormat('#,##0')
+                                  .format(prod.currentQuantity.round()),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 11,
@@ -2539,13 +2998,19 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 22, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 22,
+                            color: gridBorderColor,
+                          ),
 
                           // የአንዱ ዋጋ
                           Expanded(
                             flex: 8,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                               child: Text(
                                 _currencyFormat.format(unitPrice),
                                 textAlign: TextAlign.right,
@@ -2558,13 +3023,19 @@ class _MainScreenState extends State<MainScreen> {
                               ),
                             ),
                           ),
-                          Container(width: 1, height: 22, color: gridBorderColor),
+                          Container(
+                            width: 1,
+                            height: 22,
+                            color: gridBorderColor,
+                          ),
 
                           // ድምር ዋጋ
                           Expanded(
                             flex: 9,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                               child: Text(
                                 _currencyFormat.format(totalVal),
                                 textAlign: TextAlign.right,
@@ -2583,15 +3054,22 @@ class _MainScreenState extends State<MainScreen> {
 
                     // Table Total Footer Row (ጠቅላላ ድምር)
                     Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 8,
+                      ),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFF1F5F9),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _isAmharic ? 'ጠቅላላ ድምር ዋጋ' : 'Total Inventory Value',
+                            _isAmharic
+                                ? 'ጠቅላላ ድምር ዋጋ'
+                                : 'Total Inventory Value',
                             style: const TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w900,
@@ -2605,7 +3083,9 @@ class _MainScreenState extends State<MainScreen> {
                                   style: TextStyle(
                                     fontSize: 9.5,
                                     fontWeight: FontWeight.w600,
-                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
                                   ),
                                 ),
                                 TextSpan(
@@ -2632,9 +3112,15 @@ class _MainScreenState extends State<MainScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF242C40) : const Color(0xFFE2E8F0),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(7)),
-                border: Border(top: BorderSide(color: gridBorderColor, width: 1.2)),
+                color: isDark
+                    ? const Color(0xFF242C40)
+                    : const Color(0xFFE2E8F0),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(7),
+                ),
+                border: Border(
+                  top: BorderSide(color: gridBorderColor, width: 1.2),
+                ),
               ),
               child: Row(
                 children: [
@@ -2643,15 +3129,25 @@ class _MainScreenState extends State<MainScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () => _openEditProductDialog(prod),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                        foregroundColor: isDark
+                            ? Colors.white
+                            : const Color(0xFF1E293B),
                         side: BorderSide(color: gridBorderColor),
-                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 4,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                       icon: const Icon(Icons.edit_outlined, size: 14),
                       label: Text(
                         _isAmharic ? 'አስተካክል' : 'Edit',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -2664,15 +3160,25 @@ class _MainScreenState extends State<MainScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () => _openStockTransactionDialog(prod),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                          foregroundColor: isDark
+                              ? Colors.white
+                              : const Color(0xFF1E293B),
                           side: BorderSide(color: gridBorderColor),
-                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 4,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
                         icon: const Icon(Icons.swap_horiz, size: 14),
                         label: Text(
                           _isAmharic ? 'ገቢ / ወጪ' : 'Add / Out',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -2685,15 +3191,25 @@ class _MainScreenState extends State<MainScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () => _openProductHistoryDialog(prod),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                        foregroundColor: isDark
+                            ? Colors.white
+                            : const Color(0xFF1E293B),
                         side: BorderSide(color: gridBorderColor),
-                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 4,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                       icon: const Icon(Icons.history, size: 14),
                       label: Text(
                         _isAmharic ? 'ታሪክ' : 'History',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -2707,9 +3223,14 @@ class _MainScreenState extends State<MainScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFBA1A1A),
                         side: BorderSide(color: gridBorderColor),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         minimumSize: const Size(36, 32),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                       child: const Icon(Icons.delete_outline, size: 16),
                     ),
@@ -2863,7 +3384,9 @@ class _MainScreenState extends State<MainScreen> {
                         minHeight: 26,
                       ),
                       splashRadius: 16,
-                      tooltip: _isAmharic ? 'ዝርዝር እይ' : 'View Statement Details',
+                      tooltip: _isAmharic
+                          ? 'ዝርዝር እይ'
+                          : 'View Statement Details',
                       onPressed: () => _openStatement(rec),
                     ),
                   ],
@@ -3310,7 +3833,9 @@ class _MainScreenState extends State<MainScreen> {
                     children: [
                       Text(
                         rec.type == 'supplier'
-                            ? (_isAmharic ? 'ግዢ (ክሬዲት +)' : 'Purchase (Credit +)')
+                            ? (_isAmharic
+                                  ? 'ግዢ (ክሬዲት +)'
+                                  : 'Purchase (Credit +)')
                             : (_isAmharic ? 'ዕቃ (ዴቢት +)' : 'Goods (Debit +)'),
                         style: TextStyle(
                           fontSize: 10.5,
@@ -3354,7 +3879,9 @@ class _MainScreenState extends State<MainScreen> {
                       Text(
                         rec.type == 'supplier'
                             ? (_isAmharic ? 'ክፍያ (ዴቢት -)' : 'Payment (Debit -)')
-                            : (_isAmharic ? 'ክፍያ (ክሬዲት -)' : 'Payment (Credit -)'),
+                            : (_isAmharic
+                                  ? 'ክፍያ (ክሬዲት -)'
+                                  : 'Payment (Credit -)'),
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
@@ -3581,7 +4108,9 @@ class _MainScreenState extends State<MainScreen> {
               decoration: BoxDecoration(
                 border: Border(
                   top: BorderSide(
-                    color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
+                    color: isDark
+                        ? const Color(0xFF2E384D)
+                        : const Color(0xFFDAE2FD),
                     width: 1,
                   ),
                 ),
@@ -3605,7 +4134,9 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 unselectedLabelStyle: const TextStyle(fontSize: 11),
                 type: BottomNavigationBarType.fixed,
-                backgroundColor: isDark ? const Color(0xFF182036) : Colors.white,
+                backgroundColor: isDark
+                    ? const Color(0xFF182036)
+                    : Colors.white,
                 elevation: 6,
                 items: [
                   BottomNavigationBarItem(
@@ -3649,10 +4180,16 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       decoration: InputDecoration(
                         hintText: _currentTabIndex == 3
-                            ? (_isAmharic ? 'የመደብር ዕቃዎችን በስም ወይም በዝርዝር ፈልግ...' : 'Search Store Inventory by name, item...')
+                            ? (_isAmharic
+                                  ? 'የመደብር ዕቃዎችን በስም ወይም በዝርዝር ፈልግ...'
+                                  : 'Search Store Inventory by name, item...')
                             : _currentTabIndex == 2
-                            ? (_isAmharic ? 'በስም ወይም በዕቃ ፈልግ...' : 'Search by name or product...')
-                            : (_isAmharic ? 'በስም ወይም በማስታወሻ ፈልግ...' : 'Search $_currentTabLabel by name, item...'),
+                            ? (_isAmharic
+                                  ? 'በስም ወይም በዕቃ ፈልግ...'
+                                  : 'Search by name or product...')
+                            : (_isAmharic
+                                  ? 'በስም ወይም በማስታወሻ ፈልግ...'
+                                  : 'Search $_currentTabLabel by name, item...'),
                         hintStyle: TextStyle(
                           fontSize: 11.5,
                           color: isDark
@@ -3754,7 +4291,8 @@ class _MainScreenState extends State<MainScreen> {
                                               ),
                                               const SizedBox(height: 16),
                                               ElevatedButton.icon(
-                                                onPressed: _loadStoresAndRecords,
+                                                onPressed:
+                                                    _loadStoresAndRecords,
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: const Color(
                                                     0xFF2563EB,
@@ -3826,13 +4364,16 @@ class _MainScreenState extends State<MainScreen> {
             ),
 
       // Floating Add Transaction / Store Entry Button
-      floatingActionButton: (_currentTabIndex == 3 && widget.currentUser.isAdmin)
+      floatingActionButton:
+          (_currentTabIndex == 3 && widget.currentUser.isAdmin)
           ? null
           : FloatingActionButton.extended(
               backgroundColor: const Color(0xFF2563EB), // Primary Blue
               foregroundColor: Colors.white,
               elevation: 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               icon: const Icon(Icons.add, size: 18),
               label: Text(
                 _currentTabIndex == 3
@@ -3842,7 +4383,10 @@ class _MainScreenState extends State<MainScreen> {
                     : _currentTabIndex == 1
                     ? (_isAmharic ? 'የአቅራቢ መዝገብ' : 'Supplier Entry')
                     : (_isAmharic ? 'የደንበኛ መዝገብ' : 'Customer Entry'),
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
               onPressed: _currentTabIndex == 3
                   ? () => _openStockTransactionDialog()
