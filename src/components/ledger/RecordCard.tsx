@@ -268,8 +268,16 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
               <th className="py-2.5 px-3 border border-zinc-300 w-28 text-right">{t('Unit Price', 'የአንዱ ዋጋ')}</th>
               <th className="py-2.5 px-3 border border-zinc-300 w-32 text-right">{t('Total Amount', 'ጠቅላላ ዋጋ')}</th>
               <th className="py-2.5 px-3 border border-zinc-300 w-32">{t('Payment Method', 'የክፍያ ዘዴ')}</th>
-              <th className="py-2.5 px-3 border border-zinc-300 w-32 text-right">{t('Debit', 'ዴቢት')}</th>
-              <th className="py-2.5 px-3 border border-zinc-300 w-32 text-right">{t('Credit', 'ክሬዲት')}</th>
+              <th className="py-2.5 px-3 border border-zinc-300 w-32 text-right">
+                {isCustomer || isBroker
+                  ? t('Debit (+)', 'ዴቢት (+)')
+                  : t('Debit (-)', 'ዴቢት (-)')}
+              </th>
+              <th className="py-2.5 px-3 border border-zinc-300 w-32 text-right">
+                {isCustomer || isBroker
+                  ? t('Credit (-)', 'ክሬዲት (-)')
+                  : t('Credit (+)', 'ክሬዲት (+)')}
+              </th>
               <th className="py-2.5 px-3 border border-zinc-300 w-36 text-right font-bold">{t('Balance', 'ቀሪ ሂሳብ')}</th>
             </tr>
           </thead>
@@ -303,10 +311,14 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                     {translateDbText(row.paymentMethod)}
                   </td>
                   <td className="py-2 px-3 border border-zinc-300 text-black text-right font-medium">
-                    {formatCurrency(row.debit)}
+                    {row.debit > 0
+                      ? `${isCustomer || isBroker ? '+' : '-'}${formatCurrency(row.debit)}`
+                      : '—'}
                   </td>
                   <td className="py-2 px-3 border border-zinc-300 text-black text-right font-medium">
-                    {formatCurrency(row.credit)}
+                    {row.credit > 0
+                      ? `${isCustomer || isBroker ? '-' : '+'}${formatCurrency(row.credit)}`
+                      : '—'}
                   </td>
                   <td className="py-2 px-3 border border-zinc-300 text-black text-right font-bold">
                     {formatCurrency(row.balance)}
@@ -331,10 +343,14 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
                   {t('Subtotals:', 'ንዑስ ድምር:')}
                 </td>
                 <td className="py-2.5 px-3 text-right border border-zinc-300 font-bold">
-                  {formatCurrency(tableData.totalDebit)}
+                  {tableData.totalDebit > 0
+                    ? `${isCustomer || isBroker ? '+' : '-'}${formatCurrency(tableData.totalDebit)}`
+                    : formatCurrency(0)}
                 </td>
                 <td className="py-2.5 px-3 text-right border border-zinc-300 font-bold">
-                  {formatCurrency(tableData.totalCredit)}
+                  {tableData.totalCredit > 0
+                    ? `${isCustomer || isBroker ? '-' : '+'}${formatCurrency(tableData.totalCredit)}`
+                    : formatCurrency(0)}
                 </td>
                 <td className="py-2.5 px-3 border border-zinc-300"></td>
               </tr>

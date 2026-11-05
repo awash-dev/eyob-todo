@@ -13,9 +13,6 @@ import type { StoreInventoryItem } from '../../types/ledger'
 import { getInventoryProducts } from '../../lib/api'
 import { Button } from '../ui/button'
 import { SmartStockModal } from './SmartStockModal'
-import { StockHistoryModal } from './StockHistoryModal'
-import { EditProductModal } from './EditProductModal'
-import { ProductDetailsModal } from './ProductDetailsModal'
 
 interface StockSpreadsheetViewProps {
   onOpenMobileMenu?: () => void
@@ -36,16 +33,6 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
   const [isStockModalOpen, setIsStockModalOpen] = useState(false)
   const [stockModalMode, setStockModalMode] = useState<'IN' | 'OUT' | 'REGISTER'>('IN')
   const [targetProductName, setTargetProductName] = useState<string | undefined>(undefined)
-
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
-  const [historyProductId, setHistoryProductId] = useState<string | undefined>(undefined)
-  const [historyProductName, setHistoryProductName] = useState<string | undefined>(undefined)
-
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<StoreInventoryItem | null>(null)
-
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [viewingProduct, setViewingProduct] = useState<StoreInventoryItem | null>(null)
 
   // Fetch real-time products catalog from Neon database
   const loadProducts = useCallback(async () => {
@@ -90,45 +77,11 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
     setIsStockModalOpen(true)
   }
 
-  const handleOpenStockOut = (productName?: string) => {
-    if (isAdmin) return
-    setTargetProductName(productName)
-    setStockModalMode('OUT')
-    setIsStockModalOpen(true)
-  }
-
   const handleOpenRegister = () => {
     if (isAdmin) return
     setTargetProductName(undefined)
     setStockModalMode('REGISTER')
     setIsStockModalOpen(true)
-  }
-
-  const handleOpenHistory = (prod?: StoreInventoryItem) => {
-    if (prod) {
-      setHistoryProductId(prod.id)
-      setHistoryProductName(prod.productName)
-    } else {
-      setHistoryProductId(undefined)
-      setHistoryProductName(undefined)
-    }
-    setIsHistoryModalOpen(true)
-  }
-
-  const handleOpenEdit = (prod: StoreInventoryItem) => {
-    if (isAdmin) return
-    setEditingProduct(prod)
-    setIsEditModalOpen(true)
-  }
-
-  const handleOpenDetails = (prod: StoreInventoryItem) => {
-    setViewingProduct(prod)
-    setIsDetailsModalOpen(true)
-  }
-
-  const handleCloseDetails = () => {
-    setIsDetailsModalOpen(false)
-    setViewingProduct(null)
   }
 
   // Export to CSV
@@ -333,32 +286,8 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
                       </td>
 
                       {/* Product Name */}
-                      <td className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-800">
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => handleOpenDetails(p)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              handleOpenDetails(p)
-                            }
-                          }}
-                          className="font-extrabold text-foreground text-sm tracking-tight cursor-pointer hover:text-primary hover:underline underline-offset-2"
-                          title={t('View product details', 'የምርት ዝርዝሮችን ተመልከት')}
-                        >
-                          {translateDbText(p.productName)}
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground">
-                          <span className="bg-muted px-1.5 py-0.5 rounded font-medium">
-                            {translateDbText(p.category || 'General')}
-                          </span>
-                          {p.supplierName && (
-                            <span className="truncate max-w-[150px]">
-                              • {t('Supplier:', 'አቅራቢ:')} {translateDbText(p.supplierName)}
-                            </span>
-                          )}
-                        </div>
+                      <td className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-800 font-bold text-foreground">
+                        {translateDbText(p.productName)}
                       </td>
 
                       {/* SKU / Code */}
@@ -370,15 +299,7 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
 
                       {/* Current On-Hand Stock */}
                       <td className="py-2.5 px-3 text-right border-r border-zinc-200 dark:border-zinc-800">
-                        <div
-                          className={`text-base font-black tracking-tight ${
-                            status === 'IN_STOCK'
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : status === 'LOW_STOCK'
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-rose-600 dark:text-rose-400'
-                          }`}
-                        >
+                        <div className="text-sm font-bold text-foreground">
                           {qty.toLocaleString()}
                         </div>
                         {pcsPerCtn > 1 && (
@@ -465,52 +386,6 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
           setTargetProductName(undefined)
         }}
         onSuccess={() => loadProducts()}
-      />
-
-      {/* Stock History Audit Trail Modal */}
-      <StockHistoryModal
-        isOpen={isHistoryModalOpen}
-        productId={historyProductId}
-        productName={historyProductName}
-        onClose={() => {
-          setIsHistoryModalOpen(false)
-          setHistoryProductId(undefined)
-          setHistoryProductName(undefined)
-        }}
-      />
-
-      {/* Edit Product Modal */}
-      <EditProductModal
-        isOpen={isEditModalOpen}
-        product={editingProduct}
-        onClose={() => {
-          setIsEditModalOpen(false)
-          setEditingProduct(null)
-        }}
-        onSuccess={() => loadProducts()}
-      />
-
-      {/* Product Details Modal */}
-      <ProductDetailsModal
-        isOpen={isDetailsModalOpen}
-        product={viewingProduct}
-        onClose={handleCloseDetails}
-        onStockIn={(prod) => {
-          handleCloseDetails()
-          handleOpenStockIn(prod.productName)
-        }}
-        onStockOut={(prod) => {
-          handleCloseDetails()
-          handleOpenStockOut(prod.productName)
-        }}
-        onHistory={(prod) => {
-          handleCloseDetails()
-          handleOpenHistory(prod)
-        }}
-        onEdit={(prod) => {
-          handleCloseDetails()
-          handleOpenEdit(prod)
-        }}
       />
     </div>
   )

@@ -2683,7 +2683,9 @@ class _MainScreenState extends State<MainScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Goods (Debit +)',
+                        rec.type == 'supplier'
+                            ? (_isAmharic ? 'ግዢ (ክሬዲት +)' : 'Purchase (Credit +)')
+                            : (_isAmharic ? 'ዕቃ (ዴቢት +)' : 'Goods (Debit +)'),
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
@@ -2708,7 +2710,9 @@ class _MainScreenState extends State<MainScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Paid (Credit −)',
+                        rec.type == 'supplier'
+                            ? (_isAmharic ? 'ክፍያ (ዴቢት -)' : 'Payment (Debit -)')
+                            : (_isAmharic ? 'ክፍያ (ክሬዲት -)' : 'Payment (Credit -)'),
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
