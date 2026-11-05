@@ -220,8 +220,8 @@ class _NewProductDialogState extends State<NewProductDialog> {
                   TextFormField(
                     controller: _nameController,
                     decoration: InputDecoration(
-                      labelText: widget.isAmharic ? 'የምርት ስም (Product Name) *' : 'Product Name *',
-                      hintText: widget.isAmharic ? 'ምሳሌ፦ ወረቀት (Paper)' : 'e.g. Paper',
+                      labelText: widget.isAmharic ? 'የዕቃ ስም *' : 'Product Name *',
+                      hintText: widget.isAmharic ? 'ምሳሌ፦ ወረቀት' : 'e.g. Paper',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
@@ -323,7 +323,9 @@ class _NewProductDialogState extends State<NewProductDialog> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Formula: ${_openingCartons.toInt()} cartons × ${_pcsPerCarton.toInt()} pcs/carton = $_totalInitialPieces pieces',
+                          widget.isAmharic
+                              ? 'ቀመር፦ ${_openingCartons.toInt()} ካርቶን × ${_pcsPerCarton.toInt()} ፍሬ = $_totalInitialPieces ፍሬ'
+                              : 'Formula: ${_openingCartons.toInt()} ctns × ${_pcsPerCarton.toInt()} pcs = $_totalInitialPieces pcs',
                           style: TextStyle(
                             fontSize: 10,
                             fontFamily: 'monospace',
@@ -385,43 +387,13 @@ class _NewProductDialogState extends State<NewProductDialog> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 5. Date (Accepts direct keyboard input + optional calendar icon picker)
+                  // 5. Date
                   TextFormField(
                     controller: _dateController,
                     keyboardType: TextInputType.datetime,
                     decoration: InputDecoration(
                       labelText: widget.isAmharic ? 'ቀን' : 'Date',
-                      hintText: 'YYYY-MM-DD or DD/MM/YYYY',
-                      suffixIcon: IconButton(
-                        icon: const Icon(
-                          Icons.calendar_month_outlined,
-                          size: 20,
-                          color: Color(0xFF2563EB),
-                        ),
-                        tooltip: widget.isAmharic ? 'ቀን ምረጥ' : 'Pick Date',
-                        onPressed: () async {
-                          FocusScope.of(context).unfocus();
-                          DateTime initial = DateTime.now();
-                          try {
-                            final parsed = DateTime.tryParse(_dateController.text.trim());
-                            if (parsed != null &&
-                                parsed.isAfter(DateTime(1970)) &&
-                                parsed.isBefore(DateTime(2100))) {
-                              initial = parsed;
-                            }
-                          } catch (_) {}
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: initial,
-                            firstDate: DateTime(1970),
-                            lastDate: DateTime(2100),
-                          );
-                          if (picked != null) {
-                            _dateController.text =
-                                picked.toIso8601String().split('T')[0];
-                          }
-                        },
-                      ),
+                      hintText: 'YYYY-MM-DD',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),

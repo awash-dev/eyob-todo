@@ -47,7 +47,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
     '12W Safari300K',
     '2.5 bmt',
     '2.5 elusdy',
-    'yebefit keri (የበፊት ቀሪ)',
+    'የበፊት ቀሪ',
     'Portland Cement Bags (50kg)',
   ];
 
@@ -178,46 +178,6 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
         _activeItemIndex = _formItems.length - 1;
       }
     });
-  }
-
-  Future<void> _pickDate() async {
-    FocusScope.of(context).unfocus();
-    DateTime initial = _selectedDate;
-    try {
-      final t = _dateController.text.trim();
-      final p1 = DateTime.tryParse(t);
-      if (p1 != null) {
-        initial = p1;
-      } else if (t.contains('/')) {
-        final parts = t.split('/');
-        if (parts.length == 3) {
-          final d = int.tryParse(parts[0]);
-          final m = int.tryParse(parts[1]);
-          final y = int.tryParse(parts[2]);
-          if (d != null && m != null && y != null && y >= 1970 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-            initial = DateTime(y, m, d);
-          }
-        }
-      }
-    } catch (_) {}
-    if (initial.isBefore(DateTime(1970)) || initial.isAfter(DateTime(2100))) {
-      initial = DateTime.now();
-    }
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(1970),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-        final d = picked.day.toString().padLeft(2, '0');
-        final m = picked.month.toString().padLeft(2, '0');
-        final y = picked.year;
-        _dateController.text = '$d/$m/$y';
-      });
-    }
   }
 
   List<String> get _dynamicStockSuggestions {
@@ -410,14 +370,14 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     : (_isAmharic ? 'የአቅራቢ መዝገብ አርትዕ' : 'Edit Supplier Entry'));
 
     final nameLabel = isCustomer
-        ? (_isAmharic ? 'የደንበኛ ስም (Customer Name) *' : 'Customer Name (የደንበኛ ስም) *')
+        ? (_isAmharic ? 'የደንበኛ ስም *' : 'Customer Name *')
         : isDelala
-            ? (_isAmharic ? 'ስም (Name) *' : 'Name (ስም) *')
+            ? (_isAmharic ? 'ስም *' : 'Name *')
             : isStock
-                ? (_isAmharic ? 'የዕቃ ስም (Item Name) *' : 'Item Name (የዕቃ ስም) *')
-                : (_isAmharic ? 'የአቅራቢ ስም (Supplier Name) *' : 'Supplier Name (የአቅራቢ ስም) *');
+                ? (_isAmharic ? 'የዕቃ ስም *' : 'Item Name *')
+                : (_isAmharic ? 'የአቅራቢ ስም *' : 'Supplier Name *');
 
-    final nameHint = isStock ? 'e.g. 12W Safari' : 'John Doe';
+    final nameHint = isStock ? 'e.g. 12W Safari' : (_isAmharic ? 'ምሳሌ፡ አህመድ' : 'e.g. Ahmed');
 
     // Current active line item
     if (_activeItemIndex >= _formItems.length) {
@@ -553,7 +513,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     const SizedBox(height: 14),
 
                     // 3. Transaction Type Toggle: Debit (+) Goods vs Credit (-) Payment / Loan Return
-                    _buildFieldLabel('Transaction Type (የመዝገብ አይነት)', isDark),
+                    _buildFieldLabel(_isAmharic ? 'የመዝገብ ዓይነት' : 'Transaction Type', isDark),
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -586,7 +546,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                   const SizedBox(width: 5),
                                   Flexible(
                                     child: Text(
-                                      'Debit (+) Goods / Loan\n(ዕቃ / ብድር)',
+                                      _isAmharic ? 'ዴቢት (+)\nዕቃ / ብድር' : 'Debit (+)\nGoods / Loan',
                                       textAlign: TextAlign.center,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -643,7 +603,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                   const SizedBox(width: 5),
                                   Flexible(
                                     child: Text(
-                                      'Credit (-) Payment\n(ክፍያ / ባንክ)',
+                                      _isAmharic ? 'ክሬዲት (-)\nክፍያ / ባንክ' : 'Credit (-)\nPayment',
                                       textAlign: TextAlign.center,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -669,7 +629,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
                   // 3B. Stock-only toggle: Stock In (+) / Stock Out (-)
                   if (isStock) ...[
-                    _buildFieldLabel('Stock Movement (የዕቃ አቅርቦት አይነት)', isDark),
+                    _buildFieldLabel(_isAmharic ? 'የዕቃ ዝውውር' : 'Stock Movement', isDark),
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -702,7 +662,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                   const SizedBox(width: 5),
                                   Flexible(
                                     child: Text(
-                                      'Stock In (+)\n(ማገዝ / መግቢያ)',
+                                      _isAmharic ? 'ዕቃ ገቢ (+)' : 'Stock In (+)',
                                       textAlign: TextAlign.center,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -752,7 +712,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                   const SizedBox(width: 5),
                                   Flexible(
                                     child: Text(
-                                      'Stock Out (-)\n(መቆጣጠር / መውጫ)',
+                                      _isAmharic ? 'ዕቃ ወጪ (-)' : 'Stock Out (-)',
                                       textAlign: TextAlign.center,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -780,7 +740,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                   //     (stock-out keeps these fields so the storekeeper records what left the store).
                   if (isDebit || isStock) ...[
                     // Item Field (Clean Single Label matching Stitch UI)
-                    _buildFieldLabel('Item (የዕቃ ስም)', isDark),
+                    _buildFieldLabel(_isAmharic ? 'የዕቃ ስም' : 'Item Name', isDark),
                     const SizedBox(height: 6),
                     Autocomplete<String>(
                       initialValue: TextEditingValue(text: currentItem.nameController.text),
@@ -827,7 +787,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                             setState(() {});
                           },
                           validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Please enter item name' : null,
+                              v == null || v.trim().isEmpty ? (_isAmharic ? 'እባክዎ የዕቃ ስም ያስገቡ' : 'Please enter item name') : null,
                         );
                       },
                     ),
@@ -861,7 +821,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    'In Store (በመጋዘን ያለው):',
+                                    _isAmharic ? 'በመደብር ያለው፡' : 'In Store:',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -873,10 +833,10 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                                 const SizedBox(width: 6),
                                 Text(
                                   !hasName
-                                      ? '0 in store'
+                                      ? (_isAmharic ? '0 በመደብሩ' : '0 in store')
                                       : curCtns > 0
-                                          ? '${curCtns.toInt()} Ctns (${curPcs.toInt()} pcs)'
-                                          : '0 in store',
+                                          ? '${curCtns.toInt()} ${_isAmharic ? "ካርቶን" : "Ctns"} (${curPcs.toInt()} ${_isAmharic ? "ፍሬ" : "pcs"})'
+                                          : (_isAmharic ? '0 በመደብሩ' : '0 in store'),
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w800,
@@ -894,7 +854,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     const SizedBox(height: 14),
 
                     // Quantity (Cartons / Units) + Unit Selector
-                    _buildFieldLabel('Quantity & Packaging (ብዛት)', isDark),
+                    _buildFieldLabel(_isAmharic ? 'ብዛት' : 'Quantity', isDark),
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -991,7 +951,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
 
                     // Pieces per Carton (visible if Carton)
                     if (currentItem.packagingUnit == 'Carton') ...[
-                      _buildFieldLabel('Pieces per Carton (በካርቶን ውስጥ ያለው ብዛት)', isDark),
+                      _buildFieldLabel(_isAmharic ? 'ፍሬ በካርቶን' : 'Pieces per Carton', isDark),
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: currentItem.pcsController,
@@ -1019,7 +979,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     ],
 
                     // Unit Price (ETB)
-                    _buildFieldLabel('Unit Price (ETB) (የአንዱ ዋጋ)', isDark),
+                    _buildFieldLabel(_isAmharic ? 'የአንዱ ዋጋ (ብር)' : 'Unit Price (ETB)', isDark),
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: currentItem.priceController,
@@ -1040,7 +1000,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     const SizedBox(height: 14),
 
                     // Total Price (ETB) Auto-Computed
-                    _buildFieldLabel('Total Price (ETB) (ጠቅላላ ድምር)', isDark),
+                    _buildFieldLabel(_isAmharic ? 'ጠቅላላ ዋጋ (ብር)' : 'Total Price (ETB)', isDark),
                     const SizedBox(height: 6),
                     Container(
                       height: 46,
@@ -1065,7 +1025,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     const SizedBox(height: 14),
                   ] else ...[
                     // 4B. If Credit (-) Payment / Bank Transfer / Loan Repayment
-                    _buildFieldLabel('Which Bank Transfer? (የተከፈለበት ባንክ)', isDark),
+                    _buildFieldLabel(_isAmharic ? 'የተከፈለበት ባንክ' : 'Which Bank Transfer?', isDark),
                     const SizedBox(height: 6),
                     Container(
                       height: 44,
@@ -1108,7 +1068,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                           color: theme.colorScheme.onSurface,
                         ),
                         decoration: InputDecoration(
-                          labelText: 'Specify Bank / Channel (e.g. Amole, POA, M-Pesa)',
+                          labelText: _isAmharic ? 'የባንክ ወይም የክፍያ ስም' : 'Specify Bank / Channel',
                           labelStyle: TextStyle(
                             fontSize: 11,
                             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -1125,7 +1085,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                     const SizedBox(height: 14),
 
                     // Payment Amount (ETB)
-                    _buildFieldLabel('Payment Amount (ETB) (የተከፈለ ብር)', isDark),
+                    _buildFieldLabel(_isAmharic ? 'የተከፈለ ብር' : 'Payment Amount (ETB)', isDark),
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: currentItem.priceController,
@@ -1151,7 +1111,7 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                   ],
 
                   // 5. Date Field with Ethiopian text option + Calendar Picker button
-                  _buildFieldLabel(_isAmharic ? 'ቀን (Date) *' : 'Date (ቀን) *', isDark),
+                  _buildFieldLabel(_isAmharic ? 'ቀን *' : 'Date *', isDark),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _dateController,
@@ -1177,23 +1137,18 @@ class _RecordFormDialogState extends State<RecordFormDialog> {
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide(color: inputBorder),
                       ),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.calendar_month_outlined, size: 20, color: Color(0xFF2563EB)),
-                        tooltip: _isAmharic ? 'ቀን ምረጥ' : 'Pick Date',
-                        onPressed: _pickDate,
-                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
 
                   // 6. Note (optional)
-                  _buildFieldLabel('Note (optional) (ማስታወሻ)', isDark),
+                  _buildFieldLabel(_isAmharic ? 'ማስታወሻ' : 'Note (optional)', isDark),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _notesController,
                     style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface),
                     decoration: InputDecoration(
-                      hintText: 'From supplier, 28-Aug, or reference',
+                      hintText: _isAmharic ? 'ምሳሌ፦ ደረሰኝ ቁጥር' : 'e.g. Receipt # or reference',
                       hintStyle: TextStyle(
                         fontSize: 12.5,
                         color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),

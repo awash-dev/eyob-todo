@@ -167,7 +167,7 @@ class NeonDatabaseService {
         errStr.contains('No address associated with hostname') ||
         errStr.contains('Connection refused')) {
       throw Exception(
-        'Network error: No internet connection. Please verify your Wi-Fi or mobile data is turned on and try again. (የኢንተርኔት ግንኙነት አልተገኘም)',
+        'Network error: No internet connection. Please verify your Wi-Fi or mobile data is turned on and try again.',
       );
     }
 
@@ -799,7 +799,7 @@ class NeonDatabaseService {
 
     if (rows.isEmpty) {
       final newBroker = await createBrokerDirect(
-        fullName: 'Delala Mohammed (ደላላ መሀመድ)',
+        fullName: 'Mohammed',
         phone: '0911223344',
         location: 'Merkato',
       );
@@ -1443,7 +1443,7 @@ class NeonDatabaseService {
     // 2. Strict Stock Out Check before DB write
     if (isOut && qty > currentQty) {
       throw Exception(
-        'Insufficient stock! Available quantity: ${currentQty.toInt()} pieces. You cannot withdraw ${qty.toInt()} pieces. (በቂ እቃ የለም! በመደብሩ ያለው መጠን ${currentQty.toInt()} ብቻ ነው። ${qty.toInt()} መውሰድ አይቻልም።)',
+        'Insufficient stock! Available quantity: ${currentQty.toInt()} pieces. You cannot withdraw ${qty.toInt()} pieces.',
       );
     }
 
@@ -1488,7 +1488,7 @@ class NeonDatabaseService {
                 : 0.0)
             : 0.0;
         throw Exception(
-          'Insufficient stock! Available quantity: ${freshQty.toInt()} pieces. (በቂ እቃ የለም! በመደብሩ ያለው መጠን ${freshQty.toInt()} ብቻ ነው።)',
+          'Insufficient stock! Available quantity: ${freshQty.toInt()} pieces.',
         );
       }
       throw Exception('Product update failed');

@@ -346,9 +346,9 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
               <div>
                 <DialogTitle className="text-base sm:text-lg font-bold text-foreground">
                   {mode === 'IN'
-                    ? t('Stock In (Incoming Stock)', 'ዕቃ ገቢ (+ Stock In)')
+                    ? t('Stock In (+)', 'ዕቃ ገቢ (+)')
                     : mode === 'OUT'
-                    ? t('Stock Out (Outgoing Stock)', 'ዕቃ ወጪ (- Stock Out)')
+                    ? t('Stock Out (-)', 'ዕቃ ወጪ (-)')
                     : t('Register New Product', 'አዲስ ምርት መዝግብ')}
                 </DialogTitle>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -439,20 +439,20 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
                     required
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder="e.g. ወረቀት, 12W Safari, አምፖል..."
+                    placeholder={t('e.g. Paper, 12W Safari...', 'ምሳሌ፦ ወረቀት፣ 12W ሳፋሪ...')}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-700 bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">
-                    {t('SKU / Product Code', 'የምርት መለያ (SKU)')}
+                    {t('SKU Code', 'የዕቃ መለያ')}
                   </label>
                   <input
                     type="text"
                     value={regSku}
                     onChange={(e) => setRegSku(e.target.value)}
-                    placeholder="Auto-generated if blank"
+                    placeholder={t('Auto-generated if blank', 'ካልተሞላ በራሱ ይሰጣል')}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-background focus:outline-none"
                   />
                 </div>
@@ -479,18 +479,18 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
                     onChange={(e) => setRegBaseUnit(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-background focus:outline-none"
                   >
-                    <option value="Pcs">Pcs (ፍሬ)</option>
-                    <option value="Carton">Carton (ካርቶን)</option>
-                    <option value="Roll">Roll (ጥቅል)</option>
-                    <option value="Meter">Meter (ሜትር)</option>
-                    <option value="Kg">Kg (ኪሎ)</option>
-                    <option value="Set">Set (ስብስብ)</option>
+                    <option value="Pcs">{t('Pcs', 'ፍሬ')}</option>
+                    <option value="Carton">{t('Carton', 'ካርቶን')}</option>
+                    <option value="Roll">{t('Roll', 'ጥቅል')}</option>
+                    <option value="Meter">{t('Meter', 'ሜትር')}</option>
+                    <option value="Kg">{t('Kg', 'ኪሎ')}</option>
+                    <option value="Set">{t('Set', 'ስብስብ')}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">
-                    {t('Pieces per Carton (if applicable)', 'ፍሬ በካርቶን (ካለ)')}
+                    {t('Pieces / Carton', 'ፍሬ በካርቶን')}
                   </label>
                   <input
                     type="number"
@@ -504,7 +504,7 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
 
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">
-                    {t('Cost / Purchase Price (ETB)', 'የግዢ ዋጋ (ብር)')}
+                    {t('Purchase Price (ETB)', 'የግዢ ዋጋ')}
                   </label>
                   <input
                     type="number"
@@ -518,7 +518,7 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
 
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">
-                    {t('Selling Price (ETB)', 'የሽያጭ ዋጋ (ብር)')}
+                    {t('Selling Price (ETB)', 'የሽያጭ ዋጋ')}
                   </label>
                   <input
                     type="number"
@@ -546,7 +546,7 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
 
                 <div>
                   <label className="text-xs font-semibold text-foreground block mb-1">
-                    {t('Minimum Stock Level (Low Stock Alert)', 'የከነነ ዝቅተኛ ክምችት (የሚቀንስ ማንቂያ)')}
+                    {t('Minimum Stock Level', 'ዝቅተኛ ክምችት')}
                   </label>
                   <input
                     type="number"

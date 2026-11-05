@@ -639,7 +639,7 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
                                 style: const TextStyle(fontSize: 11, color: labelTextColor, fontWeight: FontWeight.w600),
                               ),
                               Text(
-                                '${widget.isAmharic ? "የአንዱ ዋጋ" : "Unit Price"}: ${_currencyFormat.format(_selectedProduct!.unitPrice)} ETB',
+                                '${widget.isAmharic ? "የአንዱ ዋጋ" : "Unit Price"}: ${_currencyFormat.format(_selectedProduct!.unitPrice)} ${widget.isAmharic ? "ብር" : "ETB"}',
                                 style: const TextStyle(fontSize: 11, color: labelTextColor, fontWeight: FontWeight.w600),
                               ),
                             ],
@@ -1068,36 +1068,6 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
                               style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: primaryTextColor),
                               decoration: InputDecoration(
                                 hintText: 'YYYY-MM-DD',
-                                suffixIcon: IconButton(
-                                  icon: const Icon(
-                                    Icons.calendar_month_outlined,
-                                    size: 18,
-                                    color: Color(0xFF2563EB),
-                                  ),
-                                  tooltip: widget.isAmharic ? 'ቀን ምረጥ' : 'Pick Date',
-                                  onPressed: () async {
-                                    FocusScope.of(context).unfocus();
-                                    DateTime initial = DateTime.now();
-                                    try {
-                                      final parsed = DateTime.tryParse(_dateController.text.trim());
-                                      if (parsed != null &&
-                                          parsed.isAfter(DateTime(1970)) &&
-                                          parsed.isBefore(DateTime(2100))) {
-                                        initial = parsed;
-                                      }
-                                    } catch (_) {}
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: initial,
-                                      firstDate: DateTime(1970),
-                                      lastDate: DateTime(2100),
-                                    );
-                                    if (picked != null) {
-                                      _dateController.text =
-                                          picked.toIso8601String().split('T')[0];
-                                    }
-                                  },
-                                ),
                                 filled: true,
                                 fillColor: inputFillColor,
                                 border: OutlineInputBorder(

@@ -64,7 +64,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
 
   const detailRows: Array<{ label: string; value: React.ReactNode }> = [
     {
-      label: t('SKU / Product ID', 'የዕቃ መለያ (SKU)'),
+      label: t('SKU Code', 'የዕቃ መለያ'),
       value: (
         <span className="font-mono font-semibold">{product.sku || 'N/A'}</span>
       ),

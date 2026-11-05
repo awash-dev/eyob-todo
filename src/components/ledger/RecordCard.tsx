@@ -223,13 +223,13 @@ export const RecordCard: React.FC<RecordCardProps> = ({ record }) => {
           <button
             type="button"
             onClick={() => openPaymentModal(record.type as 'customer' | 'supplier' | 'delala', record.title)}
-            className="text-xs font-semibold px-3 py-1.5 bg-black hover:bg-zinc-800 text-white rounded cursor-pointer transition-colors"
+            className="text-xs font-semibold px-2.5 py-1 bg-black hover:bg-zinc-800 text-white rounded cursor-pointer transition-colors"
           >
             {isCustomer
-              ? t('+ Record Credit / Payment', '+ የደንበኛ ሂሳብ / ክፍያ መዝግብ')
+              ? t('+ Add Entry', '+ ሂሳብ መዝግብ')
               : isSupplier
-              ? t('+ Record Purchase / Payment', '+ የአቅራቢ ሂሳብ / ክፍያ መዝግብ')
-              : t('+ Record Broker Transaction', '+ የደላላ ሂሳብ / ክፍያ መዝግብ')}
+              ? t('+ Add Purchase', '+ ግዢ መዝግብ')
+              : t('+ Add Deal', '+ ደላላ መዝግብ')}
           </button>
 
           <DropdownMenu>

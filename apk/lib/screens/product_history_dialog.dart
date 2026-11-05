@@ -89,7 +89,7 @@ class _ProductHistoryDialogState extends State<ProductHistoryDialog> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${widget.isAmharic ? "የእንቅስቃሴ ታሪክ" : "Stock History"} · ${widget.product.cartons} ctns (${widget.product.totalPieces} pcs)',
+                          '${widget.isAmharic ? "የዕቃ እንቅስቃሴ" : "Stock History"} · ${widget.product.cartons} ${widget.isAmharic ? "ካርቶን" : "ctns"} (${widget.product.totalPieces.toInt()} ${widget.isAmharic ? "ፍሬ" : "pcs"})',
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
@@ -163,8 +163,8 @@ class _ProductHistoryDialogState extends State<ProductHistoryDialog> {
                                         children: [
                                           Text(
                                             isOut
-                                                ? (widget.isAmharic ? 'ወጪ (Stock Out)' : 'Stock Out')
-                                                : (widget.isAmharic ? 'ገቢ (Stock In)' : 'Stock In'),
+                                                ? (widget.isAmharic ? 'ወጪ (-)' : 'Stock Out (-)')
+                                                : (widget.isAmharic ? 'ገቢ (+)' : 'Stock In (+)'),
                                             style: const TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.bold,

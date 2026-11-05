@@ -662,7 +662,7 @@ class _StatementScreenState extends State<StatementScreen> {
                         border: Border(right: BorderSide(color: gridColor, width: 0.8)),
                       ),
                       child: Text(
-                        _isAmharic ? 'ጠቅላላ ድምር (ETB)' : 'TOTAL (ETB)',
+                        _isAmharic ? 'ጠቅላላ ድምር (ብር)' : 'TOTAL (ETB)',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 11,

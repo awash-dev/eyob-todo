@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
-  AlertTriangle,
   ArrowDownUp,
-  CheckCircle2,
   Download,
   Package,
   PackagePlus,
   Store,
-  XCircle,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
@@ -67,15 +64,6 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
   useEffect(() => {
     loadProducts()
   }, [loadProducts])
-
-  // Calculate Status: In Stock (> min), Low Stock (<= min && > 0), Out of Stock (<= 0)
-  const getProductStatus = (p: StoreInventoryItem): 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK' => {
-    const qty = Number(p.currentQuantity) || 0
-    const min = Number(p.minimumStock) || 0
-    if (qty <= 0) return 'OUT_OF_STOCK'
-    if (qty <= min) return 'LOW_STOCK'
-    return 'IN_STOCK'
-  }
 
   // Filtered Products
   const filteredProducts = useMemo(() => {
@@ -155,7 +143,7 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
       'Cost Price (ETB)',
       'Selling Price (ETB)',
       'Total Value (ETB)',
-      'Status',
+      'Date',
       'Supplier',
     ]
 
@@ -170,9 +158,7 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
           ? `${ctns} ctns + ${remPcs} pcs (${pcsPerCtn}/ctn)`
           : `Direct ${p.baseUnit}`
 
-      const status = getProductStatus(p)
-      const statusLabel =
-        status === 'IN_STOCK' ? 'In Stock' : status === 'LOW_STOCK' ? 'Low Stock' : 'Out of Stock'
+      const dateStr = (p.lastTransactionDate || p.updatedAt || p.createdAt || '').split('T')[0]
 
       return [
         String(idx + 1),
@@ -184,7 +170,7 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
         cost.toFixed(2),
         (Number(p.unitPrice) || 0).toFixed(2),
         (qty * cost).toFixed(2),
-        `"${statusLabel}"`,
+        `"${dateStr}"`,
         `"${(p.supplierName || '').replace(/"/g, '""')}"`,
       ]
     })
@@ -293,7 +279,7 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
                     )}
                   </td>
                   <td className="py-2.5 px-3 text-center text-muted-foreground text-[10px]">
-                    {t('✓ Real Inventory', '✓ ትክክለኛ ክምችት')}
+                    —
                   </td>
                 </tr>
                 <tr className="bg-zinc-100 dark:bg-zinc-800/80 text-foreground font-bold border-b border-zinc-200 dark:border-zinc-700">
@@ -301,7 +287,7 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
                     #
                   </th>
                   <th className="py-2.5 px-3 border-r border-zinc-200 dark:border-zinc-700">
-                    {t('Product Name', 'የምርት ስም')}
+                    {t('Product / Item Name', 'የምርት ስም')}
                   </th>
                   <th className="py-2.5 px-3 w-32 border-r border-zinc-200 dark:border-zinc-700">
                     {t('SKU / Code', 'የዕቃ መለያ')}
@@ -313,13 +299,13 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
                     {t('Unit', 'መለኪያ')}
                   </th>
                   <th className="py-2.5 px-3 w-32 text-right border-r border-zinc-200 dark:border-zinc-700">
-                    {t('Purchase Price', 'የግዢ ዋጋ')}
+                    {t('Purchase Price (ETB)', 'የግዢ ዋጋ')}
                   </th>
                   <th className="py-2.5 px-3 w-32 text-right border-r border-zinc-200 dark:border-zinc-700">
-                    {t('Selling Price', 'የሽያጭ ዋጋ')}
+                    {t('Selling Price (ETB)', 'የሽያጭ ዋጋ')}
                   </th>
                   <th className="py-2.5 px-3 w-32 text-center border-r border-zinc-200 dark:border-zinc-700">
-                    {t('Stock Status', 'ሁኔታ')}
+                    {t('Date', 'ቀን')}
                   </th>
                 </tr>
               </thead>
@@ -328,7 +314,6 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
                   const qty = Number(p.currentQuantity) || 0
                   const cost = Number(p.costPrice) || 0
                   const price = Number(p.unitPrice) || 0
-                  const status = getProductStatus(p)
                   const pcsPerCtn = Number(p.pcsPerCarton) || 1
                   const ctns = pcsPerCtn > 1 ? Math.floor(qty / pcsPerCtn) : 0
                   const remPcs = pcsPerCtn > 1 ? qty % pcsPerCtn : 0
@@ -418,24 +403,13 @@ export const StockSpreadsheetView: React.FC<StockSpreadsheetViewProps> = ({
                         {formatCurrency(price)}
                       </td>
 
-                      {/* Stock Status Badge */}
-                      <td className="py-2.5 px-3 text-center border-r border-zinc-200 dark:border-zinc-800">
-                        {status === 'IN_STOCK' ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                            <CheckCircle2 size={12} />
-                            <span>{t('In Stock', 'ክምችት አለ')}</span>
-                          </span>
-                        ) : status === 'LOW_STOCK' ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                            <AlertTriangle size={12} />
-                            <span>{t('Low Stock', 'አነስተኛ ክምችት')}</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                            <XCircle size={12} />
-                            <span>{t('Out of Stock', 'ያለቀ')}</span>
-                          </span>
-                        )}
+                      {/* Date / Calendar */}
+                      <td className="py-2.5 px-3 text-center border-r border-zinc-200 dark:border-zinc-800 font-mono text-xs text-foreground font-semibold">
+                        {(() => {
+                          const raw = p.lastTransactionDate || p.updatedAt || p.createdAt
+                          if (!raw) return '—'
+                          return raw.includes('T') ? raw.split('T')[0] : raw
+                        })()}
                       </td>
                     </tr>
                   )

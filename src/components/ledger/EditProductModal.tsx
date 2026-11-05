@@ -136,7 +136,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1">
-                {t('SKU / Code', 'የምርት መለያ (SKU)')}
+                {t('SKU Code', 'የዕቃ መለያ')}
               </label>
               <input
                 type="text"

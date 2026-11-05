@@ -1025,14 +1025,14 @@ class _MainScreenState extends State<MainScreen> {
                                   ),
                                   Text(
                                     _isAmharic
-                                        ? 'ጠቅላላ ፍሬ፦ ${totalPieces.toStringAsFixed(totalPieces.truncateToDouble() == totalPieces ? 0 : 2)} pcs'
+                                        ? 'ጠቅላላ ፍሬ፦ ${totalPieces.toStringAsFixed(totalPieces.truncateToDouble() == totalPieces ? 0 : 2)} ፍሬ'
                                         : 'Total Pieces: ${totalPieces.toStringAsFixed(totalPieces.truncateToDouble() == totalPieces ? 0 : 2)} pcs',
                                     style: const TextStyle(fontSize: 10.5, color: Colors.grey),
                                   ),
                                 ],
                               ),
                               Text(
-                                '${finalBalance >= 0 ? '+' : ''}${_currencyFormat.format(finalBalance)} ETB',
+                                '${finalBalance >= 0 ? '+' : ''}${_currencyFormat.format(finalBalance)} ${_isAmharic ? "ብር" : "ETB"}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 15,
@@ -1101,14 +1101,14 @@ class _MainScreenState extends State<MainScreen> {
                     children: [
                       // Name (No prefix)
                       Text(
-                        _isAmharic ? '1. ስም (Name) *' : '1. Name (ስም) *',
+                        _isAmharic ? '1. ስም *' : '1. Name *',
                         style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
                       TextField(
                         controller: nameCtrl,
                         decoration: InputDecoration(
-                          hintText: 'John Doe',
+                          hintText: _isAmharic ? 'ምሳሌ፡ አህመድ' : 'John Doe',
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -1117,7 +1117,7 @@ class _MainScreenState extends State<MainScreen> {
 
                       // Product
                       Text(
-                        _isAmharic ? '2. የዕቃ ዓይነት (Item / Product) *' : '2. Item / Product (የዕቃ ዓይነት) *',
+                        _isAmharic ? '2. የዕቃ ዓይነት *' : '2. Item / Product *',
                         style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
@@ -1139,7 +1139,7 @@ class _MainScreenState extends State<MainScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _isAmharic ? '3. ዋጋ (Price ETB) *' : '3. Unit Price (ዋጋ ETB) *',
+                                  _isAmharic ? '3. ዋጋ (ብር) *' : '3. Unit Price (ETB) *',
                                   style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(height: 4),
@@ -1162,7 +1162,7 @@ class _MainScreenState extends State<MainScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _isAmharic ? '4. ብዛት (Pieces) *' : '4. Pieces (ብዛት) *',
+                                  _isAmharic ? '4. ብዛት *' : '4. Pieces *',
                                   style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(height: 4),
@@ -1185,7 +1185,7 @@ class _MainScreenState extends State<MainScreen> {
 
                       // Sign Selector (+ / -)
                       Text(
-                        _isAmharic ? '5. ምልክት (Sign) *' : '5. Sign (ምልክት) *',
+                        _isAmharic ? '5. ምልክት *' : '5. Sign *',
                         style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
@@ -1206,7 +1206,7 @@ class _MainScreenState extends State<MainScreen> {
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
-                                  _isAmharic ? '+ ተቀባይ (+1)' : '+ Positive (+1)',
+                                  _isAmharic ? '+ ተቀባይ (+)' : '+ Positive (+)',
                                   style: TextStyle(
                                     color: selectedSign == 1 ? Colors.white : Colors.grey.shade700,
                                     fontWeight: FontWeight.bold,
@@ -1232,7 +1232,7 @@ class _MainScreenState extends State<MainScreen> {
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
-                                  _isAmharic ? '- ተከፋይ (-1)' : '- Negative (-1)',
+                                  _isAmharic ? '- ተከፋይ (-)' : '- Negative (-)',
                                   style: TextStyle(
                                     color: selectedSign == -1 ? Colors.white : Colors.grey.shade700,
                                     fontWeight: FontWeight.bold,
@@ -1258,11 +1258,11 @@ class _MainScreenState extends State<MainScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              _isAmharic ? '6. ድምር (ዋጋ × ብዛት × ምልክት):' : '6. Total (Price × Pcs × Sign):',
+                              _isAmharic ? '6. ጠቅላላ ድምር:' : '6. Total:',
                               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
                             ),
                             Text(
-                              '${total >= 0 ? '+' : ''}${_currencyFormat.format(total)} ETB',
+                              '${total >= 0 ? '+' : ''}${_currencyFormat.format(total)} ${_isAmharic ? "ብር" : "ETB"}',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w900,
@@ -1280,7 +1280,7 @@ class _MainScreenState extends State<MainScreen> {
 
                       // Ethiopian Date Text Input
                       Text(
-                        _isAmharic ? '7. ቀን (የኢትዮጵያ የቀን አቆጣጠር) *' : '7. Date (Ethiopian Calendar) *',
+                        _isAmharic ? '7. ቀን *' : '7. Date *',
                         style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
@@ -1289,36 +1289,8 @@ class _MainScreenState extends State<MainScreen> {
                         keyboardType: TextInputType.datetime,
                         decoration: InputDecoration(
                           hintText: 'e.g. 02/11/2026 or 24/02/2018',
-                          helperText: _isAmharic
-                              ? 'ቀን በኢትዮጵያ አቆጣጠር ወይም በምርጫ ያስገቡ'
-                              : 'Type date text or tap calendar icon',
-                          helperStyle: const TextStyle(fontSize: 10, color: Colors.grey),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          suffixIcon: IconButton(
-                            icon: const Icon(
-                              Icons.calendar_month_outlined,
-                              size: 18,
-                              color: Color(0xFF2563EB),
-                            ),
-                            tooltip: _isAmharic ? 'ቀን ምረጥ' : 'Pick Date',
-                            onPressed: () async {
-                              FocusScope.of(context).unfocus();
-                              DateTime initial = DateTime.now();
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: initial,
-                                firstDate: DateTime(1970),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null) {
-                                final d = picked.day.toString().padLeft(2, '0');
-                                final m = picked.month.toString().padLeft(2, '0');
-                                final y = picked.year;
-                                dateCtrl.text = '$d/$m/$y';
-                              }
-                            },
-                          ),
                         ),
                       ),
                     ],
@@ -1422,14 +1394,14 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Entry? (መዝገቡ ይጥፋ?)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to delete ${entry.delalaName} - ${entry.productName}?'),
+        title: Text(_isAmharic ? 'መዝገቡ ይጥፋ?' : 'Delete Entry?', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        content: Text(_isAmharic ? 'እርግጠኛ ነዎት የ${entry.delalaName} - ${entry.productName} መዝገብ እንዲሰረዝ ይፈልጋሉ?' : 'Are you sure you want to delete ${entry.delalaName} - ${entry.productName}?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_isAmharic ? 'ይቅር' : 'Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48), foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: Text(_isAmharic ? 'ሰርዝ' : 'Delete'),
           ),
         ],
       ),
@@ -1654,7 +1626,7 @@ class _MainScreenState extends State<MainScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _isAmharic ? 'ቋንቋ (Language)' : 'Language',
+                      _isAmharic ? 'ቋንቋ' : 'Language',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 10),
@@ -2760,15 +2732,15 @@ class _MainScreenState extends State<MainScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Outstanding Balance (ቀሪ)',
-                        style: TextStyle(
+                      Text(
+                        _isAmharic ? 'ቀሪ ዕዳ' : 'Outstanding Balance',
+                        style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 11.5,
                         ),
                       ),
                       Text(
-                        'ETB ${_currencyFormat.format(rec.balance)}',
+                        '${_currencyFormat.format(rec.balance)} ${_isAmharic ? "ብር" : "ETB"}',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 13,

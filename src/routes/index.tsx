@@ -8,7 +8,6 @@ import { Sidebar } from '../components/layout/Sidebar'
 import { MobileBottomNav } from '../components/layout/MobileBottomNav'
 import { RecordCard } from '../components/ledger/RecordCard'
 import { RecordModal } from '../components/ledger/RecordModal'
-import { PaymentTransactionModal } from '../components/ledger/PaymentTransactionModal'
 import { PrintView } from '../components/ledger/PrintView'
 import { ToastContainer } from '../components/ledger/ToastContainer'
 import { StockSpreadsheetView } from '../components/ledger/StockSpreadsheetView'
@@ -47,7 +46,6 @@ function MainAppView() {
     searchQuery,
     setSearchQuery,
     openCreateModal,
-    openPaymentModal,
   } = useLedger()
 
   // Sort filtered records
@@ -136,25 +134,19 @@ function MainAppView() {
               {/* Right: Add Entry Button */}
               <div className="flex items-center gap-2 shrink-0">
                 <Button
-                  onClick={() => {
-                    if (activeTab === 'customer' || activeTab === 'supplier' || activeTab === 'delala') {
-                      openPaymentModal(activeTab)
-                    } else {
-                      openCreateModal(activeTab)
-                    }
-                  }}
+                  onClick={() => openCreateModal(activeTab)}
                   size="sm"
-                  className="text-xs font-semibold shadow-2xs flex items-center gap-1.5 h-9 px-3.5 rounded bg-black hover:bg-zinc-800 text-white cursor-pointer"
+                  className="text-xs font-semibold shadow-2xs flex items-center gap-1.5 h-8 px-3 rounded bg-black hover:bg-zinc-800 text-white cursor-pointer"
                 >
                   <Plus size={15} />
                   <span>
                     {activeTab === 'customer'
-                      ? t('+ Record Credit / Payment', '+ የደንበኛ ሂሳብ / ክፍያ መዝግብ')
+                      ? t('+ Add Customer', '+ ደንበኛ መዝግብ')
                       : activeTab === 'supplier'
-                      ? t('+ Record Purchase / Payment', '+ የአቅራቢ ሂሳብ / ክፍያ መዝግብ')
+                      ? t('+ Add Supplier', '+ አቅራቢ መዝግብ')
                       : activeTab === 'delala'
-                      ? t('+ Record Broker Transaction', '+ የደላላ ሂሳብ / ክፍያ መዝግብ')
-                      : t('Add Stock Entry', 'አዲስ የመደብር መዝገብ')}
+                      ? t('+ Add Broker', '+ ደላላ መዝግብ')
+                      : t('+ Add Stock', '+ እቃ መዝግብ')}
                   </span>
                 </Button>
               </div>
@@ -220,13 +212,7 @@ function MainAppView() {
                   ) : (
                     <Button
                       size="sm"
-                      onClick={() => {
-                        if (activeTab === 'customer' || activeTab === 'supplier' || activeTab === 'delala') {
-                          openPaymentModal(activeTab)
-                        } else {
-                          openCreateModal(activeTab)
-                        }
-                      }}
+                      onClick={() => openCreateModal(activeTab)}
                       className="font-semibold shadow-xs text-xs h-8 rounded-xl flex items-center gap-1.5"
                     >
                       <Plus size={16} />
@@ -245,7 +231,6 @@ function MainAppView() {
 
       {/* Modals & Portals */}
       <RecordModal />
-      <PaymentTransactionModal />
       <ToastContainer />
       <TranslatorToolModal />
 

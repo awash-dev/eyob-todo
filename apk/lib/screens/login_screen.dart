@@ -51,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (password.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter your password (የይለፍ ቃል ያስገቡ)';
+        _errorMessage = _isAmharic ? 'እባክዎ የይለፍ ቃል ያስገቡ' : 'Please enter your password';
       });
       return;
     }
@@ -78,8 +78,9 @@ class _LoginScreenState extends State<LoginScreen> {
             msg.contains('ClientException') ||
             msg.contains('timeout') ||
             msg.contains('No address associated with hostname')) {
-          _errorMessage =
-              'Network error. Please check your internet connection.\nየኢንተርኔት ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።';
+          _errorMessage = _isAmharic
+              ? 'የኢንተርኔት ግንኙነት ችግር ተከስቷል። እባክዎ እንደገና ይሞክሩ።'
+              : 'Network error. Please check your internet connection.';
         } else {
           _errorMessage = msg;
         }
@@ -194,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            _isAmharic ? 'ግባ (Sign In)' : 'Sign In',
+                            _isAmharic ? 'ግባ' : 'Sign In',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -234,8 +235,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                             decoration: InputDecoration(
-                              labelText: 'Phone Number (ስልክ ቁጥር)',
-                              hintText: 'e.g. 0911223344 or +251...',
+                              labelText: _isAmharic ? 'ስልክ ቁጥር' : 'Phone Number',
+                              hintText: _isAmharic ? 'ምሳሌ፦ 0911223344' : 'e.g. 0911223344',
                               prefixIcon: const Icon(
                                 Icons.phone_outlined,
                                 size: 20,
@@ -256,7 +257,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
-                              labelText: 'Password (የይለፍ ቃል)',
+                              labelText: _isAmharic ? 'የይለፍ ቃል' : 'Password',
                               hintText: '••••••••',
                               prefixIcon: const Icon(
                                 Icons.lock_outline,

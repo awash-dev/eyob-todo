@@ -148,23 +148,23 @@ export function DelalaSpreadsheet({
     e.preventDefault()
     const cleanName = cleanDelalaName(delalaName)
     if (!cleanName) {
-      setFormError('Please enter Name (ስም ያስገቡ)')
+      setFormError(t('Please enter name', 'እባክዎ ስም ያስገቡ'))
       return
     }
     if (!productName.trim()) {
-      setFormError('Please enter Item/Product name (የዕቃ ዓይነት ያስገቡ)')
+      setFormError(t('Please enter item name', 'እባክዎ የዕቃ ዓይነት ያስገቡ'))
       return
     }
     if (isNaN(livePrice) || livePrice < 0) {
-      setFormError('Please enter a valid unit price (ትክክለኛ ዋጋ ያስገቡ)')
+      setFormError(t('Please enter a valid unit price', 'እባክዎ ትክክለኛ ዋጋ ያስገቡ'))
       return
     }
     if (isNaN(livePieces) || livePieces <= 0) {
-      setFormError('Please enter valid pieces/quantity (ትክክለኛ ብዛት ያስገቡ)')
+      setFormError(t('Please enter valid quantity', 'እባክዎ ትክክለኛ ብዛት ያስገቡ'))
       return
     }
     if (!transactionDate.trim()) {
-      setFormError('Please enter transaction date in Ethiopian calendar format (ቀን ያስገቡ)')
+      setFormError(t('Please enter date', 'እባክዎ ቀን ያስገቡ'))
       return
     }
 
@@ -492,12 +492,12 @@ export function DelalaSpreadsheet({
               {/* Delala Name (No prefix) */}
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  {t('1. Name (ስም) *', '1. ስም (Name) *')}
+                  {t('1. Name *', '1. ስም *')}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="John Doe"
+                  placeholder={t('e.g. Ahmed', 'ምሳሌ፦ አህመድ')}
                   value={delalaName}
                   onChange={(e) => setDelalaName(e.target.value)}
                   className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -507,7 +507,7 @@ export function DelalaSpreadsheet({
               {/* Item / Product */}
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  {t('2. Item / Product (የዕቃው አይነት) *', '2. የዕቃው አይነት (Item / Product) *')}
+                  {t('2. Item / Product *', '2. የዕቃ ዓይነት *')}
                 </label>
                 <input
                   type="text"
@@ -523,7 +523,7 @@ export function DelalaSpreadsheet({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    {t('3. Unit Price (ዋጋ ETB) *', '3. ዋጋ (Unit Price ETB) *')}
+                    {t('3. Unit Price (ETB) *', '3. ዋጋ (ብር) *')}
                   </label>
                   <input
                     type="number"
@@ -538,7 +538,7 @@ export function DelalaSpreadsheet({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1">
-                    {t('4. Pieces (ብዛት) *', '4. ብዛት (Pieces) *')}
+                    {t('4. Pieces *', '4. ብዛት *')}
                   </label>
                   <input
                     type="number"
@@ -556,7 +556,7 @@ export function DelalaSpreadsheet({
               {/* Sign Selector (+ / -) */}
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  {t('5. Sign (ምልክት) *', '5. ምልክት (Sign) *')}
+                  {t('5. Sign *', '5. ምልክት *')}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -568,7 +568,7 @@ export function DelalaSpreadsheet({
                         : 'bg-background text-foreground border-border hover:bg-muted'
                     }`}
                   >
-                    <span>{t('+ Positive (+1)', '+ ፖዘቲቭ (+1)')}</span>
+                    <span>{t('+ Positive (+)', '+ ተቀባይ (+)')}</span>
                   </button>
                   <button
                     type="button"
@@ -579,7 +579,7 @@ export function DelalaSpreadsheet({
                         : 'bg-background text-foreground border-border hover:bg-muted'
                     }`}
                   >
-                    <span>{t('- Negative (-1)', '- ኔጌቲቭ (-1)')}</span>
+                    <span>{t('- Negative (-)', '- ተከፋይ (-)')}</span>
                   </button>
                 </div>
               </div>
@@ -588,7 +588,7 @@ export function DelalaSpreadsheet({
               <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-border flex items-center justify-between">
                 <div>
                   <span className="text-xs text-muted-foreground block">
-                    {t('6. Total (Unit Price × Pieces × Sign):', '6. ድምር (ዋጋ × ብዛት × ምልክት):')}
+                    {t('6. Total:', '6. ጠቅላላ ድምር:')}
                   </span>
                   <span className="text-[11px] text-muted-foreground">
                     {livePrice} × {livePieces} × {sign === -1 ? '-1' : '+1'}
@@ -604,14 +604,14 @@ export function DelalaSpreadsheet({
                   }`}
                 >
                   {liveTotal >= 0 ? '+' : ''}
-                  {liveTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} ETB
+                  {liveTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} {t('ETB', 'ብር')}
                 </div>
               </div>
 
               {/* Date Input (Ethiopian Calendar text) */}
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  {t('7. Date (ቀን - የኢትዮጵያ የቀን አቆጣጠር) *', '7. ቀን (የኢትዮጵያ የቀን አቆጣጠር) *')}
+                  {t('7. Date *', '7. ቀን *')}
                 </label>
                 <input
                   type="text"

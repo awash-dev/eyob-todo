@@ -37,8 +37,10 @@ interface LedgerContextType {
   isModalOpen: boolean
   modalMode: 'create' | 'edit'
   editingRecord: LedgerRecord | null
-  openCreateModal: (defaultTab?: TabType) => void
-  openEditModal: (record: LedgerRecord) => void
+  createPrefillTitle?: string
+  editAppendRow?: boolean
+  openCreateModal: (defaultTab?: TabType, prefillTitle?: string) => void
+  openEditModal: (record: LedgerRecord, appendRow?: boolean) => void
   closeModal: () => void
   addRecord: (
     record: Omit<LedgerRecord, 'id' | 'createdAt' | 'updatedAt'>,
@@ -139,6 +141,8 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [editingRecord, setEditingRecord] = useState<LedgerRecord | null>(null)
+  const [createPrefillTitle, setCreatePrefillTitle] = useState('')
+  const [editAppendRow, setEditAppendRow] = useState(false)
 
   // Credit & Payment Transaction Modal state
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
@@ -147,20 +151,6 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
   const [paymentTargetCategory, setPaymentTargetCategory] = useState<
     CreditTransactionParams['transactionCategory'] | null
   >(null)
-
-  const openPaymentModal = useCallback(
-    (
-      type?: 'customer' | 'supplier' | 'delala',
-      partyName?: string,
-      category?: CreditTransactionParams['transactionCategory'],
-    ) => {
-      setPaymentTargetType(type || (activeTab === 'supplier' ? 'supplier' : activeTab === 'delala' ? 'delala' : 'customer'))
-      setPaymentTargetParty(partyName || null)
-      setPaymentTargetCategory(category || null)
-      setIsPaymentModalOpen(true)
-    },
-    [activeTab],
-  )
 
   const closePaymentModal = useCallback(() => {
     setIsPaymentModalOpen(false)
@@ -275,15 +265,19 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [effectiveStoreId, syncWithNeon])
 
-  const openCreateModal = useCallback((defaultTab?: TabType) => {
+  const openCreateModal = useCallback((defaultTab?: TabType, prefillTitle?: string) => {
     if (defaultTab) setActiveTab(defaultTab)
     setEditingRecord(null)
+    setCreatePrefillTitle(prefillTitle || '')
+    setEditAppendRow(false)
     setModalMode('create')
     setIsModalOpen(true)
   }, [])
 
-  const openEditModal = useCallback((record: LedgerRecord) => {
+  const openEditModal = useCallback((record: LedgerRecord, appendRow?: boolean) => {
     setEditingRecord(record)
+    setCreatePrefillTitle('')
+    setEditAppendRow(!!appendRow)
     setModalMode('edit')
     setIsModalOpen(true)
   }, [])
@@ -291,7 +285,36 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
   const closeModal = useCallback(() => {
     setIsModalOpen(false)
     setEditingRecord(null)
+    setCreatePrefillTitle('')
+    setEditAppendRow(false)
   }, [])
+
+  const openPaymentModal = useCallback(
+    (
+      type?: 'customer' | 'supplier' | 'delala',
+      partyName?: string,
+      category?: CreditTransactionParams['transactionCategory'],
+    ) => {
+      const targetType = type || (activeTab === 'supplier' ? 'supplier' : activeTab === 'delala' ? 'delala' : 'customer')
+      setPaymentTargetType(targetType)
+      setPaymentTargetParty(partyName || null)
+      setPaymentTargetCategory(category || null)
+
+      if (partyName) {
+        const existing = records.find(
+          (r) => r.type === targetType && r.title.trim().toLowerCase() === partyName.trim().toLowerCase(),
+        )
+        if (existing) {
+          openEditModal(existing, true)
+          return
+        }
+        openCreateModal(targetType, partyName)
+        return
+      }
+      openCreateModal(targetType)
+    },
+    [activeTab, records, openEditModal, openCreateModal],
+  )
 
   const addRecord = useCallback(
     (data: Omit<LedgerRecord, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -504,6 +527,8 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       isModalOpen,
       modalMode,
       editingRecord,
+      createPrefillTitle,
+      editAppendRow,
       openCreateModal,
       openEditModal,
       closeModal,
@@ -537,6 +562,8 @@ export const LedgerProvider: React.FC<{ children: React.ReactNode }> = ({
       isModalOpen,
       modalMode,
       editingRecord,
+      createPrefillTitle,
+      editAppendRow,
       openCreateModal,
       openEditModal,
       closeModal,

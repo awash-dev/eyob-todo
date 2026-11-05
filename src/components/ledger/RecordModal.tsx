@@ -1,13 +1,3 @@
-import {
-  AlertCircle,
-  Building2,
-  Handshake,
-  Layers,
-  Plus,
-  ShieldCheck,
-  Trash2,
-  Users,
-} from 'lucide-react'
 import React, { useState, useEffect, useRef } from 'react'
 import { useLedger } from '../../context/LedgerContext'
 import { useLanguage } from '../../context/LanguageContext'
@@ -31,6 +21,9 @@ export const RecordModal: React.FC = () => {
     modalMode,
     editingRecord,
     activeTab,
+    createPrefillTitle,
+    editAppendRow,
+    records,
     closeModal,
     addRecord,
     updateRecord,
@@ -60,17 +53,27 @@ export const RecordModal: React.FC = () => {
       setDate(editingRecord.date || new Date().toISOString().split('T')[0])
       setNotes(editingRecord.notes || '')
       setShowCustoms(editingRecord.items.some((it) => (it.customs || 0) > 0))
-      setItems(
-        editingRecord.items.map((it) => ({
-          ...it,
-          id:
-            it.id ||
-            `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        })),
-      )
+      const mapped = editingRecord.items.map((it) => ({
+        ...it,
+        id:
+          it.id ||
+          `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      }))
+      if (editAppendRow) {
+        mapped.push({
+          id: `item-${Date.now()}-new`,
+          name: '',
+          unitPrice: 0,
+          quantity: 1,
+          sign: '+',
+          customType: 'Stock',
+          pcsPrice: 0,
+        })
+      }
+      setItems(mapped)
     } else {
-      // Create new
-      setTitle('')
+      // Create new register
+      setTitle(createPrefillTitle || '')
       setDate(new Date().toISOString().split('T')[0])
       setNotes('')
       setShowCustoms(false)
@@ -87,7 +90,7 @@ export const RecordModal: React.FC = () => {
       ])
     }
     setError(null)
-  }, [isModalOpen, modalMode, editingRecord])
+  }, [isModalOpen, modalMode, editingRecord, createPrefillTitle, editAppendRow])
 
   // Helpers for line items
   const handleAddItem = () => {
@@ -103,7 +106,6 @@ export const RecordModal: React.FC = () => {
 
     setItems((prev) => [...prev, newItem])
 
-    // After the new row renders, bring it into view and focus its name field.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const container = itemListRef.current
@@ -172,7 +174,7 @@ export const RecordModal: React.FC = () => {
     )
   }
 
-  // Free-text Bank / Custom Type input (accepts any custom value)
+  // Free-text Bank / Custom Type input
   const handleBankOrTypeChange = (index: number, val: string) => {
     setItems((prev) =>
       prev.map((it, i) => {
@@ -199,7 +201,7 @@ export const RecordModal: React.FC = () => {
     )
   }
 
-  // Quick Carton tool & direct cartons / pcs per carton calculation
+  // Quick Carton / Pcs calculation
   const handleCartonOrPcsChange = (
     index: number,
     field: 'cartons' | 'pcsPerCarton',
@@ -236,90 +238,75 @@ export const RecordModal: React.FC = () => {
     return acc + (item.sign === '-' ? -base : base + customs)
   }, 0)
 
-  // Title label and badge based on activeTab
+  // Title label based on activeTab (strictly single-language, simple short words)
   const getTabLabel = () => {
     switch (activeTab) {
       case 'customer':
         return {
           header:
-            modalMode === 'create'
-              ? t('New Customer Entry', 'አዲስ የደንበኛ መዝገብ')
-              : t('Edit Customer Entry', 'የደንበኛ መዝገብ አስተካክል'),
-          placeholder: 'John Doe',
-          badge: t('Customer Credit', 'የደንበኛ ሂሳብ'),
-          badgeColor:
-            'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-          Icon: Users,
+            modalMode === 'edit'
+              ? t('Edit Customer Entry', 'የደንበኛ መዝገብ አርትዕ')
+              : t('Customer Entry', 'የደንበኛ መዝገብ'),
+          placeholder: t('Customer Name *', 'የደንበኛ ስም *'),
         }
       case 'supplier':
         return {
           header:
-            modalMode === 'create'
-              ? t('New Supplier Entry', 'አዲስ የአቅራቢ መዝገብ')
-              : t('Edit Supplier Entry', 'የአቅራቢ መዝገብ አስተካክል'),
-          placeholder: 'John Doe',
-          badge: t('Supplier Credit', 'የአቅራቢ ሂሳብ'),
-          badgeColor:
-            'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-          Icon: Building2,
+            modalMode === 'edit'
+              ? t('Edit Supplier Entry', 'የአቅራቢ መዝገብ አርትዕ')
+              : t('Supplier Entry', 'የአቅራቢ መዝገብ'),
+          placeholder: t('Supplier Name *', 'የአቅራቢ ስም *'),
         }
       case 'delala':
         return {
           header:
-            modalMode === 'create'
-              ? t('New Delala Entry', 'አዲስ የደላላ መዝገብ')
-              : t('Edit Delala Entry', 'የደላላ መዝገብ አስተካክል'),
-          placeholder: t('Delala Name (e.g. Mohammed, Ahmed)', 'የደላላ ስም (ለምሳሌ፦ መሀመድ፣ አህመድ)'),
-          badge: t('Delala Credit', 'የደላላ ሂሳብ'),
-          badgeColor:
-            'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-          Icon: Handshake,
+            modalMode === 'edit'
+              ? t('Edit Broker Entry', 'የደላላ መዝገብ አርትዕ')
+              : t('Broker Entry', 'የደላላ መዝገብ'),
+          placeholder: t('Broker Name *', 'የደላላ ስም *'),
         }
       case 'stock':
         return {
           header:
-            modalMode === 'create'
-              ? t('New Stock Entry', 'አዲስ የመደብር መዝገብ')
-              : t('Edit Stock Entry', 'የመደብር መዝገብ አስተካክል'),
-          placeholder: 'Stock Lot / Account (e.g. KELIL AGINBI - Electrical & LED Lighting)',
-          badge: t('Stock & Inventory', 'የመደብር ዕቃዎች'),
-          badgeColor:
-            'bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-          Icon: Layers,
+            modalMode === 'edit'
+              ? t('Edit Stock Entry', 'የመደብር መዝገብ አርትዕ')
+              : t('Stock Entry', 'የመደብር መዝገብ'),
+          placeholder: t('Item Name *', 'የዕቃ ስም *'),
         }
     }
   }
 
-  const { header, placeholder, badge, badgeColor, Icon } = getTabLabel()
+  const { header, placeholder } = getTabLabel()
 
   const isStockTab = activeTab === 'stock'
   const lineLabels = isStockTab
     ? {
-        type: t('Bank / Stock Type', 'ባንክ / አይነት'),
-        item: t('Item / Description', 'ዕቃ / ዝርዝር'),
-        unitPrice: t('Unit Cost', 'የአንዱ ዋጋ'),
-        quantity: t('Total Qty', 'ጠቅላላ ብዛት'),
-        amount: t('Total Value', 'ጠቅላላ ዋጋ'),
-      }
+      type: t('Bank / Type', 'ባንክ / ዓይነት'),
+      item: t('Item / Description', 'ዕቃ / ዝርዝር'),
+      unitPrice: t('Cost', 'የአንዱ ዋጋ'),
+      quantity: t('Total Qty', 'ጠቅላላ ብዛት'),
+      amount: t('Total', 'መጠን'),
+    }
     : {
-        type: t('Bank / Type', 'ባንክ / አይነት'),
-        item: t('Item / Description', 'ዕቃ / ዝርዝር'),
-        unitPrice: t('Unit Price', 'የአንዱ ዋጋ'),
-        quantity: t('Qty', 'ብዛት'),
-        amount: t('Amount', 'መጠን'),
-      }
+      type: t('Bank / Type', 'ባንክ / ዓይነት'),
+      item: t('Item / Description', 'ዕቃ / ዝርዝር'),
+      unitPrice: t('Unit Price', 'የአንዱ ዋጋ'),
+      pcsPrice: t('Pcs Price', 'ፍሬ ዋጋ'),
+      quantity: t('Qty', 'ብዛት'),
+      amount: t('Amount', 'መጠን'),
+    }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!title.trim()) {
-      setError('Please provide a title or name.')
+      setError(t('Please enter name.', 'እባክዎ ስም ያስገቡ።'))
       return
     }
 
     const validItems = items.filter((it) => it.name.trim() !== '')
     if (validItems.length === 0) {
-      setError('Please provide at least one line item.')
+      setError(t('Please enter at least one item.', 'እባክዎ ቢያንስ አንድ ዕቃ ያስገቡ።'))
       return
     }
 
@@ -354,7 +341,22 @@ export const RecordModal: React.FC = () => {
     if (modalMode === 'edit' && editingRecord) {
       updateRecord(editingRecord.id, recordData)
     } else {
-      addRecord(recordData)
+      // Check if an existing record with the exact same title & tab exists
+      const existingMatch = records.find(
+        (r) =>
+          r.type === activeTab &&
+          r.title.trim().toLowerCase() === title.trim().toLowerCase(),
+      )
+      if (existingMatch) {
+        updateRecord(existingMatch.id, {
+          ...existingMatch,
+          date: date || existingMatch.date,
+          notes: notes.trim() || existingMatch.notes,
+          items: [...existingMatch.items, ...cleanedItems],
+        })
+      } else {
+        addRecord(recordData)
+      }
     }
 
     closeModal()
@@ -362,59 +364,56 @@ export const RecordModal: React.FC = () => {
 
   return (
     <Dialog open={isModalOpen} onOpenChange={(open) => !open && closeModal()}>
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto overflow-x-hidden sm:rounded-2xl p-4 sm:p-6 border-0 shadow-2xl bg-card">
-        <DialogHeader className="pb-2 text-left pr-12 sm:pr-14">
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2 min-w-0">
-              <span
-                className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${badgeColor}`}
-              >
-                <Icon size={12} />
-                <span>{badge}</span>
-              </span>
-              <DialogTitle className="text-base sm:text-lg font-bold text-foreground truncate">
-                {header}
-              </DialogTitle>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              {isStockTab && (
-                <button
-                  type="button"
-                  onClick={() => setShowCustoms(!showCustoms)}
-                  className={`text-[11px] font-medium flex items-center gap-1 cursor-pointer shrink-0 transition-colors ${
-                    showCustoms
-                      ? 'text-blue-600 dark:text-blue-400 font-semibold underline'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  title="Toggle optional Customs duty / tariff column for imported items"
-                >
-                  <ShieldCheck size={14} />
-                  <span>{showCustoms ? 'Hide Customs' : '+ Customs Duty'}</span>
-                </button>
-              )}
-            </div>
-          </div>
+      <DialogContent className="max-w-4xl w-[96vw] max-h-[85vh] overflow-y-auto overflow-x-hidden sm:rounded-xl p-3 sm:p-4 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-black dark:text-white shadow-xl">
+        {/* Simple compact header - NO decorative icons or badges */}
+        <DialogHeader className="pb-1.5 text-left flex flex-row items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
+          <DialogTitle className="text-sm sm:text-base font-bold text-foreground">
+            {header}
+          </DialogTitle>
+          {isStockTab && (
+            <button
+              type="button"
+              onClick={() => setShowCustoms(!showCustoms)}
+              className="text-xs text-muted-foreground hover:text-foreground cursor-pointer mr-6"
+            >
+              {showCustoms ? t('Hide Customs', 'ጉምሩክ ደብቅ') : t('+ Customs', '+ ጉምሩክ')}
+            </button>
+          )}
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-3 pt-1 w-full min-w-0 max-w-full">
+        <form onSubmit={handleSubmit} className="space-y-2.5 pt-2 w-full min-w-0">
           {error && (
-            <div className="flex items-center gap-2 p-2.5 text-xs text-rose-700 bg-rose-50 dark:bg-rose-950/50 dark:text-rose-300 rounded-lg">
-              <AlertCircle size={16} className="shrink-0" />
-              <span>{error}</span>
+            <div className="p-2 text-xs text-rose-700 bg-rose-50 dark:bg-rose-950/50 dark:text-rose-300 rounded border border-rose-200 dark:border-rose-900">
+              {error}
             </div>
           )}
 
-          {/* Title & Date */}
+          {/* Datalist for existing party names in this section */}
+          <datalist id="existing-party-names">
+            {Array.from(
+              new Set(
+                records
+                  .filter((r) => r.type === activeTab)
+                  .map((r) => r.title)
+                  .filter(Boolean),
+              ),
+            ).map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+
+          {/* Top Inputs: Name & Date */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div className="sm:col-span-2">
               <Input
+                list="existing-party-names"
                 placeholder={placeholder}
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value)
                   if (error) setError(null)
                 }}
-                className="text-xs sm:text-sm font-medium h-9 bg-muted/30 focus:bg-background rounded-lg border-0 ring-1 ring-zinc-950/10 dark:ring-white/10"
+                className="text-xs font-semibold h-8 bg-background rounded border border-zinc-300 dark:border-zinc-700 focus:border-black dark:focus:border-white"
                 required
                 autoFocus
               />
@@ -422,410 +421,274 @@ export const RecordModal: React.FC = () => {
             <div>
               <Input
                 type="text"
-                placeholder="DD/MM/YYYY (e.g. 02/11/2026)"
+                placeholder={t('Date (YYYY-MM-DD)', 'ቀን')}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="text-xs h-9 bg-muted/30 focus:bg-background rounded-lg border-0 ring-1 ring-zinc-950/10 dark:ring-white/10"
+                className="text-xs h-8 bg-background rounded border border-zinc-300 dark:border-zinc-700"
               />
             </div>
           </div>
 
-          {/* Optional Notes */}
+          {/* Optional Note */}
           <div>
             <Input
-              placeholder="Notes, phone, or invoice reference (optional)..."
+              placeholder={t('Note (optional)...', 'ማስታወሻ (አማራጭ)...')}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="text-xs text-muted-foreground h-8 bg-muted/30 focus:bg-background rounded-lg border-0 ring-1 ring-zinc-950/10 dark:ring-white/10"
+              className="text-xs h-7.5 bg-background rounded border border-zinc-200 dark:border-zinc-800 text-muted-foreground"
             />
           </div>
 
-          {/* Line Items - Clean, spacious layout with Bank and Custom Type support */}
-          <div className="pt-1 w-full min-w-0 max-w-full">
-            <div className="w-full min-w-0 max-w-full overflow-x-auto pb-1.5 scrollbar-thin rounded-xl border border-zinc-100 dark:border-zinc-800/80 p-2 sm:p-3 bg-muted/10">
-              <div className={isStockTab ? (showCustoms ? 'min-w-[890px]' : 'min-w-[820px]') : 'min-w-[780px]'}>
-                <div className="flex items-center gap-2 text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-1 border-b border-zinc-100 dark:border-zinc-800/80 pb-1.5">
-                  <span className="w-8 text-center shrink-0">+/-</span>
-                  <span className="w-32 sm:w-36 text-left shrink-0">
-                    {lineLabels.type}
-                  </span>
-                  <span className="flex-1 min-w-[130px] text-left">
-                    {lineLabels.item}
-                  </span>
-                  {isStockTab ? (
-                    <>
-                      <span className="w-14 sm:w-16 text-right shrink-0" title="Cartons / Boxes">
-                        Ctns
-                      </span>
-                      <span className="w-14 sm:w-16 text-right shrink-0" title="Pieces per Carton">
-                        Pcs/Ctn
-                      </span>
-                      <span className="w-16 sm:w-20 text-right shrink-0" title="Total Quantity (Ctns × Pcs/Ctn)">
-                        Total Qty
-                      </span>
-                      <span className="w-20 sm:w-24 text-right shrink-0">
-                        {lineLabels.unitPrice}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-20 sm:w-24 text-right shrink-0">
-                        {lineLabels.unitPrice}
-                      </span>
-                      <span className="w-20 sm:w-24 text-right shrink-0">
-                        Pcs Price
-                      </span>
-                      <span className="w-20 sm:w-24 text-center shrink-0">
-                        {lineLabels.quantity}
-                      </span>
-                    </>
-                  )}
-                  {isStockTab && showCustoms && (
-                    <span className="w-20 sm:w-24 text-right shrink-0">Customs</span>
-                  )}
-                  <span className="w-24 sm:w-28 text-right shrink-0">
-                    {lineLabels.amount}
-                  </span>
-                  <span className="w-8 shrink-0"></span>
-                </div>
+          {/* Table Container - Compact, small height */}
+          <div className="w-full min-w-0 max-w-full overflow-x-auto rounded border border-zinc-200 dark:border-zinc-800 p-2 bg-zinc-50/50 dark:bg-zinc-900/30">
+            <div className="min-w-[760px]">
+              {/* Table Column Headers */}
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider pb-1 border-b border-zinc-200 dark:border-zinc-800">
+                <span className="w-7 text-center shrink-0">+/-</span>
+                <span className="w-28 sm:w-32 text-left shrink-0">
+                  {lineLabels.type}
+                </span>
+                <span className="flex-1 min-w-[120px] text-left">
+                  {lineLabels.item}
+                </span>
+                {isStockTab ? (
+                  <>
+                    <span className="w-14 sm:w-16 text-right shrink-0">Ctns</span>
+                    <span className="w-14 sm:w-16 text-right shrink-0">Pcs/Ctn</span>
+                    <span className="w-16 sm:w-20 text-right shrink-0">Total Qty</span>
+                    <span className="w-20 sm:w-22 text-right shrink-0">
+                      {lineLabels.unitPrice}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-20 sm:w-22 text-right shrink-0">
+                      {lineLabels.unitPrice}
+                    </span>
+                    <span className="w-20 sm:w-22 text-right shrink-0">
+                      {lineLabels.pcsPrice}
+                    </span>
+                    <span className="w-16 sm:w-20 text-center shrink-0">
+                      {lineLabels.quantity}
+                    </span>
+                  </>
+                )}
+                {isStockTab && showCustoms && (
+                  <span className="w-18 sm:w-20 text-right shrink-0">Customs</span>
+                )}
+                <span className="w-24 sm:w-28 text-right shrink-0">
+                  {lineLabels.amount}
+                </span>
+                <span className="w-7 shrink-0"></span>
+              </div>
 
-                <div ref={itemListRef} className="space-y-1.5">
-                  {/* Suggestion lists for the free-text Bank / Stock Type inputs */}
-                  <datalist id="stock-type-options">
-                    {STOCK_TYPE_OPTIONS.map((type) => (
-                      <option key={type} value={type} />
-                    ))}
-                  </datalist>
-                  <datalist id="bank-options">
-                    {ETHIOPIAN_BANKS.map((bank) => (
-                      <option key={bank} value={bank} />
-                    ))}
-                  </datalist>
+              {/* Rows */}
+              <div ref={itemListRef} className="space-y-1 pt-1">
+                <datalist id="stock-type-options">
+                  {STOCK_TYPE_OPTIONS.map((type) => (
+                    <option key={type} value={type} />
+                  ))}
+                </datalist>
+                <datalist id="bank-options">
+                  {ETHIOPIAN_BANKS.map((bank) => (
+                    <option key={bank} value={bank} />
+                  ))}
+                </datalist>
 
-                  {items.map((item, index) => {
-                    const isAdd = item.sign === '+'
-                    const baseTotal =
-                      (Number(item.unitPrice) || 0) *
-                      (Number(item.quantity) || 0)
-                    const lineTotal = isAdd
-                      ? baseTotal + (Number(item.customs) || 0)
-                      : -baseTotal
+                {items.map((item, index) => {
+                  const isAdd = item.sign === '+'
+                  const baseTotal =
+                    (Number(item.unitPrice) || 0) * (Number(item.quantity) || 0)
+                  const lineTotal = isAdd
+                    ? baseTotal + (Number(item.customs) || 0)
+                    : -baseTotal
 
-                    return (
-                      <div
-                        key={item.id}
-                        data-item-row
-                        className="flex items-center gap-2 py-1.5 border-b border-zinc-100 dark:border-zinc-800/60 last:border-0"
-                      >
-                        {/* Minimal Sign Toggle */}
-                        <button
-                          type="button"
-                          onClick={() => toggleSign(index)}
-                          className={`w-8 h-8 shrink-0 rounded-md flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
-                            isAdd
-                              ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 hover:bg-blue-100'
-                              : 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 hover:bg-rose-100'
+                  return (
+                    <div
+                      key={item.id}
+                      data-item-row
+                      className="flex items-center gap-1.5 py-1 border-b border-zinc-100 dark:border-zinc-800/60 last:border-0"
+                    >
+                      {/* +/- Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => toggleSign(index)}
+                        className={`w-7 h-7 shrink-0 rounded flex items-center justify-center font-bold text-xs cursor-pointer border ${isAdd
+                            ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800'
+                            : 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/60 dark:text-rose-400 dark:border-rose-800'
                           }`}
-                          title="Toggle (+) Add or (-) Deduct"
-                        >
-                          {isAdd ? '+' : '−'}
-                        </button>
+                        title="Toggle (+) Debit or (-) Credit"
+                      >
+                        {isAdd ? '+' : '−'}
+                      </button>
 
-                        {/* Bank / Custom Type free-text input */}
-                        <input
-                          type="text"
-                          list={isAdd ? 'stock-type-options' : 'bank-options'}
-                          value={
-                            isAdd
-                              ? (item.customType ?? 'Stock')
-                              : (item.bank ?? 'CBE')
-                          }
-                          onChange={(e) =>
-                            handleBankOrTypeChange(index, e.target.value)
-                          }
-                          placeholder={isAdd ? 'Stock type' : 'Bank'}
-                          className="w-32 sm:w-36 h-8 px-2 text-[11px] font-medium bg-muted/30 hover:bg-muted focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none shrink-0"
-                          title={
-                            isAdd
-                              ? 'Type any stock type (Stock, Goods, Delivery, ...)'
-                              : 'Type any bank or payment channel'
-                          }
-                        />
+                      {/* Type / Bank Input */}
+                      <input
+                        type="text"
+                        list={isAdd ? 'stock-type-options' : 'bank-options'}
+                        value={
+                          isAdd
+                            ? (item.customType ?? 'Stock')
+                            : (item.bank ?? 'CBE')
+                        }
+                        onChange={(e) =>
+                          handleBankOrTypeChange(index, e.target.value)
+                        }
+                        placeholder={isAdd ? 'Stock' : 'CBE'}
+                        className="w-28 sm:w-32 h-7.5 px-2 text-xs bg-background rounded border border-zinc-200 dark:border-zinc-800 focus:outline-none shrink-0"
+                      />
 
-                        {/* Description */}
-                        <input
-                          data-item-name
-                          placeholder={
-                            isAdd
-                              ? 'Item name (e.g. 12W SAFARI)'
-                              : 'Payment reference or notes'
-                          }
-                          value={item.name}
-                          onChange={(e) =>
-                            handleItemChange(index, 'name', e.target.value)
-                          }
-                          className="flex-1 min-w-[130px] h-8 px-2 text-xs bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors"
-                          required
-                        />
+                      {/* Item / Description */}
+                      <input
+                        type="text"
+                        data-item-name
+                        value={item.name}
+                        onChange={(e) =>
+                          handleItemChange(index, 'name', e.target.value)
+                        }
+                        placeholder={t('Item / Description', 'ዕቃ / ዝርዝር')}
+                        className="flex-1 min-w-[120px] h-7.5 px-2 text-xs bg-background rounded border border-zinc-200 dark:border-zinc-800 focus:outline-none"
+                      />
 
-                        {/* Inputs: Stock tab (Cartons, Pcs, Qty, Price) vs Customer/Supplier tabs */}
-                        {isStockTab ? (
-                          isAdd ? (
-                            <>
-                              {/* Ctns */}
-                              <input
-                                type="number"
-                                placeholder="Ctns"
-                                step="any"
-                                min="0"
-                                value={item.cartons || ''}
-                                onChange={(e) =>
-                                  handleCartonOrPcsChange(
-                                    index,
-                                    'cartons',
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="w-14 sm:w-16 h-8 px-1 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                title="Number of Cartons (e.g. 10)"
-                              />
-
-                              {/* Pcs/Ctn */}
-                              <input
-                                type="number"
-                                placeholder="Pcs"
-                                step="any"
-                                min="0"
-                                value={item.pcsPerCarton || ''}
-                                onChange={(e) =>
-                                  handleCartonOrPcsChange(
-                                    index,
-                                    'pcsPerCarton',
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="w-14 sm:w-16 h-8 px-1 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                title="Pieces per Carton (e.g. 100)"
-                              />
-
-                              {/* Total Qty (auto-calculated: Ctns × Pcs/Ctn) */}
-                              <input
-                                type="number"
-                                placeholder="Qty"
-                                step="any"
-                                min="0"
-                                value={item.quantity === 0 ? '' : item.quantity}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    'quantity',
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="w-16 sm:w-20 h-8 px-1 text-xs text-right font-mono font-semibold bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                title="Total Quantity = Ctns × Pcs/Ctn"
-                              />
-
-                              {/* Unit Price in ETB */}
-                              <input
-                                type="number"
-                                placeholder="Price"
-                                step="any"
-                                min="0"
-                                value={item.unitPrice === 0 ? '' : item.unitPrice}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    'unitPrice',
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              />
-
-                              {/* Pieces Price in ETB */}
-                              <input
-                                type="number"
-                                placeholder="Pcs Price"
-                                step="any"
-                                min="0"
-                                value={item.pcsPrice === 0 ? '' : item.pcsPrice}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    'pcsPrice',
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                title="Price per single piece"
-                              />
-                            </>
-                          ) : (
-                            <>
-                              {/* Deduction / Bank payment placeholders and amount */}
-                              <div className="w-14 sm:w-16 h-8 flex items-center justify-center text-muted-foreground/30 font-mono text-xs shrink-0">
-                                —
-                              </div>
-                              <div className="w-14 sm:w-16 h-8 flex items-center justify-center text-muted-foreground/30 font-mono text-xs shrink-0">
-                                —
-                              </div>
-                              <div className="w-16 sm:w-20 h-8 flex items-center justify-center text-muted-foreground/50 font-mono text-xs shrink-0 font-semibold">
-                                1
-                              </div>
-                              <input
-                                type="number"
-                                placeholder="Amount"
-                                step="any"
-                                min="0"
-                                value={item.unitPrice === 0 ? '' : item.unitPrice}
-                                onChange={(e) =>
-                                  handleItemChange(
-                                    index,
-                                    'unitPrice',
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono font-bold bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                title="Payment Amount in ETB"
-                              />
-                            </>
+                      {/* Unit Price */}
+                      <input
+                        type="number"
+                        placeholder="0"
+                        step="any"
+                        min="0"
+                        value={item.unitPrice ? item.unitPrice : ''}
+                        onChange={(e) =>
+                          handleItemChange(
+                            index,
+                            'unitPrice',
+                            parseFloat(e.target.value) || 0,
                           )
-                        ) : (
-                          <>
-                            {/* Customer / Supplier tabs standard Price and Qty */}
-                            <input
-                              type="number"
-                              placeholder="Price"
-                              step="any"
-                              min="0"
-                              value={item.unitPrice === 0 ? '' : item.unitPrice}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  'unitPrice',
-                                  parseFloat(e.target.value) || 0,
-                                )
-                              }
-                              className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <input
-                              type="number"
-                              placeholder="Pcs Price"
-                              step="any"
-                              min="0"
-                              value={item.pcsPrice === 0 ? '' : item.pcsPrice}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  'pcsPrice',
-                                  parseFloat(e.target.value) || 0,
-                                )
-                              }
-                              className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              title="Price per single piece"
-                            />
-                            <input
-                              type="number"
-                              placeholder="Qty"
-                              step="any"
-                              min="0"
-                              value={item.quantity === 0 ? '' : item.quantity}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  'quantity',
-                                  parseFloat(e.target.value) || 0,
-                                )
-                              }
-                              className="w-20 sm:w-24 h-8 px-1 text-xs text-center font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                          </>
-                        )}
+                        }
+                        className="w-20 sm:w-22 h-7.5 px-1.5 text-xs text-right font-mono bg-background rounded border border-zinc-200 dark:border-zinc-800 focus:outline-none shrink-0"
+                      />
 
-                        {/* Customs duty (optional toggle, stock additions only) */}
-                        {isStockTab && showCustoms && (
-                          isAdd ? (
-                            <input
-                              type="number"
-                              placeholder="Customs"
-                              step="any"
-                              min="0"
-                              value={item.customs ? item.customs : ''}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  'customs',
-                                  parseFloat(e.target.value) || 0,
-                                )
-                              }
-                              className="w-20 sm:w-24 h-8 px-1.5 text-xs text-right font-mono bg-muted/20 focus:bg-background rounded-md border-0 ring-1 ring-zinc-950/10 focus:ring-primary focus:outline-none transition-colors shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              title="Customs / duty amount for this line (added to the value)"
-                            />
-                          ) : (
-                            <div className="w-20 sm:w-24 h-8 flex items-center justify-center text-muted-foreground/40 text-xs shrink-0 font-mono">
-                              —
-                            </div>
-                          )
-                        )}
-
-                        {/* Subtotal */}
-                        <div className="w-24 sm:w-28 text-right font-mono font-semibold text-xs truncate shrink-0">
-                          <span
-                            className={
-                              isAdd
-                                ? 'text-blue-600 dark:text-blue-400'
-                                : 'text-rose-600 dark:text-rose-400'
+                      {/* Pcs Price / Ctns */}
+                      {!isStockTab ? (
+                        <input
+                          type="number"
+                          placeholder="Pcs Price"
+                          step="any"
+                          min="0"
+                          value={item.pcsPrice ? item.pcsPrice : ''}
+                          onChange={(e) =>
+                            handleItemChange(
+                              index,
+                              'pcsPrice',
+                              parseFloat(e.target.value) || 0,
+                            )
+                          }
+                          className="w-20 sm:w-22 h-7.5 px-1.5 text-xs text-right font-mono bg-background rounded border border-zinc-200 dark:border-zinc-800 focus:outline-none shrink-0"
+                        />
+                      ) : (
+                        <>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            step="any"
+                            min="0"
+                            value={item.cartons ? item.cartons : ''}
+                            onChange={(e) =>
+                              handleCartonOrPcsChange(
+                                index,
+                                'cartons',
+                                parseFloat(e.target.value) || 0,
+                              )
                             }
-                          >
-                            {formatCurrency(lineTotal)}
-                          </span>
-                        </div>
+                            className="w-14 sm:w-16 h-7.5 px-1.5 text-xs text-right font-mono bg-background rounded border border-zinc-200 dark:border-zinc-800 focus:outline-none shrink-0"
+                          />
+                          <input
+                            type="number"
+                            placeholder="1"
+                            step="any"
+                            min="0"
+                            value={item.pcsPerCarton ? item.pcsPerCarton : ''}
+                            onChange={(e) =>
+                              handleCartonOrPcsChange(
+                                index,
+                                'pcsPerCarton',
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
+                            className="w-14 sm:w-16 h-7.5 px-1.5 text-xs text-right font-mono bg-background rounded border border-zinc-200 dark:border-zinc-800 focus:outline-none shrink-0"
+                          />
+                        </>
+                      )}
 
-                        {/* Remove item button */}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(index)}
-                          className="w-8 h-8 shrink-0 text-muted-foreground hover:text-rose-600 flex items-center justify-center rounded transition-colors cursor-pointer"
-                          title="Remove row"
+                      {/* Quantity */}
+                      <input
+                        type="number"
+                        placeholder="1"
+                        step="any"
+                        min="0"
+                        value={item.quantity ? item.quantity : ''}
+                        onChange={(e) =>
+                          handleItemChange(
+                            index,
+                            'quantity',
+                            parseFloat(e.target.value) || 0,
+                          )
+                        }
+                        className="w-16 sm:w-20 h-7.5 px-1.5 text-xs text-center font-mono bg-background rounded border border-zinc-200 dark:border-zinc-800 focus:outline-none shrink-0"
+                      />
+
+                      {/* Line Total */}
+                      <div className="w-24 sm:w-28 text-right font-mono font-bold text-xs truncate shrink-0">
+                        <span
+                          className={
+                            isAdd
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : 'text-rose-600 dark:text-rose-400'
+                          }
                         >
-                          <Trash2 size={14} />
-                        </button>
+                          {isAdd ? '+' : ''}
+                          {formatCurrency(lineTotal)}
+                        </span>
                       </div>
-                    )
-                  })}
-                </div>
+
+                      {/* Remove Row Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(index)}
+                        className="w-7 h-7 shrink-0 text-zinc-400 hover:text-rose-600 flex items-center justify-center rounded cursor-pointer text-sm font-bold"
+                        title={t('Remove row', 'ረድፍ ሰርዝ')}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
             </div>
-
-            {/* Add Line Item simple link */}
-            <button
-              type="button"
-              onClick={handleAddItem}
-              className="mt-2 text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1.5 py-1 cursor-pointer"
-            >
-              <Plus size={16} />
-              <span>Add another item</span>
-            </button>
           </div>
 
-          {/* Simple Clean Grand Total Bar */}
-          <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-3 w-full min-w-0">
-            <div className="min-w-0">
-              <span className="text-[11px] text-muted-foreground block">
-                Total Balance
+          {/* Add Item Link */}
+          <button
+            type="button"
+            onClick={handleAddItem}
+            className="text-xs font-semibold text-black dark:text-white hover:underline inline-flex items-center gap-1 py-0.5 cursor-pointer"
+          >
+            + {t('Add another item', 'ተጨማሪ ረድፍ ጨምር')}
+          </button>
+
+          {/* Footer - Total & Action Buttons */}
+          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 w-full">
+            <div>
+              <span className="text-[11px] text-muted-foreground mr-1.5">
+                {t('Total Balance', 'ጠቅላላ ቀሪ')}:
               </span>
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <span
-                  className={`text-base sm:text-lg font-mono font-bold ${
-                    calculatedGrandTotal >= 0
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-rose-600 dark:text-rose-400'
+              <span
+                className={`text-base font-mono font-bold ${calculatedGrandTotal >= 0
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-rose-600 dark:text-rose-400'
                   }`}
-                >
-                  {formatCurrency(calculatedGrandTotal)}
-                </span>
-              </div>
+              >
+                {formatCurrency(calculatedGrandTotal)}
+              </span>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
@@ -836,35 +699,37 @@ export const RecordModal: React.FC = () => {
                   onClick={() => {
                     if (
                       window.confirm(
-                        t(`Are you sure you want to delete "${editingRecord.title}"?`, `እርግጠኛ ነዎት "${editingRecord.title}"ን መሰረዝ ይፈልጋሉ?`),
+                        t(
+                          `Are you sure you want to delete "${editingRecord.title}"?`,
+                          `እርግጠኛ ነዎት "${editingRecord.title}"ን መሰረዝ ይፈልጋሉ?`,
+                        ),
                       )
                     ) {
                       deleteRecord(editingRecord.id)
                       closeModal()
                     }
                   }}
-                  className="text-xs h-8 px-2.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 hover:text-rose-700 cursor-pointer flex items-center gap-1"
+                  className="text-xs h-7.5 px-2.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 cursor-pointer"
                 >
-                  <Trash2 size={13} />
-                  <span>{t('Delete', 'ሰርዝ')}</span>
+                  {t('Delete', 'ሰርዝ')}
                 </Button>
               )}
               <Button
                 type="button"
                 variant="ghost"
                 onClick={closeModal}
-                className="text-xs h-8 px-3 rounded-lg cursor-pointer"
+                className="text-xs h-7.5 px-3 cursor-pointer"
               >
                 {t('Cancel', 'ተመለስ')}
               </Button>
               <Button
                 type="submit"
                 size="sm"
-                className="text-xs font-semibold h-8 px-4 rounded-lg shadow-xs cursor-pointer whitespace-nowrap"
+                className="text-xs font-semibold h-7.5 px-4 rounded bg-black hover:bg-zinc-800 text-white cursor-pointer"
               >
                 {modalMode === 'edit'
-                  ? t('Save Changes', 'ለውጦችን አስቀምጥ')
-                  : t('Create Entry', 'መዝገቡን ፍጠር')}
+                  ? t('Save Changes', 'አስቀምጥ')
+                  : t('Save', 'መዝግብ')}
               </Button>
             </div>
           </div>
