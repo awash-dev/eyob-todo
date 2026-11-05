@@ -174,6 +174,15 @@ export interface StoreInventoryItem {
   createdBy?: string
   createdAt?: string
   updatedAt?: string
+  // Kena Store Product schema fields
+  quantityCartons: number
+  quantityPerCarton: number
+  totalQuantity: number
+  unit: string
+  pricePerPiece: number
+  totalValue: number
+  isActive: boolean
+  updatedBy?: string
 }
 
 export interface NewProductInput {
@@ -193,6 +202,38 @@ export interface NewProductInput {
   description?: string
   englishName?: string
   amharicName?: string
+  // Kena Store Product schema fields
+  quantityCartons?: number
+  quantityPerCarton?: number
+  totalQuantity?: number
+  unit?: string
+  pricePerPiece?: number
+  totalValue?: number
+  isActive?: boolean
+  transactionDate?: string
+}
+
+export interface UpdateProductInput {
+  productName?: string
+  sku?: string
+  category?: string
+  baseUnit?: string
+  minimumStock?: number
+  costPrice?: number
+  unitPrice?: number
+  pcsPerCarton?: number
+  supplierName?: string
+  description?: string
+  // Kena Store Product schema fields
+  quantityCartons?: number
+  quantityPerCarton?: number
+  totalQuantity?: number
+  unit?: string
+  pricePerPiece?: number
+  totalValue?: number
+  isActive?: boolean
+  updatedBy?: string
+  transactionDate?: string
 }
 
 export type StockMovementType = 'IN' | 'OUT'

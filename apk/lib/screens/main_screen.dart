@@ -56,6 +56,17 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  // Products collapsed by default (tap header to expand) — mobile friendly cards
+  final Set<String> _expandedProductIds = <String>{};
+
+  void _toggleProductExpanded(String id) {
+    setState(() {
+      if (!_expandedProductIds.remove(id)) {
+        _expandedProductIds.add(id);
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -502,6 +513,140 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  void _showProductActions(InventoryProduct prod) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final unitPrice = prod.unitPrice > 0 ? prod.unitPrice : prod.costPrice;
+    final totalVal = prod.currentQuantity * unitPrice;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            LanguageService.translateProduct(prod.productName),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Theme.of(context).colorScheme.onSurface,
+                              height: 1.25,
+                            ),
+                            softWrap: true,
+                          ),
+                          const SizedBox(height: 2),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: _isAmharic ? 'ድምር ዋጋ: ' : 'Stock Value: ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: _isAmharic ? 'ብር ' : 'ETB ',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: _currencyFormat.format(totalVal),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 16),
+              ListTile(
+                leading: const Icon(
+                  Icons.history,
+                  color: Color(0xFF2563EB),
+                ),
+                title: Text(_isAmharic ? 'የዕቃ እንቅስቃሴ ታሪክ' : 'View Stock History'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openProductHistoryDialog(prod);
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.edit_outlined,
+                  color: Color(0xFF4059AA),
+                ),
+                title: Text(_isAmharic ? 'ምርቱን አስተካክል' : 'Edit Product'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openEditProductDialog(prod);
+                },
+              ),
+              if (!widget.currentUser.isAdmin)
+                ListTile(
+                  leading: const Icon(
+                    Icons.swap_horiz,
+                    color: Color(0xFF0D9488),
+                  ),
+                  title: Text(_isAmharic ? 'ዕቃ ገቢ / ወጪ' : 'Stock In / Out'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openStockTransactionDialog(prod);
+                  },
+                ),
+              if (widget.currentUser.isAdmin)
+                ListTile(
+                  leading: const Icon(
+                    Icons.delete_outline,
+                    color: Color(0xFFBA1A1A),
+                  ),
+                  title: Text(_isAmharic ? 'ምርቱን ሰርዝ' : 'Delete Product'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _deleteInventoryProduct(prod);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleLogout() async {
     await ApiService.logout();
     if (!mounted) return;
@@ -609,13 +754,30 @@ class _MainScreenState extends State<MainScreen> {
                             : const Color(0xFF64748B),
                       ),
                     ),
-                    Text(
-                      'ETB ${_currencyFormat.format(netBalance)}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.2,
-                        color: theme.colorScheme.onSurface,
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: _isAmharic ? 'ብር ' : 'ETB ',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                          TextSpan(
+                            text: _currencyFormat.format(netBalance),
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'monospace',
+                              letterSpacing: -0.2,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -646,12 +808,29 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    'ETB ${_currencyFormat.format(totalDebit)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: _isAmharic ? 'ብር ' : 'ETB ',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                        TextSpan(
+                          text: _currencyFormat.format(totalDebit),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'monospace',
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -669,12 +848,29 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    'ETB ${_currencyFormat.format(totalCredit)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: _isAmharic ? 'ብር ' : 'ETB ',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                        TextSpan(
+                          text: _currencyFormat.format(totalCredit),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'monospace',
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1498,6 +1694,7 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (ctx) => EditProductDialog(
         product: prod,
+        currentUser: widget.currentUser,
         isAmharic: _isAmharic,
       ),
     );
@@ -1740,7 +1937,11 @@ class _MainScreenState extends State<MainScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Available Store Items Header Bar (Occupies space naturally below search)
+          // 1. Admin Top Summary Component: Totals Product Have and All Prices (ONLY for Admin sides)
+          if (widget.currentUser.isAdmin)
+            _buildStoreAdminSummary(theme, isDark),
+
+          // 2. Available Store Items Header Bar (Occupies space naturally below search)
           Container(
             margin: const EdgeInsets.fromLTRB(14, 2, 14, 8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1775,7 +1976,7 @@ class _MainScreenState extends State<MainScreen> {
           ),
           const SizedBox(height: 6),
 
-          // 2. Products List or Empty State
+          // 3. Products List or Empty State
           if (filteredProducts.isEmpty)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
@@ -1804,300 +2005,719 @@ class _MainScreenState extends State<MainScreen> {
                       color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _isAmharic
-                        ? 'የመጀመሪያውን ዕቃ ለመመዝገብ ከታች "+ የመደብር መዝገብ" የሚለውን ይጫኑ'
-                        : 'Tap "+ Store Entry" below to record inventory',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
-                  ),
-                  const SizedBox(height: 10),
-                  TextButton.icon(
-                    onPressed: _openNewProductDialog,
-                    icon: const Icon(Icons.add_box_outlined, size: 16),
-                    label: Text(
-                      _isAmharic ? '+ አዲስ ምርት መዝግብ' : '+ Register New Product',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  if (widget.currentUser.isAdmin) ...[
+                    const SizedBox(height: 10),
+                    TextButton.icon(
+                      onPressed: _openNewProductDialog,
+                      icon: const Icon(Icons.add_box_outlined, size: 16),
+                      label: Text(
+                        _isAmharic ? '+ አዲስ ምርት መዝግብ' : '+ Register New Product',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
                     ),
-                  ),
+                  ] else ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _isAmharic
+                          ? 'የመጀመሪያውን ዕቃ ለመመዝገብ ከታች "+ የመደብር መዝገብ" የሚለውን ይጫኑ'
+                          : 'Tap "+ Store Entry" below to record inventory',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                    ),
+                  ],
                 ],
               ),
             )
           else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Column(
-                children: filteredProducts.map((prod) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1B2234) : Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: gridBorderColor, width: 1.0),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 3,
-                          offset: const Offset(0, 1),
+            Column(
+              children: filteredProducts.map((prod) {
+                return _buildProductTable(prod, theme, isDark);
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Store Summary Component for Admin: Totals Product Have and All Prices
+  Widget _buildStoreAdminSummary(ThemeData theme, bool isDark) {
+    if (!widget.currentUser.isAdmin) {
+      return const SizedBox.shrink();
+    }
+
+    final gridBorderColor = isDark
+        ? const Color(0xFF2E384D)
+        : const Color(0xFFCBD5E1);
+
+    final totalProductCount = _inventoryProducts.length;
+    final totalPieces = _inventoryProducts.fold<double>(
+      0.0,
+      (sum, p) => sum + p.currentQuantity,
+    );
+    final totalValuation = _inventoryProducts.fold<double>(
+      0.0,
+      (sum, p) {
+        final price = p.unitPrice > 0 ? p.unitPrice : p.costPrice;
+        return sum + (p.currentQuantity * price);
+      },
+    );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 2, 14, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E2638) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: gridBorderColor, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Total Products (totals product have)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _isAmharic ? 'ያሉ ምርቶች ጠቅላላ' : 'TOTAL PRODUCTS',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '$totalProductCount ',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: theme.colorScheme.onSurface,
                         ),
-                      ],
-                    ),
+                      ),
+                      TextSpan(
+                        text: _isAmharic
+                            ? 'አይነት (${NumberFormat(\'#,##0\').format(totalPieces)} ፍሬ)'
+                            : 'items (${NumberFormat(\'#,##0\').format(totalPieces)} pcs)',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 36,
+            color: gridBorderColor,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+          ),
+          // Total Stock Value (all prices) with reduced Birr text
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _isAmharic ? 'ጠቅላላ የዕቃዎች ዋጋ' : 'TOTAL STOCK VALUE',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: _isAmharic ? 'ብር ' : 'ETB ',
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        ),
+                      ),
+                      TextSpan(
+                        text: _currencyFormat.format(totalValuation),
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'monospace',
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Product Table card identical to Customer & Supplier table style
+  Widget _buildProductTable(InventoryProduct prod, ThemeData theme, bool isDark) {
+    final isExpanded = _expandedProductIds.contains(prod.id);
+    final gridBorderColor = isDark
+        ? const Color(0xFF2E384D)
+        : const Color(0xFFCBD5E1);
+
+    final unitPrice = prod.unitPrice > 0 ? prod.unitPrice : prod.costPrice;
+    final totalVal = prod.currentQuantity * unitPrice;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1B2234) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: gridBorderColor, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header (straight level): Chevron + Name & Subtitle | Total Price + Eye Icon + 3-Dot
+          InkWell(
+            onTap: () => _toggleProductExpanded(prod.id),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF242C40)
+                    : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(7),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Expand / Collapse chevron
+                  Icon(
+                    isExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    size: 20,
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 4),
+
+                  // Product Name & SKU / Category
+                  Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Product Name Title Header (Bilingual)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 11, 14, 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  LanguageService.translateProduct(prod.productName),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 14,
-                                    letterSpacing: 0.2,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (prod.isOutOfStock)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFEF2F2),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: const Color(0xFFFECACA)),
-                                  ),
-                                  child: Text(
-                                    _isAmharic ? 'አልቋል' : 'Out of Stock',
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFFDC2626),
-                                    ),
-                                  ),
-                                ),
-                            ],
+                        Text(
+                          LanguageService.translateProduct(prod.productName),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 1.5),
+                        Text(
+                          '${prod.sku != null && prod.sku!.isNotEmpty ? "${prod.sku} · " : ""}${prod.category}${prod.isOutOfStock ? " · ${_isAmharic ? 'አልቋል' : 'Out of Stock'}" : ""}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: prod.isOutOfStock
+                                ? const Color(0xFFDC2626)
+                                : (isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B)),
+                            fontWeight: prod.isOutOfStock ? FontWeight.bold : FontWeight.normal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // Total Value with reduced Birr / ETB size
+                  RichText(
+                    textAlign: TextAlign.end,
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: _isAmharic ? 'ብር ' : 'ETB ',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
                           ),
                         ),
-                        Divider(height: 1, color: gridBorderColor),
-
-                        // Specifications Grid (Cartons | Pieces/Carton | Loose Pieces | Total Available | Unit Price)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _isAmharic ? 'ካርቶን' : 'Cartons',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${prod.cartons}',
-                                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _isAmharic ? 'በካርቶን ፍሬ' : 'Pieces per Carton',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${prod.pcsPerCarton.toInt()}',
-                                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _isAmharic ? 'ተርፍ ፍሬ' : 'Loose Pieces',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${prod.loosePieces}',
-                                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _isAmharic ? 'ያለው ጠቅላላ' : 'Total Available',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          _isAmharic
-                                              ? '${NumberFormat('#,##0').format(prod.totalPieces)} ፍሬ'
-                                              : '${NumberFormat('#,##0').format(prod.totalPieces)} Pieces',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w900,
-                                            color: theme.colorScheme.onSurface,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _isAmharic ? 'የአንዱ ዋጋ' : 'Unit Price',
-                                          style: TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w600,
-                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${_currencyFormat.format(prod.unitPrice > 0 ? prod.unitPrice : prod.costPrice)} ETB',
-                                          style: TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w900,
-                                            color: theme.colorScheme.onSurface,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        Divider(height: 1, color: gridBorderColor),
-
-                        // Product Action Buttons: Add / Out | Edit | History | Delete
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          child: Row(
-                            children: [
-                              // 1. Add / Out
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _openStockTransactionDialog(prod),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
-                                    side: BorderSide(color: gridBorderColor),
-                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                  ),
-                                  icon: const Icon(Icons.swap_horiz, size: 14),
-                                  label: Text(
-                                    _isAmharic ? 'ገቢ / ወጪ' : 'Add / Out',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              // 2. Edit
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _openEditProductDialog(prod),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
-                                    side: BorderSide(color: gridBorderColor),
-                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                  ),
-                                  icon: const Icon(Icons.edit_outlined, size: 14),
-                                  label: Text(
-                                    _isAmharic ? 'አስተካክል' : 'Edit',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              // 3. History
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _openProductHistoryDialog(prod),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
-                                    side: BorderSide(color: gridBorderColor),
-                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                  ),
-                                  icon: const Icon(Icons.history, size: 14),
-                                  label: Text(
-                                    _isAmharic ? 'ታሪክ' : 'History',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              // 4. Delete
-                              OutlinedButton(
-                                onPressed: () => _deleteInventoryProduct(prod),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                  side: BorderSide(color: gridBorderColor),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  minimumSize: const Size(36, 32),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                ),
-                                child: const Icon(Icons.delete_outline, size: 16),
-                              ),
-                            ],
+                        TextSpan(
+                          text: _currencyFormat.format(totalVal),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'monospace',
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
+                  ),
+
+                  // Eye icon (on straight level)
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.visibility_outlined,
+                      size: 18,
+                      color: Color(0xFF2563EB),
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 26,
+                      minHeight: 26,
+                    ),
+                    splashRadius: 16,
+                    tooltip: _isAmharic ? 'የዕቃ እንቅስቃሴ ታሪክ' : 'View Stock History',
+                    onPressed: () => _openProductHistoryDialog(prod),
+                  ),
+
+                  // 3-dot menu icon (on straight level)
+                  const SizedBox(width: 2),
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 26,
+                      minHeight: 26,
+                    ),
+                    splashRadius: 16,
+                    tooltip: _isAmharic ? 'ተጨማሪ' : 'Actions',
+                    onPressed: () => _showProductActions(prod),
+                  ),
+                ],
               ),
             ),
+          ),
+
+          // Expanded Table View matching customer/supplier table format
+          if (isExpanded) ...[
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF161D2E) : Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: gridBorderColor, width: 1.0),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Table Header Row: # | ካርቶን | በካርቶን | ተርፍ | ጠቅላላ ፍሬ | የአንዱ ዋጋ | ድምር
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        border: Border(bottom: BorderSide(color: gridBorderColor, width: 1.0)),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 22,
+                            child: Text(
+                              '#',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 6,
+                            child: Text(
+                              _isAmharic ? 'ካርቶን' : 'Carton',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 6,
+                            child: Text(
+                              _isAmharic ? 'በካርቶን' : 'Pcs/Ctn',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 5,
+                            child: Text(
+                              _isAmharic ? 'ተርፍ' : 'Loose',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 8,
+                            child: Text(
+                              _isAmharic ? 'ጠቅላላ ፍሬ' : 'Total Pcs',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 8,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                _isAmharic ? 'የአንዱ ዋጋ' : 'Unit Price',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 16, color: gridBorderColor),
+                          Expanded(
+                            flex: 9,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                _isAmharic ? 'ድምር ዋጋ' : 'Total Value',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Table Data Row
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF161D2E) : Colors.white,
+                        border: Border(bottom: BorderSide(color: gridBorderColor, width: 0.8)),
+                      ),
+                      child: Row(
+                        children: [
+                          // #
+                          SizedBox(
+                            width: 22,
+                            child: Text(
+                              '1',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 22, color: gridBorderColor),
+
+                          // ካርቶን
+                          Expanded(
+                            flex: 6,
+                            child: Text(
+                              '${prod.cartons}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'monospace',
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 22, color: gridBorderColor),
+
+                          // በካርቶን
+                          Expanded(
+                            flex: 6,
+                            child: Text(
+                              '${prod.pcsPerCarton.toInt()}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'monospace',
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 22, color: gridBorderColor),
+
+                          // ተርፍ
+                          Expanded(
+                            flex: 5,
+                            child: Text(
+                              '${prod.loosePieces}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'monospace',
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 22, color: gridBorderColor),
+
+                          // ጠቅላላ ፍሬ
+                          Expanded(
+                            flex: 8,
+                            child: Text(
+                              NumberFormat('#,##0').format(prod.currentQuantity.round()),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'monospace',
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 22, color: gridBorderColor),
+
+                          // የአንዱ ዋጋ
+                          Expanded(
+                            flex: 8,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                _currencyFormat.format(unitPrice),
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'monospace',
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Container(width: 1, height: 22, color: gridBorderColor),
+
+                          // ድምር ዋጋ
+                          Expanded(
+                            flex: 9,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                _currencyFormat.format(totalVal),
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: 'monospace',
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Table Total Footer Row (ጠቅላላ ድምር)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _isAmharic ? 'ጠቅላላ ድምር ዋጋ' : 'Total Inventory Value',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: _isAmharic ? 'ብር ' : 'ETB ',
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: _currencyFormat.format(totalVal),
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w900,
+                                    fontFamily: 'monospace',
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Card Footer: Action buttons matching Customer / Supplier table style
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF242C40) : const Color(0xFFE2E8F0),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(7)),
+                border: Border(top: BorderSide(color: gridBorderColor, width: 1.2)),
+              ),
+              child: Row(
+                children: [
+                  // Edit Product button
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openEditProductDialog(prod),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                        side: BorderSide(color: gridBorderColor),
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      icon: const Icon(Icons.edit_outlined, size: 14),
+                      label: Text(
+                        _isAmharic ? 'አስተካክል' : 'Edit',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  // Stock In/Out button (only for storekeeper, hidden for admin in admin dashboard)
+                  if (!widget.currentUser.isAdmin) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openStockTransactionDialog(prod),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                          side: BorderSide(color: gridBorderColor),
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        icon: const Icon(Icons.swap_horiz, size: 14),
+                        label: Text(
+                          _isAmharic ? 'ገቢ / ወጪ' : 'Add / Out',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+
+                  // History button
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openProductHistoryDialog(prod),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: isDark ? Colors.white : const Color(0xFF1E293B),
+                        side: BorderSide(color: gridBorderColor),
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      icon: const Icon(Icons.history, size: 14),
+                      label: Text(
+                        _isAmharic ? 'ታሪክ' : 'History',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+
+                  // Delete button (admin only)
+                  if (widget.currentUser.isAdmin) ...[
+                    const SizedBox(width: 6),
+                    OutlinedButton(
+                      onPressed: () => _deleteInventoryProduct(prod),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFBA1A1A),
+                        side: BorderSide(color: gridBorderColor),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: const Size(36, 32),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      child: const Icon(Icons.delete_outline, size: 16),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2144,14 +2764,14 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Expand / Collapse chevron
                   Icon(
                     isExpanded
                         ? Icons.keyboard_arrow_up
                         : Icons.keyboard_arrow_down,
-                    size: 22,
+                    size: 20,
                     color: isDark
                         ? const Color(0xFF94A3B8)
                         : const Color(0xFF64748B),
@@ -2162,6 +2782,7 @@ class _MainScreenState extends State<MainScreen> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         InkWell(
                           onTap: () => _openStatement(rec),
@@ -2169,91 +2790,96 @@ class _MainScreenState extends State<MainScreen> {
                             rec.title,
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                              fontSize: 13.5,
                               color: theme.colorScheme.onSurface,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          rec.notes != null && rec.notes!.isNotEmpty
-                              ? '${rec.date} · ${rec.notes}'
-                              : rec.date,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF64748B),
+                        if ((rec.notes != null && rec.notes!.isNotEmpty) ||
+                            rec.date.isNotEmpty) ...[
+                          const SizedBox(height: 1.5),
+                          Text(
+                            rec.notes != null && rec.notes!.isNotEmpty
+                                ? '${rec.date} · ${rec.notes}'
+                                : rec.date,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        ],
                       ],
                     ),
                   ),
                   const SizedBox(width: 6),
 
-                  // Right: Net Balance + eye icon + actions
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        rec.type == 'stock' ? 'STOCK TOTAL' : 'NET BALANCE',
-                        style: TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.6,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        'ETB ${_currencyFormat.format(rec.balance)}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (rec.type == 'customer' ||
-                              rec.type == 'supplier' ||
-                              rec.type == 'delala') ...[
-                            IconButton(
-                              icon: const Icon(
-                                Icons.visibility_outlined,
-                                size: 19,
-                                color: Color(0xFF2563EB),
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 28,
-                                minHeight: 28,
-                              ),
-                              tooltip: 'View Statement Details',
-                              onPressed: () => _openStatement(rec),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          IconButton(
-                            icon: const Icon(Icons.more_vert, size: 18),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 28,
-                              minHeight: 28,
-                            ),
-                            tooltip: 'Actions',
-                            onPressed: () => _showRecordActions(rec),
+                  // Price side with reduced Birr / ETB text size
+                  RichText(
+                    textAlign: TextAlign.end,
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: _isAmharic ? 'ብር ' : 'ETB ',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
                           ),
-                        ],
+                        ),
+                        TextSpan(
+                          text: _currencyFormat.format(rec.balance),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'monospace',
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Eye icon (on straight level)
+                  if (rec.type == 'customer' ||
+                      rec.type == 'supplier' ||
+                      rec.type == 'delala') ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.visibility_outlined,
+                        size: 18,
+                        color: Color(0xFF2563EB),
                       ),
-                    ],
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 26,
+                        minHeight: 26,
+                      ),
+                      splashRadius: 16,
+                      tooltip: _isAmharic ? 'ዝርዝር እይ' : 'View Statement Details',
+                      onPressed: () => _openStatement(rec),
+                    ),
+                  ],
+
+                  // 3-dot menu icon (on straight level)
+                  const SizedBox(width: 2),
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 26,
+                      minHeight: 26,
+                    ),
+                    splashRadius: 16,
+                    tooltip: _isAmharic ? 'ተጨማሪ' : 'Actions',
+                    onPressed: () => _showRecordActions(rec),
                   ),
                 ],
               ),
@@ -2694,13 +3320,29 @@ class _MainScreenState extends State<MainScreen> {
                               : const Color(0xFF334155),
                         ),
                       ),
-                      Text(
-                        'ETB ${_currencyFormat.format(rec.totalDebit)}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 11.5,
-                          fontFamily: 'monospace',
-                          color: theme.colorScheme.onSurface,
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: _isAmharic ? 'ብር ' : 'ETB ',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                            TextSpan(
+                              text: _currencyFormat.format(rec.totalDebit),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11.5,
+                                fontFamily: 'monospace',
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -2721,13 +3363,29 @@ class _MainScreenState extends State<MainScreen> {
                               : const Color(0xFF334155),
                         ),
                       ),
-                      Text(
-                        'ETB ${_currencyFormat.format(rec.totalCredit)}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 11.5,
-                          fontFamily: 'monospace',
-                          color: theme.colorScheme.onSurface,
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: _isAmharic ? 'ብር ' : 'ETB ',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                            TextSpan(
+                              text: _currencyFormat.format(rec.totalCredit),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11.5,
+                                fontFamily: 'monospace',
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -2743,13 +3401,29 @@ class _MainScreenState extends State<MainScreen> {
                           fontSize: 11.5,
                         ),
                       ),
-                      Text(
-                        '${_currencyFormat.format(rec.balance)} ${_isAmharic ? "ብር" : "ETB"}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                          fontFamily: 'monospace',
-                          color: theme.colorScheme.onSurface,
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: _isAmharic ? 'ብር ' : 'ETB ',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                            TextSpan(
+                              text: _currencyFormat.format(rec.balance),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13,
+                                fontFamily: 'monospace',
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -3152,28 +3826,30 @@ class _MainScreenState extends State<MainScreen> {
             ),
 
       // Floating Add Transaction / Store Entry Button
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF2563EB), // Primary Blue
-        foregroundColor: Colors.white,
-        elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        icon: const Icon(Icons.add, size: 18),
-        label: Text(
-          _currentTabIndex == 3
-              ? (_isAmharic ? 'የመደብር መዝገብ' : 'Store Entry')
-              : _currentTabIndex == 2
-              ? (_isAmharic ? 'የደላላ መዝገብ' : 'Broker Entry')
-              : _currentTabIndex == 1
-              ? (_isAmharic ? 'የአቅራቢ መዝገብ' : 'Supplier Entry')
-              : (_isAmharic ? 'የደንበኛ መዝገብ' : 'Customer Entry'),
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-        ),
-        onPressed: _currentTabIndex == 3
-            ? () => _openStockTransactionDialog()
-            : _currentTabIndex == 2
-            ? () => _openDelalaEntryDialog()
-            : _openCreateRecordDialog,
-      ),
+      floatingActionButton: (_currentTabIndex == 3 && widget.currentUser.isAdmin)
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: const Color(0xFF2563EB), // Primary Blue
+              foregroundColor: Colors.white,
+              elevation: 3,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(
+                _currentTabIndex == 3
+                    ? (_isAmharic ? 'የመደብር መዝገብ' : 'Store Entry')
+                    : _currentTabIndex == 2
+                    ? (_isAmharic ? 'የደላላ መዝገብ' : 'Broker Entry')
+                    : _currentTabIndex == 1
+                    ? (_isAmharic ? 'የአቅራቢ መዝገብ' : 'Supplier Entry')
+                    : (_isAmharic ? 'የደንበኛ መዝገብ' : 'Customer Entry'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              onPressed: _currentTabIndex == 3
+                  ? () => _openStockTransactionDialog()
+                  : _currentTabIndex == 2
+                  ? () => _openDelalaEntryDialog()
+                  : _openCreateRecordDialog,
+            ),
     );
   }
 }

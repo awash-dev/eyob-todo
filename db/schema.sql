@@ -215,7 +215,50 @@ BEGIN
   ALTER TABLE stock_movements ALTER COLUMN unit_price SET DEFAULT 0;
   ALTER TABLE stock_movements ALTER COLUMN total_price TYPE DECIMAL(14,2) USING COALESCE(total_price, 0)::DECIMAL(14,2);
   ALTER TABLE stock_movements ALTER COLUMN total_price SET DEFAULT 0;
+
+  -- Kena Store Product schema extension
+  ALTER TABLE store_inventory ADD COLUMN IF NOT EXISTS quantity_cartons DECIMAL(14,3) NOT NULL DEFAULT 0;
+  ALTER TABLE store_inventory ADD COLUMN IF NOT EXISTS quantity_per_carton DECIMAL(14,3) NOT NULL DEFAULT 1;
+  ALTER TABLE store_inventory ADD COLUMN IF NOT EXISTS total_quantity DECIMAL(14,3) NOT NULL DEFAULT 0;
+  ALTER TABLE store_inventory ADD COLUMN IF NOT EXISTS unit VARCHAR(32) NOT NULL DEFAULT 'PCS';
+  ALTER TABLE store_inventory ADD COLUMN IF NOT EXISTS price_per_piece DECIMAL(14,2) NOT NULL DEFAULT 0;
+  ALTER TABLE store_inventory ADD COLUMN IF NOT EXISTS total_value DECIMAL(14,2) NOT NULL DEFAULT 0;
+  ALTER TABLE store_inventory ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+  ALTER TABLE store_inventory ADD COLUMN IF NOT EXISTS updated_by VARCHAR(64);
 END $$;
+
+-- Indexes for Store Inventory
+CREATE INDEX IF NOT EXISTS idx_store_inventory_active ON store_inventory (is_active);
+CREATE INDEX IF NOT EXISTS idx_store_inventory_sku ON store_inventory (sku);
+
+-- Non-negative constraints for store inventory
+DO $$
+BEGIN
+  ALTER TABLE store_inventory
+    ADD CONSTRAINT store_inventory_non_negative_calc CHECK (
+      quantity_cartons >= 0 AND 
+      quantity_per_carton >= 0 AND 
+      total_quantity >= 0 AND 
+      price_per_piece >= 0 AND 
+      total_value >= 0
+    );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Safe backfill for existing inventory records
+UPDATE store_inventory SET
+  quantity_per_carton = COALESCE(NULLIF(pcs_per_carton, 0), 1),
+  total_quantity = COALESCE(current_quantity, 0),
+  quantity_cartons = CASE 
+    WHEN COALESCE(pcs_per_carton, 1) > 0 THEN ROUND(COALESCE(current_quantity, 0) / COALESCE(pcs_per_carton, 1), 3) 
+    ELSE 0 
+  END,
+  unit = COALESCE(NULLIF(base_unit, ''), 'PCS'),
+  price_per_piece = COALESCE(NULLIF(unit_price, 0), cost_price, 0),
+  total_value = ROUND(COALESCE(current_quantity, 0) * COALESCE(NULLIF(unit_price, 0), cost_price, 0), 2),
+  is_active = CASE WHEN is_deleted = true THEN false ELSE true END
+WHERE total_quantity = 0 AND current_quantity > 0 OR quantity_cartons = 0;
 
 -- Existing data repair: quantity, price, and balance values must never be NULL/undefined.
 UPDATE store_inventory SET

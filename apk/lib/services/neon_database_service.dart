@@ -1312,6 +1312,9 @@ class NeonDatabaseService {
     if (cleanName.isEmpty) {
       throw Exception('Product name cannot be empty');
     }
+    if (unitPrice < 0 || openingCartons < 0 || minimumStock < 0) {
+      throw Exception('Quantity and price values cannot be negative');
+    }
     final pcsPerCtn = pcsPerCarton > 0 ? pcsPerCarton : 1.0;
     final totalInitialPieces = (openingCartons * pcsPerCtn) + openingLoosePieces;
     final txnDate = (date != null && date.trim().isNotEmpty)
@@ -1319,17 +1322,21 @@ class NeonDatabaseService {
         : DateTime.now().toIso8601String().split('T')[0];
     final sku = 'SKU-${DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
     final pCost = costPrice > 0 ? costPrice : unitPrice;
+    final totalValue = totalInitialPieces * unitPrice;
 
     final rows = await executeSql(
       '''
       INSERT INTO store_inventory (
         store_id, product_name, sku, category, base_unit,
         current_quantity, minimum_stock, unit_price, cost_price,
-        pcs_per_carton, supplier_name, last_transaction_date, description, created_by
+        pcs_per_carton, supplier_name, last_transaction_date, description, created_by,
+        quantity_cartons, quantity_per_carton, total_quantity, unit,
+        price_per_piece, total_value, is_active, updated_by
       ) VALUES (
         \$1, \$2, \$3, \$4, 'Pcs',
         \$5, \$6, \$7, \$8,
-        \$9, \$10, \$11, \$12, \$13
+        \$9, \$10, \$11, \$12, \$13,
+        \$14, \$15, \$16, 'PCS', \$17, \$18, TRUE, \$13
       )
       RETURNING *
       ''',
@@ -1347,6 +1354,11 @@ class NeonDatabaseService {
         txnDate,
         description,
         createdBy,
+        openingCartons,
+        pcsPerCtn,
+        totalInitialPieces,
+        unitPrice,
+        totalValue,
       ],
     );
 
@@ -1607,11 +1619,22 @@ class NeonDatabaseService {
     double? unitPrice,
     double? costPrice,
     double? pcsPerCarton,
+    double? quantityCartons,
     double? minimumStock,
     String? category,
     String? supplierName,
     String? description,
+    String? updatedBy,
+    bool? isActive,
   }) async {
+    if ((unitPrice ?? 0) < 0 || (costPrice ?? 0) < 0 ||
+        (pcsPerCarton ?? 1) <= 0 ||
+        (quantityCartons ?? 0) < 0 ||
+        (minimumStock ?? 0) < 0) {
+      throw Exception('Quantity and price values cannot be negative');
+    }
+
+    final effectiveCartons = quantityCartons;
     final rows = await executeSql(
       '''
       UPDATE store_inventory SET
@@ -1619,12 +1642,30 @@ class NeonDatabaseService {
         unit_price = COALESCE(\$2, unit_price),
         cost_price = COALESCE(\$3, cost_price),
         pcs_per_carton = COALESCE(\$4, pcs_per_carton),
-        minimum_stock = COALESCE(\$5, minimum_stock),
-        category = COALESCE(\$6, category),
-        supplier_name = COALESCE(\$7, supplier_name),
-        description = COALESCE(\$8, description),
+        quantity_per_carton = COALESCE(\$4, quantity_per_carton),
+        quantity_cartons = COALESCE(\$5, quantity_cartons),
+        minimum_stock = COALESCE(\$6, minimum_stock),
+        category = COALESCE(\$7, category),
+        supplier_name = COALESCE(\$8, supplier_name),
+        description = COALESCE(\$9, description),
+        updated_by = COALESCE(\$11, updated_by),
+        is_active = COALESCE(\$12, is_active),
+        current_quantity = CASE
+          WHEN \$5 IS NOT NULL THEN \$5::DECIMAL * COALESCE(\$4, quantity_per_carton)
+          ELSE current_quantity
+        END,
+        total_quantity = CASE
+          WHEN \$5 IS NOT NULL THEN \$5::DECIMAL * COALESCE(\$4, quantity_per_carton)
+          ELSE total_quantity
+        END,
+        price_per_piece = COALESCE(\$2, price_per_piece),
+        total_value = CASE
+          WHEN \$5 IS NOT NULL
+            THEN ROUND(\$5::DECIMAL * COALESCE(\$4, quantity_per_carton) * COALESCE(\$2, unit_price), 2)
+          ELSE ROUND(COALESCE(total_quantity, current_quantity) * COALESCE(\$2, unit_price), 2)
+        END,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = \$9
+      WHERE id = \$10
       RETURNING *
       ''',
       [
@@ -1632,11 +1673,14 @@ class NeonDatabaseService {
         unitPrice,
         costPrice,
         pcsPerCarton,
-        minimumStock,
-        category,
-        supplierName,
-        description,
+          effectiveCartons,
+          minimumStock,
+          category,
+          supplierName,
+          description,
         id,
+        updatedBy,
+        isActive,
       ],
     );
 

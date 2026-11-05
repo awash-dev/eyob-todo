@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/user.dart';
+import '../models/inventory_product.dart';
 import '../services/api_service.dart';
+import '../services/ethiopian_calendar.dart';
 
 class NewProductDialog extends StatefulWidget {
   final AppUser currentUser;
@@ -28,6 +32,10 @@ class _NewProductDialogState extends State<NewProductDialog> {
   final _openingCartonsController = TextEditingController(text: '0');
   final _minStockController = TextEditingController(text: '0');
   final _dateController = TextEditingController();
+  Timer? _autocompleteTimer;
+  List<InventoryProduct> _suggestions = [];
+  DateTime _selectedDate = DateTime.now();
+  String _calendarMode = 'gregorian';
 
   bool _isSaving = false;
   String? _errorMessage;
@@ -39,12 +47,17 @@ class _NewProductDialogState extends State<NewProductDialog> {
 
     _pcsPerCartonController.addListener(_onCalculationsChanged);
     _openingCartonsController.addListener(_onCalculationsChanged);
+    _unitPriceController.addListener(_onCalculationsChanged);
+    _nameController.addListener(_onNameChanged);
   }
 
   @override
   void dispose() {
     _pcsPerCartonController.removeListener(_onCalculationsChanged);
     _openingCartonsController.removeListener(_onCalculationsChanged);
+    _unitPriceController.removeListener(_onCalculationsChanged);
+    _nameController.removeListener(_onNameChanged);
+    _autocompleteTimer?.cancel();
     _nameController.dispose();
     _unitPriceController.dispose();
     _pcsPerCartonController.dispose();
@@ -56,6 +69,29 @@ class _NewProductDialogState extends State<NewProductDialog> {
 
   void _onCalculationsChanged() {
     setState(() {});
+  }
+
+  void _onNameChanged() {
+    _autocompleteTimer?.cancel();
+    final query = _nameController.text.trim();
+    if (query.length < 2) {
+      if (_suggestions.isNotEmpty) setState(() => _suggestions = []);
+      return;
+    }
+    _autocompleteTimer = Timer(const Duration(milliseconds: 300), () async {
+      try {
+        final storeId = widget.currentUser.isStorekeeper
+            ? (widget.currentUser.storeId ?? widget.activeStoreId)
+            : (widget.activeStoreId == 'all' ? null : widget.activeStoreId);
+        final products = await ApiService.getInventoryProducts(storeId: storeId);
+        if (!mounted) return;
+        final matches = products.where((p) =>
+            p.productName.toLowerCase().contains(query.toLowerCase())).take(8).toList();
+        setState(() => _suggestions = matches);
+      } catch (_) {
+        if (mounted) setState(() => _suggestions = []);
+      }
+    });
   }
 
   double get _pcsPerCarton {
@@ -71,11 +107,54 @@ class _NewProductDialogState extends State<NewProductDialog> {
 
   double get _unitPrice =>
       double.tryParse(_unitPriceController.text.trim()) ?? 0.0;
+  double get _totalValue => _totalInitialPieces * _unitPrice;
+
+  void _selectSuggestion(InventoryProduct product) {
+    _nameController.text = product.productName;
+    _pcsPerCartonController.text = '${product.pcsPerCarton > 0 ? product.pcsPerCarton : 1}';
+    _unitPriceController.text = product.unitPrice > 0 ? '${product.unitPrice}' : '';
+    _minStockController.text = '${product.minimumStock}';
+    setState(() => _suggestions = []);
+  }
+
+  String get _displayDate {
+    if (_calendarMode == 'gregorian') {
+      return _dateController.text;
+    }
+    final eth = EthiopianCalendar.toEthiopian(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
+    return EthiopianCalendar.formatDisplay(eth, lang: widget.isAmharic ? 'am' : 'en');
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        _dateController.text =
+            '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      });
+    }
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     final name = _nameController.text.trim();
+    if (_openingCartons < 0 || _unitPrice < 0) {
+      setState(() => _errorMessage = widget.isAmharic
+          ? 'መጠንና ዋጋ አሉታዊ መሆን አይችሉም'
+          : 'Quantities and prices cannot be negative');
+      return;
+    }
     final targetStoreId = widget.currentUser.isStorekeeper
         ? (widget.currentUser.storeId ?? widget.activeStoreId)
         : (widget.activeStoreId == 'all' ? null : widget.activeStoreId);
@@ -89,34 +168,9 @@ class _NewProductDialogState extends State<NewProductDialog> {
       // Duplicate check
       final exists = await ApiService.checkProductExists(name, targetStoreId);
       if (exists && mounted) {
-        final proceed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(widget.isAmharic ? 'ተመሳሳይ ዕቃ አለ' : 'Duplicate Product'),
-            content: Text(
-              widget.isAmharic
-                  ? '"$name" የሚል ዕቃ ቀድሞ በመደብሩ ተመዝግቧል። ቢሆንም አዲስ ሆኖ እንዲመዘገብ ይፈልጋሉ?'
-                  : 'A product named "$name" already exists in this store. Do you still want to register it as a new product?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(widget.isAmharic ? 'ይቅር' : 'Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(widget.isAmharic ? 'ይቀጥሉ' : 'Confirm'),
-              ),
-            ],
-          ),
-        );
-
-        if (proceed != true) {
-          setState(() {
-            _isSaving = false;
-          });
-          return;
-        }
+        throw Exception(widget.isAmharic
+            ? 'ይህ ምርት ቀድሞ ተመዝግቧል። ከዝርዝሩ ይምረጡ ወይም ስሙን ያርሙ።'
+            : 'This product already exists. Select it from suggestions or edit its saved details.');
       }
 
       final product = await ApiService.registerProduct(
@@ -232,6 +286,35 @@ class _NewProductDialogState extends State<NewProductDialog> {
                       return null;
                     },
                   ),
+                  if (_suggestions.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 180),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E2638) : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _suggestions.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final product = _suggestions[index];
+                          return ListTile(
+                            dense: true,
+                            title: Text(product.productName),
+                            subtitle: Text(
+                              '${product.pcsPerCarton} pcs/carton · ${product.unitPrice} ETB',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            trailing: const Icon(Icons.north_west, size: 16),
+                            onTap: () => _selectSuggestion(product),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
 
                   // 2. Pieces per Carton & Opening Cartons
@@ -279,6 +362,13 @@ class _NewProductDialogState extends State<NewProductDialog> {
                               vertical: 12,
                             ),
                           ),
+                          validator: (v) {
+                            final n = double.tryParse(v?.trim() ?? '');
+                            if (n == null || n < 0) {
+                              return widget.isAmharic ? 'አሉታዊ ሊሆን አይችልም' : 'Cannot be negative';
+                            }
+                            return null;
+                          },
                         ),
                       ),
                     ],
@@ -334,6 +424,17 @@ class _NewProductDialogState extends State<NewProductDialog> {
                                 : const Color(0xFF64748B),
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.isAmharic
+                              ? 'ጠቅላላ ዋጋ: ${_totalValue.toStringAsFixed(2)} ብር'
+                              : 'Total Value: ${_totalValue.toStringAsFixed(2)} ETB',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -355,8 +456,12 @@ class _NewProductDialogState extends State<NewProductDialog> {
                             if (v == null || v.trim().isEmpty) {
                               return widget.isAmharic ? 'ዋጋ ያስፈልጋል' : 'Price required';
                             }
-                            if (double.tryParse(v.trim()) == null) {
+                            final price = double.tryParse(v.trim());
+                            if (price == null) {
                               return widget.isAmharic ? 'ትክክለኛ ቁጥር ያስገቡ' : 'Invalid number';
+                            }
+                            if (price < 0) {
+                              return widget.isAmharic ? 'አሉታዊ ሊሆን አይችልም' : 'Cannot be negative';
                             }
                             return null;
                           },
@@ -388,18 +493,35 @@ class _NewProductDialogState extends State<NewProductDialog> {
                   const SizedBox(height: 12),
 
                   // 5. Date
-                  TextFormField(
-                    controller: _dateController,
-                    keyboardType: TextInputType.datetime,
-                    decoration: InputDecoration(
-                      labelText: widget.isAmharic ? 'ቀን' : 'Date',
-                      hintText: 'YYYY-MM-DD',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  SegmentedButton<String>(
+                    segments: [
+                      ButtonSegment(
+                        value: 'gregorian',
+                        label: Text(widget.isAmharic ? 'ግሪጎሪያን' : 'Gregorian'),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
+                      ButtonSegment(
+                        value: 'ethiopian',
+                        label: Text(widget.isAmharic ? 'ኢትዮጵያዊ' : 'Ethiopian'),
+                      ),
+                    ],
+                    selected: {_calendarMode},
+                    onSelectionChanged: (values) {
+                      setState(() => _calendarMode = values.first);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(8),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: widget.isAmharic ? 'ቀን' : 'Date',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      child: Text(
+                        _displayDate,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),

@@ -98,6 +98,38 @@ function notifyUnauthorized() {
   for (const listener of unauthorizedListeners) listener()
 }
 
+/**
+ * Retrieves the currently logged-in user from client storage if available.
+ */
+export function getAuthenticatedUser(): AuthUser | null {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const raw = localStorage.getItem(USER_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as AuthUser
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Strictly verifies admin role.
+ * Rejects unauthenticated callers (401) and non-admin roles like storekeeper/customer (403).
+ */
+export function assertAdminAccess(user?: AuthUser | null): AuthUser {
+  const currentUser = user || getAuthenticatedUser()
+  if (!currentUser) {
+    throw new ApiError(401, 'Authentication required. Please sign in as an admin.')
+  }
+  if (currentUser.role !== 'admin') {
+    throw new ApiError(
+      403,
+      'Unauthorized: Admin access required for store product management. (ይፈቀድልም: የዕቃ አስተዳደር ለአድሚን ብቻ የተፈቀደ ነው)'
+    )
+  }
+  return currentUser
+}
+
 function parseJsonField<T>(val: unknown, fallback: T): T {
   if (val === null || val === undefined) return fallback
   if (typeof val === 'object') return val as T
@@ -1976,49 +2008,141 @@ export async function deleteDelalaEntry(id: string): Promise<{ ok: boolean }> {
 // ============================================================================
 // SMART INVENTORY & PRODUCT CATALOG API
 // ============================================================================
+// SMART INVENTORY & PRODUCT CATALOG (Stock In / Stock Out Ledger)
+// ============================================================================
 import type {
   StoreInventoryItem,
   NewProductInput,
+  UpdateProductInput,
   StockMovement,
   StockTransactionInput,
 } from '../types/ledger'
 
-export async function getInventoryProducts(storeId?: string): Promise<StoreInventoryItem[]> {
-  const sql = getSql()
-  let rows: any[]
+export function mapStoreInventoryRow(r: any): StoreInventoryItem {
+  const currentQty = Number(r.current_quantity) || 0
+  const pcsPerCtn = Number(r.quantity_per_carton) || Number(r.pcs_per_carton) || 1
+  const totalQty =
+    r.total_quantity != null && !isNaN(Number(r.total_quantity))
+      ? Number(r.total_quantity)
+      : currentQty
+  const qtyCartons =
+    r.quantity_cartons != null && !isNaN(Number(r.quantity_cartons))
+      ? Number(r.quantity_cartons)
+      : pcsPerCtn > 0
+      ? Math.round((totalQty / pcsPerCtn) * 1000) / 1000
+      : 0
+  const pricePiece =
+    Number(r.price_per_piece) || Number(r.cost_price) || Number(r.unit_price) || 0
+  const totalVal =
+    r.total_value != null && !isNaN(Number(r.total_value))
+      ? Number(r.total_value)
+      : Math.round(totalQty * pricePiece * 100) / 100
 
-  if (storeId && storeId !== 'all') {
-    rows = await sql`
-      SELECT * FROM store_inventory
-      WHERE store_id = ${storeId} OR store_id IS NULL
-      ORDER BY product_name ASC
-    `
-  } else {
-    rows = await sql`
-      SELECT * FROM store_inventory
-      ORDER BY product_name ASC
-    `
-  }
-
-  return rows.map((r) => ({
+  return {
     id: String(r.id),
     storeId: r.store_id ? String(r.store_id) : undefined,
     productName: String(r.product_name),
     sku: r.sku ? String(r.sku) : undefined,
     category: r.category ? String(r.category) : 'General',
-    baseUnit: r.base_unit ? String(r.base_unit) : 'Pcs',
-    currentQuantity: Number(r.current_quantity) || 0,
+    baseUnit: r.unit ? String(r.unit) : r.base_unit ? String(r.base_unit) : 'Pcs',
+    currentQuantity: totalQty,
     minimumStock: Number(r.minimum_stock) || 0,
-    unitPrice: Number(r.unit_price) || 0,
-    costPrice: Number(r.cost_price) || 0,
-    pcsPerCarton: Number(r.pcs_per_carton) || 1,
+    unitPrice: Number(r.unit_price) || pricePiece,
+    costPrice: Number(r.cost_price) || pricePiece,
+    pcsPerCarton: pcsPerCtn,
     supplierName: r.supplier_name ? String(r.supplier_name) : undefined,
     lastTransactionDate: r.last_transaction_date ? String(r.last_transaction_date) : undefined,
     description: r.description ? String(r.description) : undefined,
     createdBy: r.created_by ? String(r.created_by) : undefined,
     createdAt: r.created_at ? String(r.created_at) : undefined,
     updatedAt: r.updated_at ? String(r.updated_at) : undefined,
-  }))
+    // Kena Store Product schema fields
+    quantityCartons: qtyCartons,
+    quantityPerCarton: pcsPerCtn,
+    totalQuantity: totalQty,
+    unit: r.unit ? String(r.unit) : r.base_unit ? String(r.base_unit) : 'PCS',
+    pricePerPiece: pricePiece,
+    totalValue: totalVal,
+    isActive: r.is_active !== false && r.is_deleted !== true,
+    updatedBy: r.updated_by ? String(r.updated_by) : undefined,
+  }
+}
+
+export async function getInventoryProducts(
+  storeId?: string,
+  includeInactive: boolean = false
+): Promise<StoreInventoryItem[]> {
+  const sql = getSql()
+  let rows: any[]
+
+  if (storeId && storeId !== 'all') {
+    rows = await sql`
+      SELECT * FROM store_inventory
+      WHERE (store_id = ${storeId} OR store_id IS NULL)
+        AND (${includeInactive} = true OR is_active = true)
+      ORDER BY product_name ASC
+    `
+  } else {
+    rows = await sql`
+      SELECT * FROM store_inventory
+      WHERE (${includeInactive} = true OR is_active = true)
+      ORDER BY product_name ASC
+    `
+  }
+
+  return rows.map(mapStoreInventoryRow)
+}
+
+export async function searchInventoryProducts(
+  query: string,
+  storeId?: string,
+  includeInactive: boolean = false
+): Promise<StoreInventoryItem[]> {
+  const sql = getSql()
+  const trimmed = (query || '').trim()
+  if (!trimmed) {
+    return getInventoryProducts(storeId, includeInactive)
+  }
+
+  const searchPattern = `%${trimmed}%`
+  let rows: any[]
+
+  if (storeId && storeId !== 'all') {
+    rows = await sql`
+      SELECT * FROM store_inventory
+      WHERE (store_id = ${storeId} OR store_id IS NULL)
+        AND (${includeInactive} = true OR is_active = true)
+        AND (
+          product_name ILIKE ${searchPattern}
+          OR sku ILIKE ${searchPattern}
+          OR category ILIKE ${searchPattern}
+        )
+      ORDER BY 
+        CASE WHEN product_name ILIKE ${trimmed} THEN 0
+             WHEN product_name ILIKE ${trimmed + '%'} THEN 1
+             ELSE 2 END,
+        product_name ASC
+      LIMIT 20
+    `
+  } else {
+    rows = await sql`
+      SELECT * FROM store_inventory
+      WHERE (${includeInactive} = true OR is_active = true)
+        AND (
+          product_name ILIKE ${searchPattern}
+          OR sku ILIKE ${searchPattern}
+          OR category ILIKE ${searchPattern}
+        )
+      ORDER BY 
+        CASE WHEN product_name ILIKE ${trimmed} THEN 0
+             WHEN product_name ILIKE ${trimmed + '%'} THEN 1
+             ELSE 2 END,
+        product_name ASC
+      LIMIT 20
+    `
+  }
+
+  return rows.map(mapStoreInventoryRow)
 }
 
 export async function getInventoryProductById(id: string): Promise<StoreInventoryItem | null> {
@@ -2027,57 +2151,93 @@ export async function getInventoryProductById(id: string): Promise<StoreInventor
     SELECT * FROM store_inventory WHERE id = ${id} LIMIT 1
   `
   if (!rows.length) return null
-  const r = rows[0]
-  return {
-    id: String(r.id),
-    storeId: r.store_id ? String(r.store_id) : undefined,
-    productName: String(r.product_name),
-    sku: r.sku ? String(r.sku) : undefined,
-    category: r.category ? String(r.category) : 'General',
-    baseUnit: r.base_unit ? String(r.base_unit) : 'Pcs',
-    currentQuantity: Number(r.current_quantity) || 0,
-    minimumStock: Number(r.minimum_stock) || 0,
-    unitPrice: Number(r.unit_price) || 0,
-    costPrice: Number(r.cost_price) || 0,
-    pcsPerCarton: Number(r.pcs_per_carton) || 1,
-    supplierName: r.supplier_name ? String(r.supplier_name) : undefined,
-    lastTransactionDate: r.last_transaction_date ? String(r.last_transaction_date) : undefined,
-    description: r.description ? String(r.description) : undefined,
-  }
+  return mapStoreInventoryRow(rows[0])
 }
 
-export async function registerNewProduct(input: NewProductInput): Promise<StoreInventoryItem> {
+export async function registerNewProduct(
+  input: NewProductInput,
+  currentUser?: AuthUser | null
+): Promise<StoreInventoryItem> {
+  const admin = assertAdminAccess(currentUser)
   const sql = getSql()
-  const sku = input.sku || `SKU-${Date.now().toString(36).toUpperCase()}`
-  const initialQty = Number(input.initialQuantity) || 0
-  const unitPrice = Number(input.unitPrice) || 0
-  const costPrice = Number(input.costPrice) || unitPrice
-  const pcsPerCtn = Number(input.pcsPerCarton) || 1
 
-  // Register the product and its initial stock movement atomically
-  // (one statement = one transaction), and record who registered it.
-  const inserted = initialQty > 0
+  const name = input.productName ? input.productName.trim() : ''
+  if (!name) {
+    throw new ApiError(400, 'Product name is required.')
+  }
+
+  // Automatic backend live calculation — never trust frontend values
+  const rawCartons = Number(
+    input.quantityCartons != null
+      ? input.quantityCartons
+      : input.initialQuantity != null && input.pcsPerCarton
+      ? Number(input.initialQuantity) / Number(input.pcsPerCarton)
+      : 0
+  )
+  const rawPerCarton = Number(
+    input.quantityPerCarton != null
+      ? input.quantityPerCarton
+      : input.pcsPerCarton != null
+      ? input.pcsPerCarton
+      : 1
+  )
+  const rawPricePiece = Number(
+    input.pricePerPiece != null
+      ? input.pricePerPiece
+      : input.costPrice != null
+      ? input.costPrice
+      : input.unitPrice
+  ) || 0
+
+  if (rawCartons < 0 || rawPerCarton < 0 || rawPricePiece < 0) {
+    throw new ApiError(400, 'Quantities and prices must not be negative.')
+  }
+
+  const quantityCartons = Math.max(0, rawCartons)
+  const quantityPerCarton = Math.max(0.001, rawPerCarton)
+  const totalQuantity = Math.round(quantityCartons * quantityPerCarton * 1000) / 1000
+  const pricePerPiece = Math.round(rawPricePiece * 100) / 100
+  const totalValue = Math.round(totalQuantity * pricePerPiece * 100) / 100
+
+  const sku = input.sku?.trim() || `SKU-${Date.now().toString(36).toUpperCase()}`
+  const unit = input.unit?.trim() || input.baseUnit?.trim() || 'PCS'
+  const category = input.category?.trim() || 'General'
+  const minStock = Number(input.minimumStock) || 0
+  const isActive = input.isActive !== false
+  const txnDate = normalizeTransactionDate(input.transactionDate)
+
+  const inserted = totalQuantity > 0
     ? await sql`
         WITH ins AS (
           INSERT INTO store_inventory (
             store_id, product_name, sku, category, base_unit,
             current_quantity, minimum_stock, unit_price, cost_price,
-            pcs_per_carton, supplier_name, last_transaction_date, description, created_by
+            pcs_per_carton, supplier_name, last_transaction_date, description,
+            created_by, updated_by, quantity_cartons, quantity_per_carton,
+            total_quantity, unit, price_per_piece, total_value, is_active
           ) VALUES (
             ${input.storeId || null},
-            ${input.productName.trim()},
+            ${name},
             ${sku},
-            ${input.category || 'General'},
-            ${input.baseUnit || 'Pcs'},
-            ${initialQty},
-            ${Number(input.minimumStock) || 0},
-            ${unitPrice},
-            ${costPrice},
-            ${pcsPerCtn},
+            ${category},
+            ${unit},
+            ${totalQuantity},
+            ${minStock},
+            ${pricePerPiece},
+            ${pricePerPiece},
+            ${quantityPerCarton},
             ${input.supplierName || null},
-            ${new Date().toISOString().split('T')[0]},
+            ${txnDate},
             ${input.description || null},
-            ${input.createdBy || null}
+            ${admin.id},
+            ${admin.id},
+            ${quantityCartons},
+            ${quantityPerCarton},
+            ${totalQuantity},
+            ${unit},
+            ${pricePerPiece},
+            ${totalValue},
+            ${isActive}
           )
           RETURNING *
         ),
@@ -2089,11 +2249,11 @@ export async function registerNewProduct(input: NewProductInput): Promise<StoreI
             transaction_date, source_type, source_id, note, created_by
           )
           SELECT
-            i.store_id, i.id, 'IN', ${initialQty},
-            ${input.baseUnit || 'Pcs'}, ${pcsPerCtn}, ${initialQty},
-            0, i.current_quantity, ${costPrice}, ${initialQty * costPrice},
-            CURRENT_DATE, 'INITIAL', ${input.supplierName || null},
-            'Initial product registration stock', ${input.createdBy || null}
+            i.store_id, i.id, 'IN', ${totalQuantity},
+            ${unit}, ${quantityPerCarton}, ${totalQuantity},
+            0, i.current_quantity, ${pricePerPiece}, ${totalValue},
+            ${txnDate}::DATE, 'INITIAL', ${input.supplierName || null},
+            'Initial product registration stock', ${admin.id}
           FROM ins i
           RETURNING id
         )
@@ -2105,22 +2265,32 @@ export async function registerNewProduct(input: NewProductInput): Promise<StoreI
         INSERT INTO store_inventory (
           store_id, product_name, sku, category, base_unit,
           current_quantity, minimum_stock, unit_price, cost_price,
-          pcs_per_carton, supplier_name, last_transaction_date, description, created_by
+          pcs_per_carton, supplier_name, last_transaction_date, description,
+          created_by, updated_by, quantity_cartons, quantity_per_carton,
+          total_quantity, unit, price_per_piece, total_value, is_active
         ) VALUES (
           ${input.storeId || null},
-          ${input.productName.trim()},
+          ${name},
           ${sku},
-          ${input.category || 'General'},
-          ${input.baseUnit || 'Pcs'},
-          ${initialQty},
-          ${Number(input.minimumStock) || 0},
-          ${unitPrice},
-          ${costPrice},
-          ${pcsPerCtn},
+          ${category},
+          ${unit},
+          ${totalQuantity},
+          ${minStock},
+          ${pricePerPiece},
+          ${pricePerPiece},
+          ${quantityPerCarton},
           ${input.supplierName || null},
-          ${new Date().toISOString().split('T')[0]},
+          ${txnDate},
           ${input.description || null},
-          ${input.createdBy || null}
+          ${admin.id},
+          ${admin.id},
+          ${quantityCartons},
+          ${quantityPerCarton},
+          ${totalQuantity},
+          ${unit},
+          ${pricePerPiece},
+          ${totalValue},
+          ${isActive}
         )
         RETURNING *
       `
@@ -2128,7 +2298,6 @@ export async function registerNewProduct(input: NewProductInput): Promise<StoreI
   const r = inserted[0]
   const productId = String(r.id)
 
-  // Save product translations if provided
   if (input.amharicName) {
     await sql`
       INSERT INTO product_translations (product_id, language_code, product_name)
@@ -2144,22 +2313,7 @@ export async function registerNewProduct(input: NewProductInput): Promise<StoreI
     `
   }
 
-  return {
-    id: productId,
-    storeId: r.store_id ? String(r.store_id) : undefined,
-    productName: String(r.product_name),
-    sku: String(r.sku),
-    category: String(r.category),
-    baseUnit: String(r.base_unit),
-    currentQuantity: Number(r.current_quantity),
-    minimumStock: Number(r.minimum_stock),
-    unitPrice: Number(r.unit_price),
-    costPrice: Number(r.cost_price),
-    pcsPerCarton: Number(r.pcs_per_carton),
-    supplierName: r.supplier_name ? String(r.supplier_name) : undefined,
-    lastTransactionDate: r.last_transaction_date ? String(r.last_transaction_date) : undefined,
-    description: r.description ? String(r.description) : undefined,
-  }
+  return mapStoreInventoryRow(r)
 }
 
 /** Normalizes user-entered transaction dates (YYYY-MM-DD / DD/MM/YYYY) to ISO YYYY-MM-DD. */
@@ -2512,24 +2666,7 @@ export async function executeStockTransaction(input: StockTransactionInput): Pro
       createdBy: createdById ?? undefined,
       createdAt: row.movement_created_at ? String(row.movement_created_at) : undefined,
     },
-    updatedProduct: {
-      id: String(row.id),
-      storeId: row.store_id ? String(row.store_id) : undefined,
-      productName: String(row.product_name),
-      sku: row.sku ? String(row.sku) : undefined,
-      category: row.category ? String(row.category) : 'General',
-      baseUnit: row.base_unit ? String(row.base_unit) : 'Pcs',
-      currentQuantity: Number(row.current_quantity),
-      minimumStock: Number(row.minimum_stock),
-      unitPrice: Number(row.unit_price),
-      costPrice: Number(row.cost_price),
-      pcsPerCarton: Number(row.pcs_per_carton),
-      supplierName: row.supplier_name ? String(row.supplier_name) : undefined,
-      lastTransactionDate: row.last_transaction_date
-        ? String(row.last_transaction_date)
-        : undefined,
-      description: row.description ? String(row.description) : undefined,
-    },
+    updatedProduct: mapStoreInventoryRow(row),
     ledgerRecordId: String(row.ledger_id || ledgerId),
   }
 }
@@ -2593,32 +2730,92 @@ export async function getStockMovements(productId?: string, storeId?: string): P
 
 export async function updateInventoryProduct(
   id: string,
-  updates: {
-    productName?: string
-    sku?: string
-    category?: string
-    baseUnit?: string
-    minimumStock?: number
-    costPrice?: number
-    unitPrice?: number
-    pcsPerCarton?: number
-    supplierName?: string
-    description?: string
-  }
+  updates: UpdateProductInput,
+  currentUser?: AuthUser | null
 ): Promise<StoreInventoryItem> {
+  const admin = assertAdminAccess(currentUser)
   const sql = getSql()
+
+  const existing = await sql`SELECT * FROM store_inventory WHERE id = ${id} LIMIT 1`
+  if (!existing.length) {
+    throw new ApiError(404, `Product not found: ${id}`)
+  }
+  const curr = existing[0]
+
+  if (updates.productName !== undefined && !updates.productName.trim()) {
+    throw new ApiError(400, 'Product name cannot be empty.')
+  }
+
+  const newName = updates.productName !== undefined ? updates.productName.trim() : curr.product_name
+  const newSku = updates.sku !== undefined ? updates.sku.trim() : curr.sku
+  const newCategory = updates.category !== undefined ? updates.category.trim() : curr.category
+  const newUnit =
+    updates.unit !== undefined
+      ? updates.unit.trim()
+      : updates.baseUnit !== undefined
+      ? updates.baseUnit.trim()
+      : curr.unit || curr.base_unit || 'PCS'
+  const newSupplier =
+    updates.supplierName !== undefined ? updates.supplierName.trim() : curr.supplier_name
+  const newDescription =
+    updates.description !== undefined ? updates.description.trim() : curr.description
+  const newIsActive = updates.isActive !== undefined ? updates.isActive : curr.is_active
+
+  // Live recalculations — Never trust frontend values
+  const rawCartons =
+    updates.quantityCartons !== undefined
+      ? Number(updates.quantityCartons)
+      : Number(curr.quantity_cartons)
+  const rawPerCarton =
+    updates.quantityPerCarton !== undefined
+      ? Number(updates.quantityPerCarton)
+      : updates.pcsPerCarton !== undefined
+      ? Number(updates.pcsPerCarton)
+      : Number(curr.quantity_per_carton || curr.pcs_per_carton || 1)
+  const rawPricePiece =
+    updates.pricePerPiece !== undefined
+      ? Number(updates.pricePerPiece)
+      : updates.costPrice !== undefined
+      ? Number(updates.costPrice)
+      : updates.unitPrice !== undefined
+      ? Number(updates.unitPrice)
+      : Number(curr.price_per_piece || curr.cost_price || 0)
+
+  if (rawCartons < 0 || rawPerCarton < 0 || rawPricePiece < 0) {
+    throw new ApiError(400, 'Quantities and prices must not be negative.')
+  }
+
+  const quantityCartons = Math.max(0, rawCartons)
+  const quantityPerCarton = Math.max(0.001, rawPerCarton)
+  const totalQuantity = Math.round(quantityCartons * quantityPerCarton * 1000) / 1000
+  const pricePerPiece = Math.round(rawPricePiece * 100) / 100
+  const totalValue = Math.round(totalQuantity * pricePerPiece * 100) / 100
+  const minStock =
+    updates.minimumStock !== undefined
+      ? Number(updates.minimumStock)
+      : Number(curr.minimum_stock || 0)
+
   const rows = await sql`
     UPDATE store_inventory
-    SET product_name = COALESCE(${updates.productName || null}, product_name),
-        sku = COALESCE(${updates.sku || null}, sku),
-        category = COALESCE(${updates.category || null}, category),
-        base_unit = COALESCE(${updates.baseUnit || null}, base_unit),
-        minimum_stock = COALESCE(${updates.minimumStock != null ? updates.minimumStock : null}, minimum_stock),
-        cost_price = COALESCE(${updates.costPrice != null ? updates.costPrice : null}, cost_price),
-        unit_price = COALESCE(${updates.unitPrice != null ? updates.unitPrice : null}, unit_price),
-        pcs_per_carton = COALESCE(${updates.pcsPerCarton != null ? updates.pcsPerCarton : null}, pcs_per_carton),
-        supplier_name = COALESCE(${updates.supplierName || null}, supplier_name),
-        description = COALESCE(${updates.description || null}, description),
+    SET product_name = ${newName},
+        sku = ${newSku},
+        category = ${newCategory},
+        base_unit = ${newUnit},
+        unit = ${newUnit},
+        minimum_stock = ${minStock},
+        cost_price = ${pricePerPiece},
+        unit_price = ${pricePerPiece},
+        price_per_piece = ${pricePerPiece},
+        pcs_per_carton = ${quantityPerCarton},
+        quantity_per_carton = ${quantityPerCarton},
+        quantity_cartons = ${quantityCartons},
+        total_quantity = ${totalQuantity},
+        current_quantity = ${totalQuantity},
+        total_value = ${totalValue},
+        supplier_name = ${newSupplier || null},
+        description = ${newDescription || null},
+        is_active = ${newIsActive},
+        updated_by = ${admin.id},
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${id}
     RETURNING *
@@ -2626,31 +2823,54 @@ export async function updateInventoryProduct(
   if (!rows.length) {
     throw new ApiError(404, `Product not found: ${id}`)
   }
-  const r = rows[0]
-  return {
-    id: String(r.id),
-    storeId: r.store_id ? String(r.store_id) : undefined,
-    productName: String(r.product_name),
-    sku: r.sku ? String(r.sku) : undefined,
-    category: r.category ? String(r.category) : 'General',
-    baseUnit: r.base_unit ? String(r.base_unit) : 'Pcs',
-    currentQuantity: Number(r.current_quantity) || 0,
-    minimumStock: Number(r.minimum_stock) || 0,
-    unitPrice: Number(r.unit_price) || 0,
-    costPrice: Number(r.cost_price) || 0,
-    pcsPerCarton: Number(r.pcs_per_carton) || 1,
-    supplierName: r.supplier_name ? String(r.supplier_name) : undefined,
-    lastTransactionDate: r.last_transaction_date ? String(r.last_transaction_date) : undefined,
-    description: r.description ? String(r.description) : undefined,
-    createdBy: r.created_by ? String(r.created_by) : undefined,
-    createdAt: r.created_at ? String(r.created_at) : undefined,
-    updatedAt: r.updated_at ? String(r.updated_at) : undefined,
-  }
+  return mapStoreInventoryRow(rows[0])
 }
 
-export async function deleteInventoryProduct(id: string): Promise<void> {
+export async function toggleProductStatus(
+  id: string,
+  isActive: boolean,
+  currentUser?: AuthUser | null
+): Promise<StoreInventoryItem> {
+  const admin = assertAdminAccess(currentUser)
   const sql = getSql()
-  await sql`DELETE FROM store_inventory WHERE id = ${id}`
+  const rows = await sql`
+    UPDATE store_inventory
+    SET is_active = ${isActive},
+        is_deleted = ${!isActive},
+        updated_by = ${admin.id},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${id}
+    RETURNING *
+  `
+  if (!rows.length) {
+    throw new ApiError(404, `Product not found: ${id}`)
+  }
+  return mapStoreInventoryRow(rows[0])
+}
+
+export async function deleteInventoryProduct(
+  id: string,
+  currentUser?: AuthUser | null
+): Promise<void> {
+  const admin = assertAdminAccess(currentUser)
+  const sql = getSql()
+  const movements = await sql`
+    SELECT count(*) FROM stock_movements WHERE product_id = ${id}
+  `
+  const hasMovements = Number(movements[0]?.count) > 0
+  if (hasMovements) {
+    // Preserve transaction history: soft deactivate
+    await sql`
+      UPDATE store_inventory
+      SET is_active = false,
+          is_deleted = true,
+          updated_by = ${admin.id},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+    `
+  } else {
+    await sql`DELETE FROM store_inventory WHERE id = ${id}`
+  }
 }
 
 // ============================================================================

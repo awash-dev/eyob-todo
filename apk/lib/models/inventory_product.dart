@@ -5,6 +5,12 @@ class InventoryProduct {
   final String? sku;
   final String category;
   final String baseUnit;
+  final double quantityCartons;
+  final double quantityPerCarton;
+  final double totalQuantity;
+  final String unit;
+  final double pricePerPiece;
+  final double totalValue;
   final double currentQuantity; // authoritative stock in pieces
   final double minimumStock;
   final double unitPrice; // selling price
@@ -14,7 +20,9 @@ class InventoryProduct {
   final String? lastTransactionDate;
   final String? description;
   final String? createdBy;
+  final String? updatedBy;
   final bool isDeleted;
+  final bool isActive;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -25,6 +33,12 @@ class InventoryProduct {
     this.sku,
     this.category = 'General',
     this.baseUnit = 'Pcs',
+    this.quantityCartons = 0,
+    this.quantityPerCarton = 1,
+    this.totalQuantity = 0,
+    this.unit = 'PCS',
+    this.pricePerPiece = 0,
+    this.totalValue = 0,
     required this.currentQuantity,
     this.minimumStock = 0,
     required this.unitPrice,
@@ -34,7 +48,9 @@ class InventoryProduct {
     this.lastTransactionDate,
     this.description,
     this.createdBy,
+    this.updatedBy,
     this.isDeleted = false,
+    this.isActive = true,
     this.createdAt,
     this.updatedAt,
   });
@@ -94,6 +110,12 @@ class InventoryProduct {
       sku: json['sku']?.toString(),
       category: json['category']?.toString() ?? 'General',
       baseUnit: json['base_unit']?.toString() ?? 'Pcs',
+      quantityCartons: parseDouble(json['quantity_cartons']),
+      quantityPerCarton: parseDouble(json['quantity_per_carton'], 1.0),
+      totalQuantity: parseDouble(json['total_quantity']),
+      unit: json['unit']?.toString() ?? 'PCS',
+      pricePerPiece: parseDouble(json['price_per_piece']),
+      totalValue: parseDouble(json['total_value']),
       currentQuantity: parseDouble(json['current_quantity']),
       minimumStock: parseDouble(json['minimum_stock']),
       unitPrice: parseDouble(json['unit_price']),
@@ -103,7 +125,9 @@ class InventoryProduct {
       lastTransactionDate: json['last_transaction_date']?.toString(),
       description: json['description']?.toString(),
       createdBy: json['created_by']?.toString(),
+      updatedBy: json['updated_by']?.toString(),
       isDeleted: parseBool(json['is_deleted']),
+      isActive: json['is_active'] == null ? !parseBool(json['is_deleted']) : parseBool(json['is_active']),
       createdAt: parseDate(json['created_at']),
       updatedAt: parseDate(json['updated_at']),
     );
@@ -117,6 +141,12 @@ class InventoryProduct {
       'sku': sku,
       'category': category,
       'base_unit': baseUnit,
+      'quantity_cartons': quantityCartons,
+      'quantity_per_carton': quantityPerCarton,
+      'total_quantity': totalQuantity,
+      'unit': unit,
+      'price_per_piece': pricePerPiece,
+      'total_value': totalValue,
       'current_quantity': currentQuantity,
       'minimum_stock': minimumStock,
       'unit_price': unitPrice,
@@ -126,7 +156,9 @@ class InventoryProduct {
       'last_transaction_date': lastTransactionDate,
       'description': description,
       'created_by': createdBy,
+      'updated_by': updatedBy,
       'is_deleted': isDeleted,
+      'is_active': isActive,
     };
   }
 }

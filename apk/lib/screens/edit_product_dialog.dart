@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import '../models/inventory_product.dart';
 import '../services/api_service.dart';
+import '../models/user.dart';
 
 class EditProductDialog extends StatefulWidget {
   final InventoryProduct product;
+  final AppUser? currentUser;
   final bool isAmharic;
 
   const EditProductDialog({
     super.key,
     required this.product,
+    this.currentUser,
     this.isAmharic = true,
   });
 
@@ -26,6 +29,7 @@ class _EditProductDialogState extends State<EditProductDialog> {
   late TextEditingController _minStockController;
   late TextEditingController _categoryController;
   late TextEditingController _supplierController;
+  late TextEditingController _quantityCartonsController;
 
   bool _isSaving = false;
   String? _errorMessage;
@@ -41,6 +45,14 @@ class _EditProductDialogState extends State<EditProductDialog> {
     _minStockController = TextEditingController(text: '${p.minimumStock.toInt()}');
     _categoryController = TextEditingController(text: p.category);
     _supplierController = TextEditingController(text: p.supplierName ?? '');
+    final cartons = p.quantityCartons > 0
+        ? p.quantityCartons
+        : (p.pcsPerCarton > 0 ? p.currentQuantity / p.pcsPerCarton : 0);
+    _quantityCartonsController =
+        TextEditingController(text: cartons.toStringAsFixed(cartons % 1 == 0 ? 0 : 3));
+    _unitPriceController.addListener(_onChanged);
+    _pcsPerCartonController.addListener(_onChanged);
+    _quantityCartonsController.addListener(_onChanged);
   }
 
   @override
@@ -52,11 +64,36 @@ class _EditProductDialogState extends State<EditProductDialog> {
     _minStockController.dispose();
     _categoryController.dispose();
     _supplierController.dispose();
+    _unitPriceController.removeListener(_onChanged);
+    _pcsPerCartonController.removeListener(_onChanged);
+    _quantityCartonsController.removeListener(_onChanged);
+    _quantityCartonsController.dispose();
     super.dispose();
   }
 
+  void _onChanged() => setState(() {});
+
+  double get _cartons =>
+      double.tryParse(_quantityCartonsController.text.trim()) ?? 0;
+
+  double get _piecesPerCarton =>
+      double.tryParse(_pcsPerCartonController.text.trim()) ?? 1;
+
+  double get _totalQuantity => _cartons * _piecesPerCarton;
+
+  double get _unitPrice =>
+      double.tryParse(_unitPriceController.text.trim()) ?? 0;
+
+  double get _totalValue => _totalQuantity * _unitPrice;
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_cartons < 0 || _piecesPerCarton <= 0 || _unitPrice < 0) {
+      setState(() => _errorMessage = widget.isAmharic
+          ? 'መጠንና ዋጋ ትክክለኛ መሆን አለባቸው'
+          : 'Quantities and prices must be valid and non-negative');
+      return;
+    }
 
     setState(() {
       _isSaving = true;
@@ -70,9 +107,11 @@ class _EditProductDialogState extends State<EditProductDialog> {
         unitPrice: double.tryParse(_unitPriceController.text.trim()),
         costPrice: double.tryParse(_costPriceController.text.trim()),
         pcsPerCarton: double.tryParse(_pcsPerCartonController.text.trim()),
+        quantityCartons: double.tryParse(_quantityCartonsController.text.trim()),
         minimumStock: double.tryParse(_minStockController.text.trim()),
         category: _categoryController.text.trim(),
         supplierName: _supplierController.text.trim().isNotEmpty ? _supplierController.text.trim() : null,
+        updatedBy: widget.currentUser?.id,
       );
 
       if (mounted) {
@@ -158,6 +197,22 @@ class _EditProductDialogState extends State<EditProductDialog> {
                   ),
                   const SizedBox(height: 12),
 
+                  TextFormField(
+                    controller: _quantityCartonsController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: widget.isAmharic ? 'የካርቶን ብዛት' : 'Quantity in Cartons',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    validator: (v) {
+                      final value = double.tryParse(v?.trim() ?? '');
+                      if (value == null || value < 0) return widget.isAmharic ? 'አሉታዊ ሊሆን አይችልም' : 'Cannot be negative';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
                   Row(
                     children: [
                       Expanded(
@@ -216,6 +271,46 @@ class _EditProductDialogState extends State<EditProductDialog> {
                   ),
                   const SizedBox(height: 12),
 
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              widget.isAmharic ? 'ጠቅላላ ብዛት' : 'Total Quantity',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            Text(
+                              '${_totalQuantity.toStringAsFixed(_totalQuantity % 1 == 0 ? 0 : 3)} pcs',
+                              style: const TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              widget.isAmharic ? 'ጠቅላላ ዋጋ' : 'Total Value',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            Text(
+                              '${_totalValue.toStringAsFixed(2)} ETB',
+                              style: const TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: _supplierController,
                     decoration: InputDecoration(
@@ -267,4 +362,3 @@ class _EditProductDialogState extends State<EditProductDialog> {
     );
   }
 }
-

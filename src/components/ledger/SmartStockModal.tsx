@@ -19,6 +19,7 @@ import {
 } from '../../lib/api'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
+import { EthioDatePicker } from '../common/EthioDatePicker'
 
 interface SmartStockModalProps {
   isOpen: boolean
@@ -35,7 +36,7 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { activeStoreId, activeStore, user, isAdmin } = useAuth()
+  const { activeStoreId, activeStore, user } = useAuth()
   const { t, formatCurrency: fmtCurr } = { ...useLanguage(), ...useLedger() }
   const { showToast } = useLedger()
 
@@ -285,21 +286,32 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
 
     setSubmitting(true)
     try {
-      const created = await registerNewProduct({
-        storeId: activeStoreId || undefined,
-        createdBy: user?.id,
-        productName: regName.trim(),
-        sku: regSku.trim() || undefined,
-        category: regCategory.trim() || 'General',
-        baseUnit: regBaseUnit.trim() || 'Pcs',
-        initialQuantity: regInitialQty,
-        minimumStock: regMinStock,
-        unitPrice: regSellingPrice,
-        costPrice: regCostPrice > 0 ? regCostPrice : regSellingPrice,
-        pcsPerCarton: regPcsPerCarton > 0 ? regPcsPerCarton : 1,
-        supplierName: regSupplier.trim() || undefined,
-        description: regDescription.trim() || undefined,
-      })
+      const created = await registerNewProduct(
+        {
+          storeId: activeStoreId || undefined,
+          createdBy: user?.id,
+          productName: regName.trim(),
+          sku: regSku.trim() || undefined,
+          category: regCategory.trim() || 'General',
+          baseUnit: regBaseUnit.trim() || 'Pcs',
+          initialQuantity: regInitialQty,
+          quantityCartons:
+            regPcsPerCarton > 0 ? Math.floor(regInitialQty / regPcsPerCarton) : 0,
+          quantityPerCarton: regPcsPerCarton > 0 ? regPcsPerCarton : 1,
+          totalQuantity: regInitialQty,
+          unit: regBaseUnit.trim() || 'PCS',
+          pricePerPiece: regCostPrice > 0 ? regCostPrice : regSellingPrice,
+          totalValue:
+            regInitialQty * (regCostPrice > 0 ? regCostPrice : regSellingPrice),
+          minimumStock: regMinStock,
+          unitPrice: regSellingPrice,
+          costPrice: regCostPrice > 0 ? regCostPrice : regSellingPrice,
+          pcsPerCarton: regPcsPerCarton > 0 ? regPcsPerCarton : 1,
+          supplierName: regSupplier.trim() || undefined,
+          description: regDescription.trim() || undefined,
+        },
+        user
+      )
 
       showToast(
         t(`Product "${created.productName}" registered successfully!`, `ምርት "${created.productName}" በተሳካ ሁኔታ ተመዝግቧል!`),
@@ -317,7 +329,7 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
     }
   }
 
-  if (!isOpen || isAdmin) return null
+  if (!isOpen) return null
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -888,15 +900,10 @@ export const SmartStockModal: React.FC<SmartStockModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-foreground block mb-1">
-                    {t('Date', 'ቀን')}
-                  </label>
-                  <input
-                    type="text"
+                  <EthioDatePicker
                     value={transactionDate}
-                    onChange={(e) => setTransactionDate(e.target.value)}
-                    placeholder="YYYY-MM-DD"
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-200 dark:border-zinc-700 bg-background focus:outline-none"
+                    onChange={setTransactionDate}
+                    label={t('Date *', 'ቀን *')}
                   />
                 </div>
               </div>

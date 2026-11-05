@@ -608,10 +608,13 @@ class ApiService {
     double? unitPrice,
     double? costPrice,
     double? pcsPerCarton,
+    double? quantityCartons,
     double? minimumStock,
     String? category,
     String? supplierName,
     String? description,
+    String? updatedBy,
+    bool? isActive,
   }) async {
     return await NeonDatabaseService.updateInventoryProductDirect(
       id: id,
@@ -619,10 +622,13 @@ class ApiService {
       unitPrice: unitPrice,
       costPrice: costPrice,
       pcsPerCarton: pcsPerCarton,
+      quantityCartons: quantityCartons,
       minimumStock: minimumStock,
       category: category,
       supplierName: supplierName,
       description: description,
+      updatedBy: updatedBy,
+      isActive: isActive,
     );
   }
 
