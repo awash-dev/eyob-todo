@@ -380,7 +380,7 @@ class ApiService {
         double debit = 0;
         double credit = 0;
 
-        if (type == 'customer' || type == 'stock') {
+        if (type == 'customer' || type == 'stock' || type == 'delala') {
           if (isDebit) debit = subtotal;
           if (isPayment) credit = subtotal;
         } else {
@@ -423,7 +423,7 @@ class ApiService {
       totalDebit += debit;
       totalCredit += credit;
 
-      if (type == 'customer' || type == 'stock') {
+      if (type == 'customer' || type == 'stock' || type == 'delala') {
         runningBalance = totalDebit - totalCredit;
       } else {
         runningBalance = totalCredit - totalDebit;
@@ -446,7 +446,7 @@ class ApiService {
       );
     }
 
-    final outstanding = type == 'customer'
+    final outstanding = (type == 'customer' || type == 'delala')
         ? (totalDebit - totalCredit)
         : (totalCredit - totalDebit);
 
@@ -457,11 +457,13 @@ class ApiService {
       storeName: storeName,
       entries: computedEntries,
       payments: computedEntries
-          .where((e) => type == 'customer' ? e.credit > 0 : e.debit > 0)
+          .where((e) => (type == 'customer' || type == 'delala') ? e.credit > 0 : e.debit > 0)
           .map(
             (e) => StatementPayment(
               date: e.date,
-              amount: type == 'customer' ? e.credit : e.debit,
+              amount: (type == 'customer' || type == 'delala')
+                  ? e.credit
+                  : e.debit,
               paymentMethod: e.paymentMethod,
               reference: e.reference,
               notes: e.notes,
@@ -494,6 +496,8 @@ class ApiService {
     required int sign,
     required String transactionDate,
     String? storeId,
+    String operationType = 'item_cash',
+    String? notes,
   }) async {
     return NeonDatabaseService.createDelalaEntryDirect(
       delalaName: delalaName,
@@ -503,6 +507,8 @@ class ApiService {
       sign: sign,
       transactionDate: transactionDate,
       storeId: storeId,
+      operationType: operationType,
+      notes: notes,
     );
   }
 
@@ -515,6 +521,8 @@ class ApiService {
     int? sign,
     String? transactionDate,
     String? storeId,
+    String? operationType,
+    String? notes,
   }) async {
     return NeonDatabaseService.updateDelalaEntryDirect(
       id: id,
@@ -525,6 +533,8 @@ class ApiService {
       sign: sign,
       transactionDate: transactionDate,
       storeId: storeId,
+      operationType: operationType,
+      notes: notes,
     );
   }
 

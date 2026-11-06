@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../models/user.dart';
 import '../models/store.dart';
 import '../models/ledger_record.dart';
-import '../models/delala_entry.dart';
 import '../services/api_service.dart';
 import '../services/language_service.dart';
 import 'login_screen.dart';
@@ -38,7 +37,6 @@ class _MainScreenState extends State<MainScreen> {
   List<Store> _stores = [];
   String? _selectedStoreId;
   List<LedgerRecord> _records = [];
-  List<DelalaEntry> _delalaEntries = [];
   List<InventoryProduct> _inventoryProducts = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -83,8 +81,13 @@ class _MainScreenState extends State<MainScreen> {
       _selectedStoreId = 'all';
     }
 
+    LanguageService.currentLanguage.addListener(_onLanguageChanged);
     _loadLanguagePreference();
     _loadStoresAndRecords();
+  }
+
+  void _onLanguageChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadLanguagePreference() async {
@@ -94,14 +97,9 @@ class _MainScreenState extends State<MainScreen> {
     } catch (_) {}
   }
 
-  static String cleanDelalaName(String name) {
-    return name
-        .replaceFirst(RegExp(r'^(delala|ደላላ)\s+', caseSensitive: false), '')
-        .trim();
-  }
-
   @override
   void dispose() {
+    LanguageService.currentLanguage.removeListener(_onLanguageChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -183,7 +181,6 @@ class _MainScreenState extends State<MainScreen> {
         _selectedStoreId = targetStoreId;
       }
       final records = await ApiService.getRecords(storeId: targetStoreId);
-      final delalaEntries = await ApiService.getDelalaEntries(targetStoreId);
       final inventoryProducts = await ApiService.getInventoryProducts(
         storeId: targetStoreId,
       );
@@ -191,7 +188,6 @@ class _MainScreenState extends State<MainScreen> {
         setState(() {
           _stores = stores;
           _records = records;
-          _delalaEntries = delalaEntries;
           _inventoryProducts = inventoryProducts;
           _isLoading = false;
         });
@@ -218,14 +214,12 @@ class _MainScreenState extends State<MainScreen> {
         _selectedStoreId = targetStoreId;
       }
       final records = await ApiService.getRecords(storeId: targetStoreId);
-      final delalaEntries = await ApiService.getDelalaEntries(targetStoreId);
       final inventoryProducts = await ApiService.getInventoryProducts(
         storeId: targetStoreId,
       );
       if (mounted) {
         setState(() {
           _records = records;
-          _delalaEntries = delalaEntries;
           _inventoryProducts = inventoryProducts;
           _errorMessage = null;
         });
@@ -424,6 +418,56 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  Future<void> _openAddAuditEntry(LedgerRecord record) async {
+    final result = await showDialog<LedgerRecord>(
+      context: context,
+      builder: (ctx) => RecordFormDialog(
+        activeTab: record.type,
+        existingRecords: _records,
+        initialPartyName: record.title,
+        storeId: record.storeId ??
+            (_selectedStoreId == 'all' ? null : _selectedStoreId),
+      ),
+    );
+
+    if (result != null) {
+      try {
+        final existingIdx = _records.indexWhere((r) => r.id == record.id);
+        if (existingIdx >= 0) {
+          final existing = _records[existingIdx];
+          final updated = existing.copyWith(
+            items: [...existing.items, ...result.items],
+            notes: (result.notes != null && result.notes!.isNotEmpty)
+                ? result.notes
+                : existing.notes,
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          );
+          await ApiService.updateRecord(updated);
+          _reloadRecordsOnly();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isAmharic
+                    ? '"${record.title}" ላይ ማወራረጃ ተመዝግቧል'
+                    : 'Audit entry added for "${record.title}"',
+              ),
+              backgroundColor: const Color(0xFF16A34A),
+            ),
+          );
+        } else {
+          await ApiService.createRecord(result, storeId: result.storeId);
+          _reloadRecordsOnly();
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception:', ''))),
+        );
+      }
+    }
+  }
+
   void _showRecordActions(LedgerRecord record) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
@@ -483,6 +527,21 @@ class _MainScreenState extends State<MainScreen> {
               const Divider(height: 16),
               ListTile(
                 leading: const Icon(
+                  Icons.fact_check_outlined,
+                  color: Color(0xFF16A34A),
+                ),
+                title: Text(
+                  _isAmharic
+                      ? 'ማወራረጃ መዝግብ (ዕቃ / ብር)'
+                      : 'Add Audit Entry (Items / Money)',
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openAddAuditEntry(record);
+                },
+              ),
+              ListTile(
+                leading: const Icon(
                   Icons.table_chart_outlined,
                   color: Color(0xFF2563EB),
                 ),
@@ -521,147 +580,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _showProductActions(InventoryProduct prod) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final unitPrice = prod.unitPrice > 0 ? prod.unitPrice : prod.costPrice;
-    final totalVal = prod.currentQuantity * unitPrice;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            LanguageService.translateProduct(prod.productName),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Theme.of(context).colorScheme.onSurface,
-                              height: 1.25,
-                            ),
-                            softWrap: true,
-                          ),
-                          const SizedBox(height: 2),
-                          RichText(
-                            text: TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: _isAmharic
-                                      ? 'ድምር ዋጋ: '
-                                      : 'Stock Value: ',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark
-                                        ? const Color(0xFF94A3B8)
-                                        : const Color(0xFF64748B),
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: _isAmharic ? 'ብር ' : 'ETB ',
-                                  style: TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark
-                                        ? const Color(0xFF94A3B8)
-                                        : const Color(0xFF64748B),
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: _currencyFormat.format(totalVal),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 16),
-              ListTile(
-                leading: const Icon(Icons.history, color: Color(0xFF2563EB)),
-                title: Text(
-                  _isAmharic ? 'የዕቃ እንቅስቃሴ ታሪክ' : 'View Stock History',
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _openProductHistoryDialog(prod);
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.edit_outlined,
-                  color: Color(0xFF4059AA),
-                ),
-                title: Text(_isAmharic ? 'ምርቱን አስተካክል' : 'Edit Product'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _openEditProductDialog(prod);
-                },
-              ),
-              if (!widget.currentUser.isAdmin)
-                ListTile(
-                  leading: const Icon(
-                    Icons.swap_horiz,
-                    color: Color(0xFF0D9488),
-                  ),
-                  title: Text(_isAmharic ? 'ዕቃ ገቢ / ወጪ' : 'Stock In / Out'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _openStockTransactionDialog(prod);
-                  },
-                ),
-              if (widget.currentUser.isAdmin)
-                ListTile(
-                  leading: const Icon(
-                    Icons.delete_outline,
-                    color: Color(0xFFBA1A1A),
-                  ),
-                  title: Text(_isAmharic ? 'ምርቱን ሰርዝ' : 'Delete Product'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _deleteInventoryProduct(prod);
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _handleLogout() async {
     await ApiService.logout();
     if (!mounted) return;
@@ -670,1234 +588,311 @@ class _MainScreenState extends State<MainScreen> {
     ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
-  Widget _buildStatementSummary(ThemeData theme, bool isDark) {
-    final records = _filteredRecords;
-    double totalDebit = 0;
-    double totalCredit = 0;
-    for (final r in records) {
-      totalDebit += r.totalDebit;
-      totalCredit += r.totalCredit;
-    }
-
-    double netBalance = 0;
-    String balanceTitle = 'Total Receivables:';
-    String debitTitle = 'Total Debit (Invoiced)';
-    String creditTitle = 'Total Credit (Received)';
-
-    if (_currentTabType == 'customer') {
-      netBalance = totalDebit - totalCredit;
-      balanceTitle = 'Total Receivables:';
-      debitTitle = 'Total Debit (Invoiced)';
-      creditTitle = 'Total Credit (Received)';
-    } else if (_currentTabType == 'supplier') {
-      netBalance = totalCredit - totalDebit;
-      balanceTitle = 'Total Payables:';
-      debitTitle = 'Total Debit (Purchased)';
-      creditTitle = 'Total Credit (Paid)';
-    } else if (_currentTabType == 'delala') {
-      netBalance = totalDebit - totalCredit;
-      balanceTitle = 'Total Delala Balance:';
-      debitTitle = 'Total Debit (Commission/Goods)';
-      creditTitle = 'Total Credit (Settled)';
-    } else {
-      netBalance = records.fold(0.0, (sum, r) => sum + r.totalAmount);
-      balanceTitle = 'Total Inventory:';
-      debitTitle = 'Total Goods In';
-      creditTitle = 'Goods Out / Value Paid';
-    }
+  Widget _buildTopGridCard({
+    required bool isDark,
+    required String title,
+    required String mainValue,
+    required String subtitle,
+    String? currencyPrefix,
+  }) {
+    final textColor = isDark ? Colors.white : Colors.black;
+    final subColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+    final borderColor =
+        isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final bgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(14, 6, 14, 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1B2234) : Colors.white,
+        color: bgColor,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
-        ),
+        border: Border.all(color: borderColor, width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1.5),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Flexible(
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.table_view_outlined,
-                      size: 16,
-                      color: Color(0xFF2563EB),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'Statement Summary',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Wrap(
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 4,
-                  children: [
-                    Text(
-                      balanceTitle,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF64748B),
-                      ),
-                    ),
-                    RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: _isAmharic ? 'ብር ' : 'ETB ',
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? const Color(0xFF94A3B8)
-                                  : const Color(0xFF64748B),
-                            ),
-                          ),
-                          TextSpan(
-                            text: _currencyFormat.format(netBalance),
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'monospace',
-                              letterSpacing: -0.2,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 8),
-          Divider(
-            height: 1,
-            thickness: 0.8,
-            color: isDark ? const Color(0xFF2E384D) : const Color(0xFFDAE2FD),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          const SizedBox(height: 5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                if (currencyPrefix != null) ...[
                   Text(
-                    debitTitle,
+                    currencyPrefix,
                     style: TextStyle(
-                      fontSize: 10.5,
-                      color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                      color: subColor,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: _isAmharic ? 'ብር ' : 'ETB ',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF64748B),
-                          ),
-                        ),
-                        TextSpan(
-                          text: _currencyFormat.format(totalDebit),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'monospace',
-                            color: theme.colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const SizedBox(width: 2.5),
                 ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    creditTitle,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: _isAmharic ? 'ብር ' : 'ETB ',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF64748B),
-                          ),
-                        ),
-                        TextSpan(
-                          text: _currencyFormat.format(totalCredit),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'monospace',
-                            color: theme.colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _todayEthiopianText() {
-    final now = DateTime.now();
-    final d = now.day.toString().padLeft(2, '0');
-    final m = now.month.toString().padLeft(2, '0');
-    final y = now.year;
-    return '$d/$m/$y';
-  }
-
-  /// DELALA Spreadsheet View (Dedicated external broker ledger with signed totals & Ethiopian date input)
-  Widget _buildDelalaSpreadsheet(ThemeData theme, bool isDark) {
-    final gridBorderColor = isDark
-        ? const Color(0xFF2E384D)
-        : const Color(0xFFCBD5E1);
-
-    final filtered = _delalaEntries.where((e) {
-      if (_searchQuery.trim().isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        final matchName = e.delalaName.toLowerCase().contains(q);
-        final matchProduct = e.productName.toLowerCase().contains(q);
-        final matchDate = e.transactionDate.toLowerCase().contains(q);
-        if (!matchName && !matchProduct && !matchDate) return false;
-      }
-      return true;
-    }).toList();
-
-    double totalPositive = 0.0;
-    double totalNegative = 0.0;
-    double totalPieces = 0.0;
-    for (final e in filtered) {
-      totalPieces += e.pieces;
-      if (e.total >= 0) {
-        totalPositive += e.total;
-      } else {
-        totalNegative += e.total.abs();
-      }
-    }
-    final double finalBalance = totalPositive - totalNegative;
-
-    return Column(
-      children: [
-        // Spreadsheet Table (Full screen width, zero X-axis scrolling, rows given vertical height)
-        Expanded(
-          child: filtered.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.table_chart_outlined,
-                        size: 40,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _searchQuery.isNotEmpty
-                            ? (_isAmharic
-                                  ? '"$_searchQuery" ጋር የሚዛመድ የደላላ መዝገብ አልተገኘም'
-                                  : 'No Delala entries match "$_searchQuery"')
-                            : (_isAmharic
-                                  ? 'ምንም የደላላ መዝገብ አልተመዘገበም'
-                                  : 'No Delala entries recorded yet'),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        onPressed: () => _openDelalaEntryDialog(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        icon: const Icon(Icons.add, size: 16),
-                        label: Text(
-                          _isAmharic ? 'አዲስ መዝግብ' : 'Add First Entry',
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 90),
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: gridBorderColor, width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Spreadsheet Table Header Bar (Fits screen width - Zero X scrolling)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 9,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF172033)
-                                : const Color(0xFFF1F5F9),
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(11),
-                            ),
-                            border: Border(
-                              bottom: BorderSide(
-                                color: gridBorderColor,
-                                width: 1.2,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 28,
-                                child: Text(
-                                  _isAmharic ? 'ተ.ቁ' : '#',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 5,
-                                child: Text(
-                                  _isAmharic
-                                      ? 'ስም & የዕቃ ዓይነት'
-                                      : 'Name & Product',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 3,
-                                child: Text(
-                                  _isAmharic ? 'ዋጋ × ብዛት' : 'Price × Pcs',
-                                  textAlign: TextAlign.right,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 4,
-                                child: Text(
-                                  _isAmharic ? 'ድምር & እርምጃ' : 'Total & Action',
-                                  textAlign: TextAlign.right,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Spreadsheet Data Rows (Given comfortable vertical height, zero X scrolling)
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, index) => Divider(
-                            height: 1,
-                            thickness: 0.8,
-                            color: gridBorderColor,
-                          ),
-                          itemBuilder: (context, idx) {
-                            final row = filtered[idx];
-                            final isNeg = row.sign == -1;
-                            final rowBg = idx % 2 == 1
-                                ? (isDark
-                                      ? const Color(0xFF161F30)
-                                      : const Color(0xFFF8FAFC))
-                                : (isDark
-                                      ? const Color(0xFF1E293B)
-                                      : Colors.white);
-
-                            return Container(
-                              color: rowBg,
-                              constraints: const BoxConstraints(minHeight: 64),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  // Row # Badge
-                                  Container(
-                                    width: 26,
-                                    height: 26,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF242C40)
-                                          : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: gridBorderColor.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      '${idx + 1}',
-                                      style: TextStyle(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark
-                                            ? const Color(0xFF94A3B8)
-                                            : const Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-
-                                  // Name, Sign badge, and Product
-                                  Expanded(
-                                    flex: 5,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Flexible(
-                                              child: Text(
-                                                cleanDelalaName(row.delalaName),
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                  color: theme
-                                                      .colorScheme
-                                                      .onSurface,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 5),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 5,
-                                                    vertical: 1.5,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: isNeg
-                                                    ? const Color(0xFFFFE4E6)
-                                                    : const Color(0xFFD1FAE5),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                isNeg ? '-1' : '+1',
-                                                style: TextStyle(
-                                                  color: isNeg
-                                                      ? const Color(0xFFE11D48)
-                                                      : const Color(0xFF059669),
-                                                  fontWeight: FontWeight.w900,
-                                                  fontSize: 9.5,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          row.productName,
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.w500,
-                                            color: isDark
-                                                ? const Color(0xFFCBD5E1)
-                                                : const Color(0xFF334155),
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 1),
-                                        Text(
-                                          row.transactionDate,
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-
-                                  // Calculation: Unit Price × Pieces
-                                  Expanded(
-                                    flex: 3,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          _currencyFormat.format(row.unitPrice),
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.bold,
-                                            color: theme.colorScheme.onSurface,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 1),
-                                        Text(
-                                          '× ${row.pieces.toStringAsFixed(row.pieces.truncateToDouble() == row.pieces ? 0 : 2)} pcs',
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.grey,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-
-                                  // Total & Actions
-                                  Expanded(
-                                    flex: 4,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          '${row.total >= 0 ? '+' : ''}${_currencyFormat.format(row.total)} ETB',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 12.5,
-                                            color: isNeg
-                                                ? const Color(0xFF2563EB)
-                                                : const Color(0xFF059669),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons.edit_outlined,
-                                                size: 16,
-                                                color: Color(0xFF2563EB),
-                                              ),
-                                              tooltip: _isAmharic
-                                                  ? 'አርትዕ'
-                                                  : 'Edit entry',
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(
-                                                minWidth: 26,
-                                                minHeight: 26,
-                                              ),
-                                              onPressed: () =>
-                                                  _openDelalaEntryDialog(row),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons.delete_outline,
-                                                size: 16,
-                                                color: Color(0xFFE11D48),
-                                              ),
-                                              tooltip: _isAmharic
-                                                  ? 'አጥፋ'
-                                                  : 'Delete entry',
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(
-                                                minWidth: 26,
-                                                minHeight: 26,
-                                              ),
-                                              onPressed: () =>
-                                                  _deleteDelalaEntry(row),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-
-                        // Final Total Row (pinned at bottom of spreadsheet, zero X scrolling)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 11,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF131D31)
-                                : const Color(0xFFF1F5F9),
-                            borderRadius: const BorderRadius.vertical(
-                              bottom: Radius.circular(11),
-                            ),
-                            border: Border(
-                              top: BorderSide(
-                                color: gridBorderColor,
-                                width: 1.2,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _isAmharic ? 'ጠቅላላ ድምር' : 'Final Total',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 13,
-                                      color: theme.colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  Text(
-                                    _isAmharic
-                                        ? 'ጠቅላላ ፍሬ፦ ${totalPieces.toStringAsFixed(totalPieces.truncateToDouble() == totalPieces ? 0 : 2)} ፍሬ'
-                                        : 'Total Pieces: ${totalPieces.toStringAsFixed(totalPieces.truncateToDouble() == totalPieces ? 0 : 2)} pcs',
-                                    style: const TextStyle(
-                                      fontSize: 10.5,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                '${finalBalance >= 0 ? '+' : ''}${_currencyFormat.format(finalBalance)} ${_isAmharic ? "ብር" : "ETB"}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 15,
-                                  color: finalBalance < 0
-                                      ? const Color(0xFF2563EB)
-                                      : const Color(0xFF059669),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-
-  /// Open Add / Edit Delala Entry Dialog
-  Future<void> _openDelalaEntryDialog([DelalaEntry? existing]) async {
-    final nameCtrl = TextEditingController(
-      text: existing != null ? cleanDelalaName(existing.delalaName) : '',
-    );
-    final productCtrl = TextEditingController(
-      text: existing?.productName ?? '',
-    );
-    final priceCtrl = TextEditingController(
-      text: existing != null ? existing.unitPrice.toString() : '',
-    );
-    final piecesCtrl = TextEditingController(
-      text: existing != null ? existing.pieces.toString() : '',
-    );
-    int selectedSign = existing?.sign ?? 1;
-    final dateCtrl = TextEditingController(
-      text: existing?.transactionDate ?? _todayEthiopianText(),
-    );
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            final p = double.tryParse(priceCtrl.text.trim()) ?? 0.0;
-            final pcs = double.tryParse(piecesCtrl.text.trim()) ?? 0.0;
-            final total = double.parse(
-              (p * pcs * selectedSign).toStringAsFixed(2),
-            );
-
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              title: Row(
-                children: [
-                  const Icon(
-                    Icons.table_chart,
-                    color: Color(0xFF2563EB),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    existing == null
-                        ? (_isAmharic ? 'አዲስ መዝገብ' : 'New Entry')
-                        : (_isAmharic ? 'መዝገብ አርትዕ' : 'Edit Entry'),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: SizedBox(
-                  width: 360,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Name (No prefix)
-                      Text(
-                        _isAmharic ? '1. ስም *' : '1. Name *',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: nameCtrl,
-                        decoration: InputDecoration(
-                          hintText: _isAmharic ? 'ምሳሌ፡ አህመድ' : 'John Doe',
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Product
-                      Text(
-                        _isAmharic ? '2. የዕቃ ዓይነት *' : '2. Item / Product *',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: productCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'e.g. 12W Safari / 2.5 bmt',
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Price & Pieces
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _isAmharic
-                                      ? '3. ዋጋ (ብር) *'
-                                      : '3. Unit Price (ETB) *',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                TextField(
-                                  controller: priceCtrl,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                  onChanged: (_) => setDialogState(() {}),
-                                  decoration: InputDecoration(
-                                    hintText: '65',
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _isAmharic ? '4. ብዛት *' : '4. Pieces *',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                TextField(
-                                  controller: piecesCtrl,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                  onChanged: (_) => setDialogState(() {}),
-                                  decoration: InputDecoration(
-                                    hintText: '10',
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Sign Selector (+ / -)
-                      Text(
-                        _isAmharic ? '5. ምልክት *' : '5. Sign *',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: () =>
-                                  setDialogState(() => selectedSign = 1),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: selectedSign == 1
-                                      ? const Color(0xFF059669)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: selectedSign == 1
-                                        ? const Color(0xFF059669)
-                                        : Colors.grey.shade400,
-                                  ),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  _isAmharic ? '+ ተቀባይ (+)' : '+ Positive (+)',
-                                  style: TextStyle(
-                                    color: selectedSign == 1
-                                        ? Colors.white
-                                        : Colors.grey.shade700,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: InkWell(
-                              onTap: () =>
-                                  setDialogState(() => selectedSign = -1),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 9,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: selectedSign == -1
-                                      ? const Color(0xFFE11D48)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: selectedSign == -1
-                                        ? const Color(0xFFE11D48)
-                                        : Colors.grey.shade400,
-                                  ),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  _isAmharic ? '- ተከፋይ (-)' : '- Negative (-)',
-                                  style: TextStyle(
-                                    color: selectedSign == -1
-                                        ? Colors.white
-                                        : Colors.grey.shade700,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Live Total Calculation
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _isAmharic ? '6. ጠቅላላ ድምር:' : '6. Total:',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF334155),
-                              ),
-                            ),
-                            Text(
-                              '${total >= 0 ? '+' : ''}${_currencyFormat.format(total)} ${_isAmharic ? "ብር" : "ETB"}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                                color: total < 0
-                                    ? const Color(0xFF2563EB)
-                                    : total > 0
-                                    ? const Color(0xFF059669)
-                                    : const Color(0xFF334155),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Ethiopian Date Text Input
-                      Text(
-                        _isAmharic ? '7. ቀን *' : '7. Date *',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: dateCtrl,
-                        keyboardType: TextInputType.datetime,
-                        decoration: InputDecoration(
-                          hintText: 'e.g. 02/11/2026 or 24/02/2018',
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(_isAmharic ? 'ይቅር' : 'Cancel'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onPressed: () async {
-                    final name = cleanDelalaName(nameCtrl.text.trim());
-                    final prod = productCtrl.text.trim();
-                    final date = dateCtrl.text.trim();
-                    if (name.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            _isAmharic ? 'እባክዎ ስም ያስገቡ' : 'Please enter Name',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    if (prod.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            _isAmharic
-                                ? 'እባክዎ የዕቃ ዓይነት ያስገቡ'
-                                : 'Please enter Item/Product name',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    if (p <= 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            _isAmharic
-                                ? 'እባክዎ ትክክለኛ ዋጋ ያስገቡ'
-                                : 'Please enter valid unit price',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-                    if (pcs <= 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            _isAmharic
-                                ? 'እባክዎ ትክክለኛ ብዛት ያስገቡ'
-                                : 'Please enter valid pieces',
-                          ),
-                        ),
-                      );
-                      return;
-                    }
-
-                    Navigator.pop(ctx);
-                    try {
-                      if (existing != null) {
-                        await ApiService.updateDelalaEntry(
-                          id: existing.id,
-                          delalaName: name,
-                          productName: prod,
-                          unitPrice: p,
-                          pieces: pcs,
-                          sign: selectedSign,
-                          transactionDate: date,
-                          storeId: _selectedStoreId,
-                        );
-                      } else {
-                        await ApiService.createDelalaEntry(
-                          delalaName: name,
-                          productName: prod,
-                          unitPrice: p,
-                          pieces: pcs,
-                          sign: selectedSign,
-                          transactionDate: date,
-                          storeId: _selectedStoreId,
-                        );
-                      }
-                      await _reloadRecordsOnly();
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              existing == null
-                                  ? (_isAmharic
-                                        ? 'መዝገቡ ተመዝግቧል!'
-                                        : 'Entry saved successfully!')
-                                  : (_isAmharic
-                                        ? 'መዝገቡ ታድሷል!'
-                                        : 'Entry updated!'),
-                            ),
-                            backgroundColor: const Color(0xFF059669),
-                          ),
-                        );
-                      }
-                    } catch (err) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              err
-                                  .toString()
-                                  .replaceAll('Exception:', '')
-                                  .trim(),
-                            ),
-                            backgroundColor: const Color(0xFFBA1A1A),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  child: Text(
-                    existing == null
-                        ? (_isAmharic ? 'መዝግብ' : 'Save Entry')
-                        : (_isAmharic ? 'አድስ' : 'Update Entry'),
+                Text(
+                  mainValue,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'monospace',
+                    letterSpacing: -0.3,
+                    color: textColor,
                   ),
                 ),
               ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  /// Delete Delala Entry
-  Future<void> _deleteDelalaEntry(DelalaEntry entry) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          _isAmharic ? 'መዝገቡ ይጥፋ?' : 'Delete Entry?',
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          _isAmharic
-              ? 'እርግጠኛ ነዎት የ${entry.delalaName} - ${entry.productName} መዝገብ እንዲሰረዝ ይፈልጋሉ?'
-              : 'Are you sure you want to delete ${entry.delalaName} - ${entry.productName}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(_isAmharic ? 'ይቅር' : 'Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE11D48),
-              foregroundColor: Colors.white,
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(_isAmharic ? 'ሰርዝ' : 'Delete'),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: subColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
+  }
 
-    if (confirmed == true) {
-      try {
-        await ApiService.deleteDelalaEntry(entry.id);
-        await _reloadRecordsOnly();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Entry deleted'),
-              backgroundColor: Color(0xFF059669),
-            ),
-          );
-        }
-      } catch (err) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(err.toString().replaceAll('Exception:', '').trim()),
-              backgroundColor: const Color(0xFFBA1A1A),
-            ),
-          );
+  /// Classified Statement Summary Grid Cards (Customer, Supplier, Delala, and Store)
+  Widget _buildStatementSummary(ThemeData theme, bool isDark) {
+    Widget card1;
+    Widget card2;
+    Widget card3;
+
+    if (_currentTabType == 'customer') {
+      final records = _filteredRecords;
+      double totalDebit = 0;
+      double totalCredit = 0;
+      for (final r in records) {
+        totalDebit += r.totalDebit;
+        totalCredit += r.totalCredit;
+      }
+      final netBalance = totalDebit - totalCredit;
+
+      // Card 1: Invoiced
+      card1 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ሽያጭ' : 'Invoiced',
+        mainValue: _currencyFormat.format(totalDebit),
+        currencyPrefix: _isAmharic ? 'ብር' : 'ETB',
+        subtitle: _isAmharic ? 'ዴቢት' : 'Debit',
+      );
+
+      // Card 2: Received
+      card2 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ክፍያ' : 'Received',
+        mainValue: _currencyFormat.format(totalCredit),
+        currencyPrefix: _isAmharic ? 'ብር' : 'ETB',
+        subtitle: _isAmharic ? 'ክሬዲት' : 'Credit',
+      );
+
+      // Card 3: Balance
+      final isReceivable = netBalance > 0;
+      final isOverpaid = netBalance < 0;
+      card3 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ቀሪ' : 'Balance',
+        mainValue: _currencyFormat.format(netBalance.abs()),
+        currencyPrefix: _isAmharic ? 'ብር' : 'ETB',
+        subtitle: isReceivable
+            ? (_isAmharic ? 'ተሰብሳቢ' : 'Receivable')
+            : (isOverpaid
+                ? (_isAmharic ? 'ትርፍ' : 'Overpaid')
+                : (_isAmharic ? 'ተወራርዷል' : 'Settled')),
+      );
+    } else if (_currentTabType == 'supplier') {
+      final records = _filteredRecords;
+      double totalDebit = 0;
+      double totalCredit = 0;
+      for (final r in records) {
+        totalDebit += r.totalDebit;
+        totalCredit += r.totalCredit;
+      }
+      final netBalance = totalDebit - totalCredit;
+
+      // Card 1: Purchased
+      card1 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ግዢ' : 'Purchased',
+        mainValue: _currencyFormat.format(totalDebit),
+        currencyPrefix: _isAmharic ? 'ብር' : 'ETB',
+        subtitle: _isAmharic ? 'ዴቢት' : 'Debit',
+      );
+
+      // Card 2: Paid
+      card2 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ክፍያ' : 'Paid',
+        mainValue: _currencyFormat.format(totalCredit),
+        currencyPrefix: _isAmharic ? 'ብር' : 'ETB',
+        subtitle: _isAmharic ? 'ክሬዲት' : 'Credit',
+      );
+
+      // Card 3: Payables / Balance
+      final isPayable = netBalance > 0;
+      final isAdvance = netBalance < 0;
+      card3 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ዕዳ' : 'Payables',
+        mainValue: _currencyFormat.format(netBalance.abs()),
+        currencyPrefix: _isAmharic ? 'ብር' : 'ETB',
+        subtitle: isPayable
+            ? (_isAmharic ? 'ተከፋይ' : 'Payable')
+            : (isAdvance
+                ? (_isAmharic ? 'ቅድመ' : 'Advance')
+                : (_isAmharic ? 'ተወራርዷል' : 'Settled')),
+      );
+    } else if (_currentTabType == 'delala') {
+      final records = _filteredRecords;
+      double totalBorrowedPcs = 0;
+      double totalReturnedPcs = 0;
+      double totalBorrowedPrice = 0;
+      double totalSettledPrice = 0;
+      for (final r in records) {
+        for (final it in r.items) {
+          if (it.sign == '+') {
+            totalBorrowedPcs += it.quantity;
+            totalBorrowedPrice += it.subtotal;
+          } else {
+            final isItemReturn = it.packagingUnit != 'Payment' &&
+                (it.customType == 'Item Return' ||
+                    (it.quantity > 0 &&
+                        it.name.trim().toLowerCase() != 'payment'));
+            if (isItemReturn) {
+              totalReturnedPcs += it.quantity;
+              totalSettledPrice += it.subtotal;
+            } else {
+              totalSettledPrice += it.subtotal;
+            }
+          }
         }
       }
+      final remainingPcs = totalBorrowedPcs - totalReturnedPcs;
+      final netBalance = totalBorrowedPrice - totalSettledPrice;
+
+      // Card 1: Borrowed
+      card1 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ውሰት' : 'Borrowed',
+        mainValue: '${totalBorrowedPcs.toInt()} ${_isAmharic ? "ፍሬ" : "pcs"}',
+        subtitle:
+            '${_currencyFormat.format(totalBorrowedPrice)} ${_isAmharic ? "ብር" : "ETB"}',
+      );
+
+      // Card 2: Items / Remaining
+      card2 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ዕቃዎች' : 'Items',
+        mainValue: '${remainingPcs.toInt()} ${_isAmharic ? "ፍሬ" : "pcs"}',
+        subtitle: '-${totalReturnedPcs.toInt()} ${_isAmharic ? "መልስ" : "Ret"}',
+      );
+
+      // Card 3: Balance
+      card3 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ሂሳብ' : 'Balance',
+        mainValue: _currencyFormat.format(netBalance.abs()),
+        currencyPrefix: _isAmharic ? 'ብር' : 'ETB',
+        subtitle: netBalance > 0
+            ? (_isAmharic ? 'ተሰብሳቢ' : 'Receivable')
+            : (netBalance < 0
+                ? (_isAmharic ? 'ተከፋይ' : 'Payable')
+                : (_isAmharic ? 'ተወራርዷል' : 'Settled')),
+      );
+    } else {
+      // Store / Stock
+      double totalStoreValue = 0;
+      double totalPieces = 0;
+      for (final prod in _inventoryProducts) {
+        final pcs = prod.currentQuantity;
+        totalPieces += pcs;
+        totalStoreValue +=
+            (prod.totalValue > 0 ? prod.totalValue : pcs * prod.costPrice);
+      }
+
+      // Card 1: Valuation
+      card1 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ዋጋ' : 'Valuation',
+        mainValue: widget.currentUser.isAdmin
+            ? _currencyFormat.format(totalStoreValue)
+            : '•••',
+        currencyPrefix:
+            widget.currentUser.isAdmin ? (_isAmharic ? 'ብር' : 'ETB') : null,
+        subtitle: widget.currentUser.isAdmin
+            ? (_isAmharic ? 'ጠቅላላ' : 'Total')
+            : (_isAmharic ? 'አድሚን' : 'Admin'),
+      );
+
+      // Card 2: Products
+      card2 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ምርቶች' : 'Products',
+        mainValue:
+            '${_inventoryProducts.length} ${_isAmharic ? "ዓይነት" : "Items"}',
+        subtitle: _isAmharic ? 'ካታሎግ' : 'Catalog',
+      );
+
+      // Card 3: Stock
+      card3 = _buildTopGridCard(
+        isDark: isDark,
+        title: _isAmharic ? 'ክምችት' : 'Stock',
+        mainValue: '${totalPieces.toInt()} ${_isAmharic ? "ፍሬ" : "pcs"}',
+        subtitle: _isAmharic ? 'ያለ' : 'Available',
+      );
     }
+
+    if (_currentTabType == 'stock' && !widget.currentUser.isAdmin) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+        child: Row(
+          children: [
+            Expanded(child: card2),
+            const SizedBox(width: 8),
+            Expanded(child: card3),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+      child: Row(
+        children: [
+          Expanded(child: card1),
+          const SizedBox(width: 8),
+          Expanded(child: card2),
+          const SizedBox(width: 8),
+          Expanded(child: card3),
+        ],
+      ),
+    );
   }
 
   /* ------------------- Advanced Store Inventory Methods ------------------- */
@@ -2254,42 +1249,42 @@ class _MainScreenState extends State<MainScreen> {
           if (widget.currentUser.isAdmin)
             _buildStoreAdminSummary(theme, isDark),
 
-          // 2. Available Store Items Header Bar (Occupies space naturally below search)
-          Container(
-            margin: const EdgeInsets.fromLTRB(14, 2, 14, 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF242C40) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: gridBorderColor, width: 1.0),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _isAmharic ? 'በመደብር ውስጥ ያሉ ዕቃዎች' : 'Available Store Items',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12.5,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _isAmharic
-                          ? '${filteredProducts.length} ዕቃዎች'
-                          : '${filteredProducts.length} Products',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isDark
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF64748B),
-                      ),
+          // 2. Available Store Items Header Bar (Admin only - removed for Storekeeper)
+          if (widget.currentUser.isAdmin) ...[
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 2, 14, 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF242C40) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(color: gridBorderColor, width: 1.0),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _isAmharic ? 'በመደብር ውስጥ ያሉ ዕቃዎች' : 'Available Store Items',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12.5,
+                      color: theme.colorScheme.onSurface,
                     ),
-                    if (!widget.currentUser.isAdmin) ...[
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _isAmharic
+                            ? '${filteredProducts.length} ዕቃዎች'
+                            : '${filteredProducts.length} Products',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       InkWell(
                         onTap: _openNewProductDialog,
@@ -2325,12 +1320,12 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                       ),
                     ],
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
+            const SizedBox(height: 6),
+          ],
 
           // 3. Products List or Empty State
           if (filteredProducts.isEmpty)
@@ -2367,7 +1362,7 @@ class _MainScreenState extends State<MainScreen> {
                           : const Color(0xFF64748B),
                     ),
                   ),
-                  if (!widget.currentUser.isAdmin) ...[
+                  if (widget.currentUser.isAdmin) ...[
                     const SizedBox(height: 10),
                     TextButton.icon(
                       onPressed: _openNewProductDialog,
@@ -2397,154 +1392,9 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Store Summary Component for Admin: Totals Product Have and All Prices
+  /// Store Summary Component for Admin (Handled at top via _buildStatementSummary)
   Widget _buildStoreAdminSummary(ThemeData theme, bool isDark) {
-    if (!widget.currentUser.isAdmin) {
-      return const SizedBox.shrink();
-    }
-
-    final gridBorderColor = isDark
-        ? const Color(0xFF2E384D)
-        : const Color(0xFFCBD5E1);
-
-    final totalProductCount = _inventoryProducts.length;
-    final totalPieces = _inventoryProducts.fold<double>(
-      0.0,
-      (sum, p) => sum + p.currentQuantity,
-    );
-    final totalCartons = _inventoryProducts.fold<double>(0.0, (sum, p) {
-      final pcsPerCarton = p.quantityPerCarton > 0
-          ? p.quantityPerCarton
-          : p.pcsPerCarton;
-      final cartons = p.quantityCartons > 0
-          ? p.quantityCartons
-          : (pcsPerCarton > 0 ? p.currentQuantity / pcsPerCarton : 0);
-      return sum + cartons;
-    });
-    final totalValuation = _inventoryProducts.fold<double>(0.0, (sum, p) {
-      final price = p.unitPrice > 0 ? p.unitPrice : p.costPrice;
-      return sum + (p.currentQuantity * price);
-    });
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 2, 14, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E2638) : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: gridBorderColor, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Total Products (totals product have)
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _isAmharic ? 'ያሉ ምርቶች ጠቅላላ' : 'TOTAL ITEMS',
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                    color: isDark
-                        ? const Color(0xFF94A3B8)
-                        : const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '$totalProductCount ',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                      ),
-                      TextSpan(
-                        text: _isAmharic
-                            ? "እቃ  · ${NumberFormat('#,##0.##').format(totalCartons)} ካርቶን  · ${NumberFormat('#,##0.##').format(totalPieces)} ፍሬ"
-                            : "items · ${NumberFormat('#,##0.##').format(totalCartons)} cartons · ${NumberFormat('#,##0.##').format(totalPieces)} pcs",
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 36,
-            color: gridBorderColor,
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-          ),
-          // Total Stock Value (all prices) with reduced Birr text
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _isAmharic ? 'ጠቅላላ የዕቃዎች ዋጋ' : 'TOTAL STOCK VALUE',
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                    color: isDark
-                        ? const Color(0xFF94A3B8)
-                        : const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: _isAmharic ? 'ብር ' : 'ETB ',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
-                        ),
-                      ),
-                      TextSpan(
-                        text: _currencyFormat.format(totalValuation),
-                        style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'monospace',
-                          color: Color(0xFF2563EB),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return const SizedBox.shrink();
   }
 
   /// Product Table card identical to Customer & Supplier table style
@@ -2607,7 +1457,7 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                   const SizedBox(width: 4),
 
-                  // Product Name & SKU / Category
+                  // Product name & category
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2622,88 +1472,72 @@ class _MainScreenState extends State<MainScreen> {
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 1.5),
-                        Text(
-                          '${prod.sku != null && prod.sku!.isNotEmpty ? "${prod.sku} · " : ""}${prod.category}${prod.isOutOfStock ? " · ${_isAmharic ? 'አልቋል' : 'Out of Stock'}" : ""}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: prod.isOutOfStock
-                                ? const Color(0xFFDC2626)
-                                : (isDark
-                                      ? const Color(0xFF94A3B8)
-                                      : const Color(0xFF64748B)),
-                            fontWeight: prod.isOutOfStock
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                        if (prod.isOutOfStock) ...[
+                          const SizedBox(height: 1.5),
+                          Text(
+                            _isAmharic ? 'አልቋል' : 'Out of Stock',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFFDC2626),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        ],
                       ],
                     ),
                   ),
                   const SizedBox(width: 6),
 
-                  // Total Value with reduced Birr / ETB size
+                  // Total Value (for admin) or Stock Pieces (for storekeeper)
                   RichText(
                     textAlign: TextAlign.end,
                     text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: _isAmharic ? 'ብር ' : 'ETB ',
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF64748B),
-                          ),
-                        ),
-                        TextSpan(
-                          text: _currencyFormat.format(totalVal),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            fontFamily: 'monospace',
-                            color: theme.colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
+                      children: widget.currentUser.isAdmin
+                          ? [
+                              TextSpan(
+                                text: _isAmharic ? 'ብር ' : 'ETB ',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                              TextSpan(
+                                text: _currencyFormat.format(totalVal),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  fontFamily: 'monospace',
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                            ]
+                          : [
+                              TextSpan(
+                                text: '${prod.currentQuantity.toInt()} ',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  fontFamily: 'monospace',
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              TextSpan(
+                                text: _isAmharic ? 'ፍሬ' : 'pcs',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                     ),
-                  ),
-
-                  // Eye icon (on straight level)
-                  const SizedBox(width: 4),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.visibility_outlined,
-                      size: 18,
-                      color: Color(0xFF2563EB),
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 26,
-                      minHeight: 26,
-                    ),
-                    splashRadius: 16,
-                    tooltip: _isAmharic
-                        ? 'የዕቃ እንቅስቃሴ ታሪክ'
-                        : 'View Stock History',
-                    onPressed: () => _openProductHistoryDialog(prod),
-                  ),
-
-                  // 3-dot menu icon (on straight level)
-                  const SizedBox(width: 2),
-                  IconButton(
-                    icon: const Icon(Icons.more_vert, size: 18),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 26,
-                      minHeight: 26,
-                    ),
-                    splashRadius: 16,
-                    tooltip: _isAmharic ? 'ተጨማሪ' : 'Actions',
-                    onPressed: () => _showProductActions(prod),
                   ),
                 ],
               ),
@@ -2724,7 +1558,7 @@ class _MainScreenState extends State<MainScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Table Header Row: # | ካርቶን | በካርቶን | ተርፍ | ጠቅላላ ፍሬ | የአንዱ ዋጋ | ድምር
+                    // Table Header Row: # | Carton | Pcs/Ctn | Total Pcs | Unit Price | Total Value
                     Container(
                       padding: const EdgeInsets.symmetric(
                         vertical: 8,
@@ -2765,7 +1599,7 @@ class _MainScreenState extends State<MainScreen> {
                           Expanded(
                             flex: 6,
                             child: Text(
-                              _isAmharic ? 'ካርቶን' : 'Carton',
+                              _isAmharic ? 'ካርቶን' : 'Ctn',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 10.5,
@@ -2784,26 +1618,7 @@ class _MainScreenState extends State<MainScreen> {
                           Expanded(
                             flex: 6,
                             child: Text(
-                              _isAmharic ? 'በካርቶን' : 'Pcs/Ctn',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: isDark
-                                    ? const Color(0xFFCBD5E1)
-                                    : const Color(0xFF334155),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            width: 1,
-                            height: 16,
-                            color: gridBorderColor,
-                          ),
-                          Expanded(
-                            flex: 5,
-                            child: Text(
-                              _isAmharic ? 'ተርፍ' : 'Loose',
+                              _isAmharic ? 'በካርቶን' : 'Pcs',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 10.5,
@@ -2822,7 +1637,7 @@ class _MainScreenState extends State<MainScreen> {
                           Expanded(
                             flex: 8,
                             child: Text(
-                              _isAmharic ? 'ጠቅላላ ፍሬ' : 'Total Pcs',
+                              _isAmharic ? 'ጠቅላላ' : 'Total',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 10.5,
@@ -2845,7 +1660,7 @@ class _MainScreenState extends State<MainScreen> {
                                 horizontal: 4,
                               ),
                               child: Text(
-                                _isAmharic ? 'የአንዱ ዋጋ' : 'Unit Price',
+                                _isAmharic ? 'ዋጋ' : 'Price',
                                 textAlign: TextAlign.right,
                                 style: TextStyle(
                                   fontSize: 10.5,
@@ -2869,7 +1684,7 @@ class _MainScreenState extends State<MainScreen> {
                                 horizontal: 4,
                               ),
                               child: Text(
-                                _isAmharic ? 'ድምር ዋጋ' : 'Total Value',
+                                _isAmharic ? 'ድምር' : 'Value',
                                 textAlign: TextAlign.right,
                                 style: TextStyle(
                                   fontSize: 10.5,
@@ -2948,26 +1763,6 @@ class _MainScreenState extends State<MainScreen> {
                             flex: 6,
                             child: Text(
                               '${prod.pcsPerCarton.toInt()}',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                fontFamily: 'monospace',
-                                color: theme.colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            width: 1,
-                            height: 22,
-                            color: gridBorderColor,
-                          ),
-
-                          // ተርፍ
-                          Expanded(
-                            flex: 5,
-                            child: Text(
-                              '${prod.loosePieces}',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 11,
@@ -3124,7 +1919,7 @@ class _MainScreenState extends State<MainScreen> {
               ),
               child: Row(
                 children: [
-                  // Edit Product button
+                  // Edit Product button (available for both Admin and Storekeeper)
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => _openEditProductDialog(prod),
@@ -3218,21 +2013,32 @@ class _MainScreenState extends State<MainScreen> {
                   // Delete button (admin only)
                   if (widget.currentUser.isAdmin) ...[
                     const SizedBox(width: 6),
-                    OutlinedButton(
-                      onPressed: () => _deleteInventoryProduct(prod),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFBA1A1A),
-                        side: BorderSide(color: gridBorderColor),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _deleteInventoryProduct(prod),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                          side: BorderSide(
+                            color: const Color(0xFFDC2626).withValues(alpha: 0.5),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 4,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
-                        minimumSize: const Size(36, 32),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
+                        icon: const Icon(Icons.delete_outline, size: 14),
+                        label: Text(
+                          _isAmharic ? 'ሰርዝ' : 'Delete',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      child: const Icon(Icons.delete_outline, size: 16),
                     ),
                   ],
                 ],
@@ -3373,10 +2179,12 @@ class _MainScreenState extends State<MainScreen> {
                       rec.type == 'delala') ...[
                     const SizedBox(width: 4),
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.visibility_outlined,
                         size: 18,
-                        color: Color(0xFF2563EB),
+                        color: rec.type == 'delala'
+                            ? (isDark ? Colors.white70 : Colors.black87)
+                            : const Color(0xFF2563EB),
                       ),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
@@ -3571,7 +2379,14 @@ class _MainScreenState extends State<MainScreen> {
                       final pcs = item.pcsPerCarton ?? 0;
                       final unit =
                           item.packagingUnit ?? (ctns > 0 ? 'Carton' : 'Pcs');
-                      final isPayment = item.sign == '-';
+                      final isItemReturn = item.sign == '-' &&
+                          item.packagingUnit != 'Payment' &&
+                          (item.customType == 'Item Return' ||
+                              item.customType == 'Return' ||
+                              (item.bank == null &&
+                                  item.quantity > 0 &&
+                                  !item.name.toLowerCase().startsWith('payment')));
+                      final isPayment = item.sign == '-' && !isItemReturn;
                       final packDetail = isPayment
                           ? (bank != null && bank.isNotEmpty
                                 ? 'Bank: $bank'
@@ -3583,6 +2398,12 @@ class _MainScreenState extends State<MainScreen> {
                                       : (item.quantity > 0 && unit != 'Pcs'
                                             ? '${item.quantity.toInt()} $unit'
                                             : null)));
+
+                      final displayName = (rec.type == 'delala' && isPayment && (item.name.toLowerCase().contains('payment') || item.name.isEmpty))
+                          ? (_isAmharic ? 'የብር ክፍያ' : 'Payment')
+                          : (rec.type == 'delala' && item.sign == '+' && bank != null && bank.isNotEmpty && (item.name.toLowerCase().contains('payment') || item.name.toLowerCase().contains('cash') || item.name.isEmpty))
+                              ? (_isAmharic ? 'የብር ውሰት' : 'Cash Borrow')
+                              : item.name;
 
                       return Container(
                         padding: const EdgeInsets.symmetric(
@@ -3639,21 +2460,28 @@ class _MainScreenState extends State<MainScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      item.name,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: theme.colorScheme.onSurface,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            displayName,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: theme.colorScheme.onSurface,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     Builder(
                                       builder: (context) {
                                         final subDetails = <String>[];
-                                        if (packDetail != null &&
-                                            packDetail.isNotEmpty) {
+                                        if (rec.type == 'delala' && bank != null && bank.isNotEmpty) {
+                                          subDetails.add(_isAmharic ? 'ባንክ፦ $bank' : 'Bank: $bank');
+                                        } else if (packDetail != null && packDetail.isNotEmpty) {
                                           subDetails.add(packDetail);
                                         }
                                         if (item.date != null &&
@@ -3728,8 +2556,14 @@ class _MainScreenState extends State<MainScreen> {
                                 ),
                                 child: Text(
                                   item.sign == '-'
-                                      ? '-${item.quantity.toInt()}'
-                                      : '${item.quantity.toInt()}',
+                                      ? (isItemReturn
+                                          ? '-${item.quantity.toInt()}'
+                                          : '-')
+                                      : (rec.type == 'delala'
+                                          ? (bank != null && bank.isNotEmpty && ctns == 0
+                                              ? '-'
+                                              : '+${item.quantity.toInt()}')
+                                          : '${item.quantity.toInt()}'),
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 11,
@@ -3756,7 +2590,9 @@ class _MainScreenState extends State<MainScreen> {
                                 child: Text(
                                   item.sign == '-'
                                       ? '-${_currencyFormat.format(subtotal)}'
-                                      : _currencyFormat.format(subtotal),
+                                      : (rec.type == 'delala'
+                                          ? '+${_currencyFormat.format(subtotal)}'
+                                          : _currencyFormat.format(subtotal)),
                                   textAlign: TextAlign.right,
                                   style: TextStyle(
                                     fontSize: 11.5,
@@ -3832,11 +2668,15 @@ class _MainScreenState extends State<MainScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        rec.type == 'supplier'
-                            ? (_isAmharic
-                                  ? 'ግዢ (ክሬዲት +)'
-                                  : 'Purchase (Credit +)')
-                            : (_isAmharic ? 'ዕቃ (ዴቢት +)' : 'Goods (Debit +)'),
+                        rec.type == 'delala'
+                            ? (_isAmharic ? 'ውሰት (+)' : 'Borrowed (+)')
+                            : (rec.type == 'supplier'
+                                  ? (_isAmharic
+                                        ? 'ግዢ (ክሬዲት +)'
+                                        : 'Purchase (Credit +)')
+                                  : (_isAmharic
+                                        ? 'ዕቃ (ዴቢት +)'
+                                        : 'Goods (Debit +)')),
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
@@ -3877,11 +2717,17 @@ class _MainScreenState extends State<MainScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        rec.type == 'supplier'
-                            ? (_isAmharic ? 'ክፍያ (ዴቢት -)' : 'Payment (Debit -)')
-                            : (_isAmharic
-                                  ? 'ክፍያ (ክሬዲት -)'
-                                  : 'Payment (Credit -)'),
+                        rec.type == 'delala'
+                            ? (_isAmharic
+                                  ? 'መልስ / ክፍያ (-)'
+                                  : 'Returned / Paid (-)')
+                            : (rec.type == 'supplier'
+                                  ? (_isAmharic
+                                        ? 'ክፍያ (ዴቢት -)'
+                                        : 'Payment (Debit -)')
+                                  : (_isAmharic
+                                        ? 'ክፍያ (ክሬዲት -)'
+                                        : 'Payment (Credit -)')),
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
@@ -3922,7 +2768,9 @@ class _MainScreenState extends State<MainScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        _isAmharic ? 'ቀሪ ዕዳ' : 'Outstanding Balance',
+                        rec.type == 'delala'
+                            ? (_isAmharic ? 'ቀሪ ሂሳብ' : 'Net Balance')
+                            : (_isAmharic ? 'ቀሪ ዕዳ' : 'Outstanding Balance'),
                         style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 11.5,
@@ -4244,18 +3092,13 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
 
-                  // Stitch Statement Summary Card (for Customer/Supplier only)
-                  if (_currentTabIndex != 3 && _currentTabIndex != 2)
-                    _buildStatementSummary(theme, isDark),
+                  // Statement Summary Card (for Customer, Supplier, Delala, and Store)
+                  _buildStatementSummary(theme, isDark),
 
-                  // Store summary card removed per requirements
-
-                  // Content view: Store Inventory on Hand for Stock; Delala Ledger for Delala; Excel Ledgers for Parties
+                  // Content view: Store Inventory on Hand for Stock; Excel Ledgers for Parties & Delala
                   Expanded(
                     child: _currentTabIndex == 3
                         ? _buildStockInventorySheet(theme, isDark)
-                        : _currentTabIndex == 2
-                        ? _buildDelalaSpreadsheet(theme, isDark)
                         : (records.isEmpty
                               ? (_errorMessage != null
                                     ? Center(
@@ -4368,7 +3211,7 @@ class _MainScreenState extends State<MainScreen> {
           (_currentTabIndex == 3 && widget.currentUser.isAdmin)
           ? null
           : FloatingActionButton.extended(
-              backgroundColor: const Color(0xFF2563EB), // Primary Blue
+              backgroundColor: const Color(0xFF2563EB),
               foregroundColor: Colors.white,
               elevation: 3,
               shape: RoundedRectangleBorder(
@@ -4379,7 +3222,7 @@ class _MainScreenState extends State<MainScreen> {
                 _currentTabIndex == 3
                     ? (_isAmharic ? 'የመደብር መዝገብ' : 'Store Entry')
                     : _currentTabIndex == 2
-                    ? (_isAmharic ? 'የደላላ መዝገብ' : 'Broker Entry')
+                    ? (_isAmharic ? 'የደላላ መዝገብ' : 'Delala Entry')
                     : _currentTabIndex == 1
                     ? (_isAmharic ? 'የአቅራቢ መዝገብ' : 'Supplier Entry')
                     : (_isAmharic ? 'የደንበኛ መዝገብ' : 'Customer Entry'),
@@ -4390,8 +3233,6 @@ class _MainScreenState extends State<MainScreen> {
               ),
               onPressed: _currentTabIndex == 3
                   ? () => _openStockTransactionDialog()
-                  : _currentTabIndex == 2
-                  ? () => _openDelalaEntryDialog()
                   : _openCreateRecordDialog,
             ),
     );

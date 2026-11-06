@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:et_date_picker/et_date_picker.dart';
 
 import '../models/user.dart';
 import '../models/inventory_product.dart';
@@ -35,7 +36,7 @@ class _NewProductDialogState extends State<NewProductDialog> {
   Timer? _autocompleteTimer;
   List<InventoryProduct> _suggestions = [];
   DateTime _selectedDate = DateTime.now();
-  String _calendarMode = 'gregorian';
+  final String _calendarMode = 'ethiopian';
 
   bool _isSaving = false;
   String? _errorMessage;
@@ -142,13 +143,18 @@ class _NewProductDialogState extends State<NewProductDialog> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final result = await showEthiopianDatePickerDialog(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      showSelectedDatePreview: true,
+      useEthiopicNumerals: widget.isAmharic,
+      cancelText: widget.isAmharic ? 'ሰርዝ' : 'Cancel',
+      confirmText: widget.isAmharic ? 'ይሁን' : 'OK',
     );
-    if (picked != null) {
+    if (result != null) {
+      final picked = result.gregorianDate;
       setState(() {
         _selectedDate = picked;
         _dateController.text =
@@ -542,23 +548,6 @@ class _NewProductDialogState extends State<NewProductDialog> {
                   const SizedBox(height: 12),
 
                   // 5. Date
-                  SegmentedButton<String>(
-                    segments: [
-                      ButtonSegment(
-                        value: 'gregorian',
-                        label: Text(widget.isAmharic ? 'ግሪጎሪያን' : 'Gregorian'),
-                      ),
-                      ButtonSegment(
-                        value: 'ethiopian',
-                        label: Text(widget.isAmharic ? 'ኢትዮጵያዊ' : 'Ethiopian'),
-                      ),
-                    ],
-                    selected: {_calendarMode},
-                    onSelectionChanged: (values) {
-                      setState(() => _calendarMode = values.first);
-                    },
-                  ),
-                  const SizedBox(height: 8),
                   InkWell(
                     onTap: _pickDate,
                     borderRadius: BorderRadius.circular(8),

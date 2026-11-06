@@ -53,13 +53,6 @@ class StockMovement {
     return (quantity / conversionFactor).floor();
   }
 
-  int get loosePieces {
-    if (conversionFactor <= 0) return quantity.toInt();
-    final ctnPcs = (cartons * conversionFactor).round();
-    final rem = (quantity - ctnPcs).round();
-    return rem > 0 ? rem : 0;
-  }
-
   factory StockMovement.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic val) {
       if (val == null) return null;
@@ -101,4 +94,3 @@ class StockMovement {
     );
   }
 }
-

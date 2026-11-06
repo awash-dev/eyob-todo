@@ -1166,10 +1166,18 @@ class NeonDatabaseService {
   static Future<List<DelalaEntry>> getDelalaEntriesDirect([
     String? storeId,
   ]) async {
+    await executeSql(
+      "ALTER TABLE delala_entries ADD COLUMN IF NOT EXISTS operation_type VARCHAR(20) DEFAULT 'item_cash'",
+      null,
+    );
+    await executeSql(
+      'ALTER TABLE delala_entries ADD COLUMN IF NOT EXISTS notes TEXT',
+      null,
+    );
     final query = (storeId != null && storeId.isNotEmpty && storeId != 'all')
-        ? 'SELECT id, delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id, created_at, updated_at '
+        ? 'SELECT id, delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id, created_at, updated_at, operation_type, notes '
               'FROM delala_entries WHERE store_id = \$1 OR store_id IS NULL ORDER BY created_at ASC'
-        : 'SELECT id, delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id, created_at, updated_at '
+        : 'SELECT id, delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id, created_at, updated_at, operation_type, notes '
               'FROM delala_entries ORDER BY created_at ASC';
 
     final params = (storeId != null && storeId.isNotEmpty && storeId != 'all')
@@ -1195,22 +1203,123 @@ class NeonDatabaseService {
     required int sign,
     required String transactionDate,
     String? storeId,
+    String operationType = 'item_cash',
+    String? notes,
   }) async {
-    final cleanName = cleanDelalaName(delalaName).isEmpty
+    await executeSql(
+      "ALTER TABLE delala_entries ADD COLUMN IF NOT EXISTS operation_type VARCHAR(20) DEFAULT 'item_cash'",
+      null,
+    );
+    await executeSql(
+      'ALTER TABLE delala_entries ADD COLUMN IF NOT EXISTS notes TEXT',
+      null,
+    );
+    final enteredName = cleanDelalaName(delalaName).isEmpty
         ? 'Mohammed'
         : cleanDelalaName(delalaName);
-    final cleanProduct = productName.trim().isEmpty
-        ? 'Item'
-        : productName.trim();
+    final existingNames = await executeSql(
+      'SELECT delala_name FROM delala_entries '
+      'WHERE LOWER(TRIM(delala_name)) = LOWER(TRIM(\$1)) '
+      'ORDER BY created_at ASC LIMIT 1',
+      [enteredName],
+    );
+    final cleanName = existingNames.isEmpty
+        ? enteredName
+        : cleanDelalaName(
+            existingNames.first['delala_name']?.toString() ?? enteredName,
+          );
+    final cleanProduct = operationType == 'birr_only' ? '' : productName.trim();
     final int finalSign = sign == -1 ? -1 : 1;
     final double calculatedTotal = double.parse(
-      (unitPrice * pieces * finalSign).toStringAsFixed(2),
+      ((operationType == 'birr_only'
+                  ? unitPrice
+                  : operationType == 'item_only'
+                  ? 0
+                  : unitPrice * pieces) *
+              finalSign)
+          .toStringAsFixed(2),
     );
+
+    final hasStore = storeId != null && storeId.isNotEmpty && storeId != 'all';
+    final existingDuplicates = await executeSql(
+      hasStore
+          ? 'SELECT id, pieces FROM delala_entries WHERE '
+            'LOWER(TRIM(delala_name)) = LOWER(TRIM(\$2)) '
+            'AND LOWER(TRIM(COALESCE(product_name, \'\'))) = LOWER(TRIM(\$3)) '
+            'AND unit_price = \$4 AND sign = \$5 '
+            'AND transaction_date = \$6 AND operation_type = \$7 '
+            'AND (store_id = \$1 OR store_id IS NULL) '
+            'ORDER BY created_at ASC LIMIT 1'
+          : 'SELECT id, pieces FROM delala_entries WHERE '
+            'LOWER(TRIM(delala_name)) = LOWER(TRIM(\$1)) '
+            'AND LOWER(TRIM(COALESCE(product_name, \'\'))) = LOWER(TRIM(\$2)) '
+            'AND unit_price = \$3 AND sign = \$4 '
+            'AND transaction_date = \$5 AND operation_type = \$6 '
+            'ORDER BY created_at ASC LIMIT 1',
+      hasStore
+          ? [
+              storeId,
+              cleanName,
+              cleanProduct,
+              unitPrice,
+              finalSign,
+              transactionDate.trim(),
+              operationType,
+            ]
+          : [
+              cleanName,
+              cleanProduct,
+              unitPrice,
+              finalSign,
+              transactionDate.trim(),
+              operationType,
+            ],
+    );
+    if (existingDuplicates.isNotEmpty) {
+      final duplicateId = existingDuplicates.first['id']?.toString();
+      final existingPieces =
+          (existingDuplicates.first['pieces'] is num
+              ? (existingDuplicates.first['pieces'] as num).toDouble()
+              : double.tryParse(
+                    existingDuplicates.first['pieces']?.toString() ?? '0',
+                  ) ??
+                  0);
+      final mergedPieces = existingPieces + pieces;
+      final mergedTotal = double.parse(
+        ((operationType == 'birr_only'
+                    ? unitPrice
+                    : operationType == 'item_only'
+                    ? 0
+                    : unitPrice * mergedPieces) *
+                finalSign)
+            .toStringAsFixed(2),
+      );
+      await executeSql(
+        'UPDATE delala_entries SET pieces = \$1, total = \$2, '
+        'delala_name = \$3, product_name = \$4, updated_at = CURRENT_TIMESTAMP '
+        'WHERE id = \$5',
+        [
+          mergedPieces,
+          mergedTotal,
+          cleanName,
+          cleanProduct,
+          duplicateId,
+        ],
+      );
+      final rows = await executeSql(
+        'SELECT * FROM delala_entries WHERE id = \$1',
+        [duplicateId],
+      );
+      return DelalaEntry.fromMap(
+        rows.isEmpty ? <String, dynamic>{} : Map<String, dynamic>.from(rows.first),
+      );
+    }
 
     final inserted = await executeSql(
       'INSERT INTO delala_entries ('
       'delala_name, product_name, unit_price, pieces, sign, total, transaction_date, store_id'
-      ') VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8) RETURNING *',
+      ', operation_type, notes'
+      ') VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10) RETURNING *',
       [
         cleanName,
         cleanProduct,
@@ -1220,6 +1329,8 @@ class NeonDatabaseService {
         calculatedTotal,
         transactionDate.trim(),
         storeId,
+        operationType,
+        notes?.trim(),
       ],
     );
 
@@ -1236,9 +1347,19 @@ class NeonDatabaseService {
     int? sign,
     String? transactionDate,
     String? storeId,
+    String? operationType,
+    String? notes,
   }) async {
+    await executeSql(
+      "ALTER TABLE delala_entries ADD COLUMN IF NOT EXISTS operation_type VARCHAR(20) DEFAULT 'item_cash'",
+      null,
+    );
+    await executeSql(
+      'ALTER TABLE delala_entries ADD COLUMN IF NOT EXISTS notes TEXT',
+      null,
+    );
     final existing = await executeSql(
-      'SELECT unit_price, pieces, sign FROM delala_entries WHERE id = \$1',
+      'SELECT unit_price, pieces, sign, operation_type FROM delala_entries WHERE id = \$1',
       [id],
     );
     if (existing.isEmpty) return;
@@ -1255,8 +1376,32 @@ class NeonDatabaseService {
     final int curSign =
         sign ?? (cur['sign'] is num ? (cur['sign'] as num).toInt() : 1);
     final int finalSign = curSign == -1 ? -1 : 1;
+    final String finalOperationType =
+        operationType ?? cur['operation_type']?.toString() ?? 'item_cash';
+    String? canonicalName = delalaName == null
+        ? null
+        : cleanDelalaName(delalaName);
+    if ((canonicalName ?? '').isNotEmpty) {
+      final existingNames = await executeSql(
+        'SELECT delala_name FROM delala_entries '
+        'WHERE LOWER(TRIM(delala_name)) = LOWER(TRIM(\$1)) '
+        'ORDER BY created_at ASC LIMIT 1',
+        [canonicalName],
+      );
+      if (existingNames.isNotEmpty) {
+        canonicalName = cleanDelalaName(
+          existingNames.first['delala_name']?.toString() ?? canonicalName!,
+        );
+      }
+    }
     final double finalTotal = double.parse(
-      (curPrice * curPieces * finalSign).toStringAsFixed(2),
+      ((finalOperationType == 'birr_only'
+                  ? curPrice
+                  : finalOperationType == 'item_only'
+                  ? 0
+                  : curPrice * curPieces) *
+              finalSign)
+          .toStringAsFixed(2),
     );
 
     await executeSql(
@@ -1268,16 +1413,20 @@ class NeonDatabaseService {
       'sign = COALESCE(\$5, sign), '
       'total = \$6, '
       'transaction_date = COALESCE(\$7, transaction_date), '
-      'store_id = COALESCE(\$8, store_id), '
-      'updated_at = CURRENT_TIMESTAMP WHERE id = \$9',
+      'operation_type = COALESCE(\$8, operation_type), '
+      'notes = COALESCE(\$9, notes), '
+      'store_id = COALESCE(\$10, store_id), '
+      'updated_at = CURRENT_TIMESTAMP WHERE id = \$11',
       [
-        delalaName != null ? cleanDelalaName(delalaName) : null,
+        canonicalName,
         productName?.trim(),
         unitPrice,
         pieces,
         finalSign,
         finalTotal,
         transactionDate?.trim(),
+        operationType,
+        notes?.trim(),
         storeId,
         id,
       ],

@@ -11,6 +11,9 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Menu,
+  ChevronDown,
+  ChevronRight,
+  Eye,
 } from 'lucide-react'
 import {
   getDelalaEntries,
@@ -58,6 +61,8 @@ export function DelalaSpreadsheet({
   const [productName, setProductName] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
   const [pieces, setPieces] = useState('')
+  const [cartons, setCartons] = useState('')
+  const [piecesPerCarton, setPiecesPerCarton] = useState('')
   const [sign, setSign] = useState<1 | -1>(1)
   const [transactionDate, setTransactionDate] = useState(getTodayEthiopianDatePlaceholder())
   const [formError, setFormError] = useState<string | null>(null)
@@ -65,6 +70,7 @@ export function DelalaSpreadsheet({
 
   // Delete confirm
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [expandedNames, setExpandedNames] = useState<Set<string>>(new Set())
 
   const loadData = async () => {
     try {
@@ -115,10 +121,63 @@ export function DelalaSpreadsheet({
     })
   }, [entries, searchQuery, dateFilter])
 
+  const mergedEntries = useMemo(() => {
+    const merged = new Map<string, DelalaEntry>()
+    for (const entry of filteredEntries) {
+      const name = cleanDelalaName(entry.delalaName).trim()
+      const key = `${name.toLowerCase()}|${entry.productName.trim().toLowerCase()}`
+      const existing = merged.get(key)
+      if (!existing) {
+        merged.set(key, { ...entry, delalaName: name || entry.delalaName })
+        continue
+      }
+      const netPieces = existing.pieces * existing.sign + entry.pieces * entry.sign
+      const netTotal = existing.total + entry.total
+      const representative =
+        (entry.updatedAt || entry.createdAt || '') >=
+        (existing.updatedAt || existing.createdAt || '')
+          ? entry
+          : existing
+      merged.set(key, {
+        ...representative,
+        delalaName: name || representative.delalaName,
+        pieces: Math.abs(netPieces),
+        sign: (netTotal !== 0 ? netTotal : netPieces) >= 0 ? 1 : -1,
+        total: netTotal,
+      })
+    }
+    return Array.from(merged.values())
+  }, [filteredEntries])
+
+  const groupedEntries = useMemo(() => {
+    const grouped = new Map<string, DelalaEntry[]>()
+    for (const entry of filteredEntries) {
+      const name = cleanDelalaName(entry.delalaName).trim()
+      const key = (name || entry.delalaName).toLowerCase()
+      const displayName = name || entry.delalaName
+      if (!grouped.has(key)) grouped.set(key, [])
+      grouped.get(key)!.push({ ...entry, delalaName: displayName })
+    }
+    return Array.from(grouped.entries()).map(([key, rows]) => ({
+      key,
+      name: rows[0].delalaName,
+      rows: rows.sort((a, b) =>
+        (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''),
+      ),
+      total: rows.reduce((sum, row) => sum + row.total, 0),
+      date: rows[0].transactionDate,
+    }))
+  }, [filteredEntries])
+
   // Live total in modal
   const livePrice = parseFloat(unitPrice) || 0
-  const livePieces = parseFloat(pieces) || 0
+  const liveLoosePieces = parseFloat(pieces) || 0
+  const liveCartons = parseFloat(cartons) || 0
+  const livePiecesPerCarton = parseFloat(piecesPerCarton) || 1
+  const livePieces = liveCartons * livePiecesPerCarton + liveLoosePieces
   const liveTotal = parseFloat((livePrice * livePieces * sign).toFixed(2))
+  const nameSuggestions = Array.from(new Set(entries.map((entry) => cleanDelalaName(entry.delalaName)).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+  const productSuggestions = Array.from(new Set(entries.map((entry) => entry.productName.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b))
 
   const openAddModal = () => {
     setEditingEntry(null)
@@ -126,8 +185,10 @@ export function DelalaSpreadsheet({
     setProductName('')
     setUnitPrice('')
     setPieces('')
+    setCartons('')
+    setPiecesPerCarton('1')
     setSign(1)
-    setTransactionDate(getTodayEthiopianDatePlaceholder())
+    setTransactionDate(new Date().toISOString().split('T')[0])
     setFormError(null)
     setIsModalOpen(true)
   }
@@ -138,6 +199,8 @@ export function DelalaSpreadsheet({
     setProductName(entry.productName)
     setUnitPrice(entry.unitPrice.toString())
     setPieces(entry.pieces.toString())
+    setCartons('')
+    setPiecesPerCarton('1')
     setSign(entry.sign)
     setTransactionDate(entry.transactionDate)
     setFormError(null)
@@ -325,19 +388,6 @@ export function DelalaSpreadsheet({
       <div className="rounded-2xl bg-card ring-1 ring-zinc-950/5 dark:ring-white/5 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm border-collapse">
-            <thead>
-              <tr className="bg-zinc-100/80 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-muted-foreground font-semibold">
-                <th className="py-2.5 px-3 w-12 text-center">{t('No.', 'ተ.ቁ')}</th>
-                <th className="py-2.5 px-3">{t('Name', 'ስም')}</th>
-                <th className="py-2.5 px-3">{t('Product / Item', 'የዕቃው አይነት')}</th>
-                <th className="py-2.5 px-3 text-right">{t('Price', 'ዋጋ')}</th>
-                <th className="py-2.5 px-3 text-right">{t('Pieces', 'ብዛት')}</th>
-                <th className="py-2.5 px-3 text-center w-16">{t('Sign', 'ምልክት')}</th>
-                <th className="py-2.5 px-3 text-right">{t('Total ETB', 'ድምር')}</th>
-                <th className="py-2.5 px-3 text-center">{t('Date', 'ቀን')}</th>
-                <th className="py-2.5 px-3 text-center w-24">{t('Action', 'እርምጃ')}</th>
-              </tr>
-            </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {loading ? (
                 <tr>
@@ -350,7 +400,7 @@ export function DelalaSpreadsheet({
                     </div>
                   </td>
                 </tr>
-              ) : filteredEntries.length === 0 ? (
+              ) : mergedEntries.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-8 text-center text-muted-foreground">
                     {searchQuery || dateFilter
@@ -359,69 +409,66 @@ export function DelalaSpreadsheet({
                   </td>
                 </tr>
               ) : (
-                filteredEntries.map((row, idx) => {
-                  const isNegative = row.sign === -1
+                groupedEntries.map((group) => {
+                  const expanded = expandedNames.has(group.key)
                   return (
-                    <tr
-                      key={row.id}
-                      className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
-                    >
-                      <td className="py-2.5 px-3 text-center font-medium text-muted-foreground">
-                        {idx + 1}
-                      </td>
-                      <td className="py-2.5 px-3 font-semibold text-foreground">
-                        {cleanDelalaName(row.delalaName)}
-                      </td>
-                      <td className="py-2.5 px-3 text-muted-foreground">
-                        {row.productName}
-                      </td>
-                      <td className="py-2.5 px-3 text-right tabular-nums">
-                        {row.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-2.5 px-3 text-right tabular-nums font-medium">
-                        {row.pieces}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span
-                          className={`inline-flex items-center justify-center w-6 h-6 rounded-md font-bold text-xs ${
-                            isNegative
-                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
-                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                          }`}
-                        >
-                          {row.sign === -1 ? '-' : '+'}
-                        </span>
-                      </td>
-                      <td
-                        className={`py-2.5 px-3 text-right tabular-nums font-bold ${
-                          isNegative
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : 'text-emerald-600 dark:text-emerald-400'
-                        }`}
-                      >
-                        {row.total >= 0 ? '+' : ''}
-                        {row.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="py-2.5 px-3 text-center text-xs text-muted-foreground whitespace-nowrap">
-                        {row.transactionDate}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
+                    <tr key={group.key}>
+                      <td colSpan={9} className="p-2">
+                        <div className="rounded-xl border border-zinc-300 dark:border-zinc-700 bg-card overflow-hidden">
                           <button
-                            onClick={() => openEditModal(row)}
-                            className="p-1 rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 cursor-pointer"
-                            title="Edit entry"
+                            type="button"
+                            onClick={() => setExpandedNames((prev) => {
+                              const next = new Set(prev)
+                              if (next.has(group.key)) next.delete(group.key)
+                              else next.add(group.key)
+                              return next
+                            })}
+                            className="w-full px-3 py-3 flex items-center gap-3 text-left cursor-pointer"
                           >
-                            <Edit2 size={14} />
+                            {expanded
+                              ? <ChevronDown size={16} className="text-muted-foreground shrink-0" />
+                              : <ChevronRight size={16} className="text-muted-foreground shrink-0" />}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-bold text-foreground text-sm truncate">{group.name}</div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {group.date}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-extrabold text-black dark:text-white tabular-nums text-sm">
+                                {group.total < 0 ? '-' : 'ETB '}
+                                {Math.abs(group.total).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </span>
+                              <Eye size={16} className="text-blue-600" />
+                            </div>
                           </button>
-                          <button
-                            onClick={() => handleDelete(row.id)}
-                            disabled={deletingId === row.id}
-                            className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 cursor-pointer"
-                            title="Delete entry"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {expanded && (
+                            <div className="border-t border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-200 dark:divide-zinc-800">
+                              {group.rows.map((row) => (
+                                <div key={row.id} className="px-3 py-2.5 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 items-center">
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-foreground truncate">{row.productName || t('Birr only', 'ብር ብቻ')}</div>
+                                    <div className="text-xs text-muted-foreground">{row.transactionDate}</div>
+                                  </div>
+                                  <div className="text-right text-xs">
+                                    <div>{row.pieces.toLocaleString()} pcs</div>
+                                    <div className="font-bold tabular-nums">
+                                      {row.total >= 0 ? '+' : ''}
+                                      {row.total.toLocaleString(undefined, { minimumFractionDigits: 2 })} ETB
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => openEditModal(row)} className="p-1 text-muted-foreground hover:text-blue-600 cursor-pointer" title="Edit entry">
+                                      <Edit2 size={14} />
+                                    </button>
+                                    <button onClick={() => handleDelete(row.id)} disabled={deletingId === row.id} className="p-1 text-muted-foreground hover:text-rose-600 cursor-pointer" title="Delete entry">
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -429,33 +476,6 @@ export function DelalaSpreadsheet({
                 })
               )}
             </tbody>
-            {filteredEntries.length > 0 && (
-              <tfoot>
-                <tr className="bg-zinc-100/90 dark:bg-zinc-900 border-t-2 border-zinc-300 dark:border-zinc-700 font-black">
-                  <td colSpan={3} className="py-3 px-3 text-foreground font-extrabold text-right">
-                    ጠቅላላ ድምር (Final Total):
-                  </td>
-                  <td className="py-3 px-3"></td>
-                  <td className="py-3 px-3 text-right tabular-nums text-foreground">
-                    {filteredEntries.reduce((sum, r) => sum + r.pieces, 0).toLocaleString()}
-                  </td>
-                  <td className="py-3 px-3"></td>
-                  <td
-                    className={`py-3 px-3 text-right tabular-nums text-sm font-black ${
-                      finalBalance < 0
-                        ? 'text-blue-600 dark:text-blue-400'
-                        : finalBalance > 0
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-foreground'
-                    }`}
-                  >
-                    {finalBalance >= 0 ? '+' : ''}
-                    {finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETB
-                  </td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
       </div>
@@ -489,71 +509,70 @@ export function DelalaSpreadsheet({
             )}
 
             <form onSubmit={handleSave} className="space-y-3.5">
-              {/* Delala Name (No prefix) */}
+                            {/* Delala Name (No prefix) */}
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
                   {t('1. Name *', '1. ስም *')}
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={t('e.g. Ahmed', 'ምሳሌ፦ አህመድ')}
-                  value={delalaName}
-                  onChange={(e) => setDelalaName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <input type="text" required placeholder={t('e.g. Ahmed', 'ምሳሌ፦ አህመድ')} value={delalaName} list="delala-name-options"
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setDelalaName(value)
+                    const matches = entries.filter((entry) => cleanDelalaName(entry.delalaName).toLowerCase() === value.trim().toLowerCase())
+                    if (matches.length > 0) {
+                      const latest = [...matches].sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))[0]
+                      setDelalaName(cleanDelalaName(latest.delalaName))
+                      if (latest.productName) setProductName(latest.productName)
+                      setUnitPrice(latest.unitPrice.toString())
+                      setPieces(latest.pieces.toString())
+                    }
+                  }} className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                <datalist id="delala-name-options">
+                  {nameSuggestions.map((name) => <option key={name} value={name} />)}
+                </datalist>
               </div>
-
               {/* Item / Product */}
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
                   {t('2. Item / Product *', '2. የዕቃ ዓይነት *')}
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={t('e.g. 12W Safari / 2.5 bmt', 'ምሳሌ፦ 12W ሳፋሪ')}
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <input type="text" required placeholder={t('e.g. 12W Safari / 2.5 bmt', 'ምሳሌ፦ 12W ሳፋሪ')} value={productName} list="delala-product-options"
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setProductName(value)
+                    const person = delalaName.trim().toLowerCase()
+                    const matches = entries.filter((entry) => entry.productName.trim().toLowerCase() === value.trim().toLowerCase() && (!person || cleanDelalaName(entry.delalaName).toLowerCase() === person))
+                    if (matches.length > 0) {
+                      const latest = [...matches].sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))[0]
+                      setProductName(latest.productName)
+                      setUnitPrice(latest.unitPrice.toString())
+                      setPieces(latest.pieces.toString())
+                    }
+                  }} className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                <datalist id="delala-product-options">
+                  {productSuggestions.map((product) => <option key={product} value={product} />)}
+                </datalist>
               </div>
-
               {/* Unit Price & Pieces */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    {t('3. Unit Price (ETB) *', '3. ዋጋ (ብር) *')}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    required
-                    placeholder="65"
-                    value={unitPrice}
-                    onChange={(e) => setUnitPrice(e.target.value)}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
+                  <label className="block text-xs font-semibold text-foreground mb-1">{t('3. Unit Price (ETB) *', '3. ዋጋ (ብር) *')}</label>
+                  <input type="number" step="0.01" min="0" required placeholder="65" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    {t('4. Pieces *', '4. ብዛት *')}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0.001"
-                    required
-                    placeholder="10"
-                    value={pieces}
-                    onChange={(e) => setPieces(e.target.value)}
-                    className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
+                  <label className="block text-xs font-semibold text-foreground mb-1">{t('4. Cartons', '4. ካርቶን')}</label>
+                  <input type="number" step="0.001" min="0" placeholder="0" value={cartons} onChange={(e) => setCartons(e.target.value)} className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">{t('Pcs per Carton', 'ንጥሎች በካርቶን')}</label>
+                  <input type="number" step="0.001" min="0.001" placeholder="1" value={piecesPerCarton} onChange={(e) => setPiecesPerCarton(e.target.value)} className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">{t('Loose Pieces', 'ብቸኛ ቁጥር')}</label>
+                  <input type="number" step="0.001" min="0" placeholder="0" value={pieces} onChange={(e) => setPieces(e.target.value)} className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                 </div>
               </div>
-
-              {/* Sign Selector (+ / -) */}
+{/* Sign Selector (+ / -) */}
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
                   {t('5. Sign *', '5. ምልክት *')}
@@ -614,9 +633,8 @@ export function DelalaSpreadsheet({
                   {t('7. Date *', '7. ቀን *')}
                 </label>
                 <input
-                  type="text"
+                  type="date"
                   required
-                  placeholder="02/11/2026 (DD/MM/YYYY)"
                   value={transactionDate}
                   onChange={(e) => setTransactionDate(e.target.value)}
                   className="w-full px-3 py-2 text-xs sm:text-sm bg-background rounded-xl border border-border focus:ring-2 focus:ring-blue-500 focus:outline-none"

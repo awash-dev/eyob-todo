@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:et_date_picker/et_date_picker.dart';
 
 import '../models/inventory_product.dart';
 import '../services/api_service.dart';
@@ -37,7 +38,7 @@ class _EditProductDialogState extends State<EditProductDialog> {
 
   late bool _isActive;
   DateTime _selectedDate = DateTime.now();
-  String _calendarMode = 'gregorian';
+  final String _calendarMode = 'ethiopian';
 
   bool _isSaving = false;
   String? _errorMessage;
@@ -74,8 +75,8 @@ class _EditProductDialogState extends State<EditProductDialog> {
 
     _isActive = p.isActive;
 
-    final initialDateStr = p.lastTransactionDate ??
-        DateTime.now().toIso8601String().split('T')[0];
+    final initialDateStr =
+        p.lastTransactionDate ?? DateTime.now().toIso8601String().split('T')[0];
     _dateController = TextEditingController(text: initialDateStr);
     try {
       _selectedDate = DateTime.parse(initialDateStr);
@@ -140,13 +141,18 @@ class _EditProductDialogState extends State<EditProductDialog> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final result = await showEthiopianDatePickerDialog(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      showSelectedDatePreview: true,
+      useEthiopicNumerals: widget.isAmharic,
+      cancelText: widget.isAmharic ? 'ሰርዝ' : 'Cancel',
+      confirmText: widget.isAmharic ? 'ይሁን' : 'OK',
     );
-    if (picked != null) {
+    if (result != null) {
+      final picked = result.gregorianDate;
       setState(() {
         _selectedDate = picked;
         _dateController.text =
@@ -208,6 +214,7 @@ class _EditProductDialogState extends State<EditProductDialog> {
     final borderColor = isDark
         ? const Color(0xFF2E384D)
         : const Color(0xFFCBD5E1);
+    final isAdmin = widget.currentUser?.isAdmin ?? false;
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -278,7 +285,9 @@ class _EditProductDialogState extends State<EditProductDialog> {
                   TextFormField(
                     controller: _nameController,
                     decoration: InputDecoration(
-                      labelText: widget.isAmharic ? 'የዕቃ ስም *' : 'Product Name *',
+                      labelText: widget.isAmharic
+                          ? 'የዕቃ ስም *'
+                          : 'Product Name *',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -364,62 +373,64 @@ class _EditProductDialogState extends State<EditProductDialog> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 3. Selling Price (Price per piece) & Cost Price
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _unitPriceController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: widget.isAmharic
-                                ? 'የአንዱ ዋጋ (መሸጫ) *'
-                                : 'Price / Piece *',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                  // 3. Selling Price (Price per piece) & Cost Price (Admin only)
+                  if (isAdmin) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _unitPriceController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
+                            decoration: InputDecoration(
+                              labelText: widget.isAmharic
+                                  ? 'የአንዱ ዋጋ (መሸጫ) *'
+                                  : 'Price / Piece *',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                             ),
-                          ),
-                          validator: (v) {
-                            final value = double.tryParse(v?.trim() ?? '');
-                            if (value == null || value < 0) {
-                              return widget.isAmharic
-                                  ? 'ዋጋ ያስፈልጋል'
-                                  : 'Valid price required';
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _costPriceController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: widget.isAmharic
-                                ? 'የመግዣ ዋጋ'
-                                : 'Cost Price',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
-                            ),
+                            validator: (v) {
+                              final value = double.tryParse(v?.trim() ?? '');
+                              if (value == null || value < 0) {
+                                return widget.isAmharic
+                                    ? 'ዋጋ ያስፈልጋል'
+                                    : 'Valid price required';
+                              }
+                              return null;
+                            },
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _costPriceController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: widget.isAmharic
+                                  ? 'የመግዣ ዋጋ'
+                                  : 'Cost Price',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
                   // 4. Live Automatic Calculations Box
                   Container(
@@ -437,7 +448,9 @@ class _EditProductDialogState extends State<EditProductDialog> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              widget.isAmharic ? 'ጠቅላላ ፍሬ / ብዛት:' : 'Total Quantity:',
+                              widget.isAmharic
+                                  ? 'ጠቅላላ ፍሬ / ብዛት:'
+                                  : 'Total Quantity:',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
@@ -453,50 +466,37 @@ class _EditProductDialogState extends State<EditProductDialog> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              widget.isAmharic ? 'ጠቅላላ የክምችት ዋጋ:' : 'Total Stock Value:',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                        if (isAdmin) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                widget.isAmharic
+                                    ? 'ጠቅላላ የክምችት ዋጋ:'
+                                    : 'Total Stock Value:',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                            Text(
-                              '${_totalValue.toStringAsFixed(2)} ETB',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
-                                color: Color(0xFF2563EB),
+                              Text(
+                                '${_totalValue.toStringAsFixed(2)} ETB',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                  color: Color(0xFF2563EB),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
 
                   // 5. Ethiopian & Gregorian Calendar Date Selector
-                  SegmentedButton<String>(
-                    segments: [
-                      ButtonSegment(
-                        value: 'gregorian',
-                        label: Text(widget.isAmharic ? 'ግሪጎሪያን' : 'Gregorian'),
-                      ),
-                      ButtonSegment(
-                        value: 'ethiopian',
-                        label: Text(widget.isAmharic ? 'ኢትዮጵያዊ' : 'Ethiopian'),
-                      ),
-                    ],
-                    selected: {_calendarMode},
-                    onSelectionChanged: (values) {
-                      setState(() => _calendarMode = values.first);
-                    },
-                  ),
-                  const SizedBox(height: 8),
                   InkWell(
                     onTap: _pickDate,
                     borderRadius: BorderRadius.circular(8),
@@ -519,106 +519,117 @@ class _EditProductDialogState extends State<EditProductDialog> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 6. Unit & Minimum Stock
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _unitController,
-                          decoration: InputDecoration(
-                            labelText: widget.isAmharic ? 'መለኪያ' : 'Unit',
-                            hintText: 'PCS',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _minStockController,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: widget.isAmharic
-                                ? 'ዝቅተኛ ክምችት'
-                                : 'Minimum Stock',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
+                  // 6. Unit & Minimum Stock (Admin only)
+                  if (isAdmin) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _unitController,
+                            decoration: InputDecoration(
+                              labelText: widget.isAmharic ? 'መለኪያ' : 'Unit',
+                              hintText: 'PCS',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 7. Category & Supplier
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _categoryController,
-                          decoration: InputDecoration(
-                            labelText: widget.isAmharic ? 'ምድብ' : 'Category',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _minStockController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
                             ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _supplierController,
-                          decoration: InputDecoration(
-                            labelText: widget.isAmharic ? 'አቅራቢ' : 'Supplier',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
+                            decoration: InputDecoration(
+                              labelText: widget.isAmharic
+                                  ? 'ዝቅተኛ ክምችት'
+                                  : 'Minimum Stock',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 8. Active Status Switch
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      widget.isAmharic ? 'የዕቃው ሁኔታ (ንቁ)' : 'Product Status (Active)',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ],
                     ),
-                    subtitle: Text(
-                      _isActive
-                          ? (widget.isAmharic ? 'ዕቃው በክምችት ዝርዝር ውስጥ ንቁ ነው' : 'Product is active and visible')
-                          : (widget.isAmharic ? 'ዕቃው ለጊዜው እንቅስቃሴው ቆሟል' : 'Product is deactivated'),
-                      style: const TextStyle(fontSize: 11),
+                    const SizedBox(height: 12),
+
+                    // 7. Category & Supplier (Admin only)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _categoryController,
+                            decoration: InputDecoration(
+                              labelText: widget.isAmharic ? 'ምድብ' : 'Category',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _supplierController,
+                            decoration: InputDecoration(
+                              labelText: widget.isAmharic ? 'አቅራቢ' : 'Supplier',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    value: _isActive,
-                    activeThumbColor: const Color(0xFF2563EB),
-                    onChanged: (val) => setState(() => _isActive = val),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+
+                    // 8. Active Status Switch (Admin only)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        widget.isAmharic
+                            ? 'የዕቃው ሁኔታ (ንቁ)'
+                            : 'Product Status (Active)',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      subtitle: Text(
+                        _isActive
+                            ? (widget.isAmharic
+                                  ? 'ዕቃው በክምችት ዝርዝር ውስጥ ንቁ ነው'
+                                  : 'Product is active and visible')
+                            : (widget.isAmharic
+                                  ? 'ዕቃው ለጊዜው እንቅስቃሴው ቆሟል'
+                                  : 'Product is deactivated'),
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      value: _isActive,
+                      activeThumbColor: const Color(0xFF2563EB),
+                      onChanged: (val) => setState(() => _isActive = val),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // 9. Action Buttons
                   Row(

@@ -136,7 +136,7 @@ class _StatementScreenState extends State<StatementScreen> {
 
             // Excel-style Statement Table
             pw.TableHelper.fromTextArray(
-              headers: ['Date', 'Item Description', 'Qty', 'Unit Price', 'Debit (+)', 'Credit (-)', 'Balance'],
+              headers: ['Date', 'Item', 'Qty', 'Price', 'Debit', 'Credit', 'Balance'],
               headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white),
               headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF1E293B)),
               cellStyle: const pw.TextStyle(fontSize: 8.5),
@@ -396,7 +396,7 @@ class _StatementScreenState extends State<StatementScreen> {
                         border: Border(right: BorderSide(color: gridColor, width: 0.8)),
                       ),
                       child: Text(
-                        _isAmharic ? 'የዕቃ ዓይነት / ማብራሪያ' : 'Item / Description',
+                        _isAmharic ? 'ዕቃ' : 'Item',
                         style: TextStyle(
                           color: isDark ? Colors.white : const Color(0xFF1E293B),
                           fontSize: 10.5,

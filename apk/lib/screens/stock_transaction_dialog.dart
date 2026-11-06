@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:et_date_picker/et_date_picker.dart';
 import '../models/inventory_product.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/language_service.dart';
 import 'new_product_dialog.dart';
+import '../services/ethiopian_calendar.dart';
 
 /// Reusable Store Entry Dialog for Stock In (+) and Stock Out (-)
 class StockTransactionDialog extends StatefulWidget {
@@ -43,6 +45,7 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
   final _partyController = TextEditingController();
   final _notesController = TextEditingController();
   final _dateController = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
 
   bool _isSaving = false;
   String? _errorMessage;
@@ -54,7 +57,13 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
   void initState() {
     super.initState();
     _movementType = widget.initialMovementType;
-    _dateController.text = DateTime.now().toIso8601String().split('T')[0];
+    final now = DateTime.now();
+    _selectedDate = now;
+    final eth = EthiopianCalendar.toEthiopian(now.year, now.month, now.day);
+    _dateController.text = EthiopianCalendar.formatDisplay(
+      eth,
+      lang: widget.isAmharic ? 'am' : 'en',
+    );
 
     _quantityController.addListener(_onFieldChanged);
     _pcsPerCartonController.addListener(_onFieldChanged);
@@ -83,6 +92,33 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
 
   void _onFieldChanged() {
     setState(() {});
+  }
+
+  Future<void> _pickEthiopianDate() async {
+    final result = await showEthiopianDatePickerDialog(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      showSelectedDatePreview: true,
+      useEthiopicNumerals: widget.isAmharic,
+      cancelText: widget.isAmharic ? 'ሰርዝ' : 'Cancel',
+      confirmText: widget.isAmharic ? 'ይሁን' : 'OK',
+    );
+    if (result == null) return;
+    final picked = result.gregorianDate;
+    final eth = EthiopianCalendar.toEthiopian(
+      picked.year,
+      picked.month,
+      picked.day,
+    );
+    setState(() {
+      _selectedDate = picked;
+      _dateController.text = EthiopianCalendar.formatDisplay(
+        eth,
+        lang: widget.isAmharic ? 'am' : 'en',
+      );
+    });
   }
 
   void _applyProduct(InventoryProduct prod) {
@@ -145,10 +181,8 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
   }
 
   /// Unit Price per Piece
-  double get _unitPrice => double.tryParse(_unitPriceController.text.trim()) ?? 0.0;
-
-  /// Total Price = Total Pieces × Unit Price per Piece
-  double get _totalPrice => _totalPieces * _unitPrice;
+  double get _unitPrice =>
+      double.tryParse(_unitPriceController.text.trim()) ?? 0.0;
 
   /// Available pieces on-hand
   double get _availablePieces =>
@@ -157,7 +191,9 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
   /// Available cartons on-hand
   int get _availableCartons {
     if (_selectedProduct == null) return 0;
-    final factor = _selectedProduct!.pcsPerCarton > 0 ? _selectedProduct!.pcsPerCarton : 1.0;
+    final factor = _selectedProduct!.pcsPerCarton > 0
+        ? _selectedProduct!.pcsPerCarton
+        : 1.0;
     return (_selectedProduct!.currentQuantity / factor).floor();
   }
 
@@ -166,22 +202,6 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
   /// Validation: Stock Out cannot exceed available pieces
   bool get _isStockOutExceeded =>
       _isStockOut && _totalPieces > _availablePieces;
-
-  /// New total pieces after transaction
-  double get _calculatedNewTotalPieces {
-    if (_isStockOut) {
-      final rem = _availablePieces - _totalPieces;
-      return rem > 0 ? rem : 0.0;
-    } else {
-      return _availablePieces + _totalPieces;
-    }
-  }
-
-  /// New cartons derived from new total pieces
-  int get _calculatedNewCartons {
-    if (_pcsPerCarton <= 0) return 0;
-    return (_calculatedNewTotalPieces / _pcsPerCarton).floor();
-  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -232,7 +252,10 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
         pcsPerCarton: _pcsPerCarton,
         party: _partyController.text.trim().isNotEmpty ? _partyController.text.trim() : null,
         note: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
-        transactionDate: _dateController.text.trim(),
+        transactionDate:
+            '${_selectedDate.year.toString().padLeft(4, '0')}-'
+            '${_selectedDate.month.toString().padLeft(2, '0')}-'
+            '${_selectedDate.day.toString().padLeft(2, '0')}',
         storeId: _selectedProduct!.storeId ?? widget.activeStoreId,
         createdBy: widget.currentUser.id,
       );
@@ -790,104 +813,50 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Pieces per Carton Input & Unit Price Input
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Pieces per Carton input
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.isAmharic ? 'ፍሬ በካርቶን' : 'Pieces / Carton',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: labelTextColor,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            TextFormField(
-                              controller: _pcsPerCartonController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              enabled: _packaging == 'Carton',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: _packaging == 'Carton' ? primaryTextColor : const Color(0xFF94A3B8),
-                              ),
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: _packaging == 'Carton' ? inputFillColor : const Color(0xFFF1F5F9),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: inputBorderColor),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: inputBorderColor),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              ),
-                            ),
-                          ],
-                        ),
+                  // Pieces per Carton Input (shown only when packaging is Carton)
+                  if (_packaging == 'Carton') ...[
+                    Text(
+                      widget.isAmharic ? 'ፍሬ በካርቶን' : 'Pieces / Carton',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: labelTextColor,
                       ),
-                      const SizedBox(width: 10),
-
-                      // Unit Price (ETB) input
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.isAmharic ? 'የአንዱ ዋጋ (ብር)' : 'Unit Price (ETB)',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: labelTextColor,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            TextFormField(
-                              controller: _unitPriceController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor),
-                              decoration: InputDecoration(
-                                hintText: '0.00',
-                                filled: true,
-                                fillColor: inputFillColor,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: inputBorderColor),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: inputBorderColor),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              ),
-                            ),
-                          ],
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    TextFormField(
+                      controller: _pcsPerCartonController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: primaryTextColor,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: inputFillColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: inputBorderColor),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: inputBorderColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
 
                   // Strict Stock Out Protection Error
-                  if (_isStockOutExceeded)
+                  if (_isStockOutExceeded) ...[
                     Container(
-                      margin: const EdgeInsets.only(bottom: 12),
+                      margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFEF2F2),
@@ -913,136 +882,7 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
                         ],
                       ),
                     ),
-
-                  // --- 6. LIVE TOTAL PIECES & TOTAL PRICE BOX ---
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: inputBorderColor),
-                    ),
-                    child: Column(
-                      children: [
-                        // Calculated Total Pieces
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              widget.isAmharic ? 'ጠቅላላ ፍሬ:' : 'Total Pieces:',
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: labelTextColor,
-                              ),
-                            ),
-                            Text(
-                              _packaging == 'Carton'
-                                  ? '${_totalPieces.toInt()} ${widget.isAmharic ? "ፍሬ" : "Pieces"} ($_enteredQty ${widget.isAmharic ? "ካርቶን" : "ctns"} × ${_pcsPerCarton.toInt()})'
-                                  : '${_totalPieces.toInt()} ${widget.isAmharic ? "ፍሬ" : "Pieces"}',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w900,
-                                color: primaryTextColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Total Price = Total Pieces × Unit Price
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              widget.isAmharic ? 'ጠቅላላ ዋጋ:' : 'Total Price:',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: labelTextColor,
-                              ),
-                            ),
-                            Text(
-                              '${_currencyFormat.format(_totalPrice)} ${widget.isAmharic ? "ብር" : "ETB"}',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                color: _isStockOut ? const Color(0xFFDC2626) : const Color(0xFF2563EB),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        if (_selectedProduct != null) ...[
-                          const Divider(height: 16, color: Color(0xFFE2E8F0)),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                _isStockOut
-                                    ? (widget.isAmharic ? 'ቀሪ ክምችት:' : 'Remaining:')
-                                    : (widget.isAmharic ? 'አዲስ ክምችት:' : 'New Stock:'),
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: labelTextColor,
-                                ),
-                              ),
-                              Text(
-                                '$_calculatedNewCartons ${widget.isAmharic ? "ካርቶን" : "Cartons"} (${_calculatedNewTotalPieces.toInt()} ${widget.isAmharic ? "ፍሬ" : "Pieces"})',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: _calculatedNewTotalPieces <= 0
-                                      ? const Color(0xFFDC2626)
-                                      : const Color(0xFF047857),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Destination / Supplier
-                  Text(
-                    _isStockOut
-                        ? (widget.isAmharic ? 'ደንበኛ' : 'Customer')
-                        : (widget.isAmharic ? 'አቅራቢ' : 'Supplier'),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: labelTextColor,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  TextFormField(
-                    controller: _partyController,
-                    style: const TextStyle(fontSize: 13, color: primaryTextColor),
-                    decoration: InputDecoration(
-                      hintText: _isStockOut
-                          ? (widget.isAmharic ? 'ምሳሌ፡ አህመድ' : 'e.g. Ahmed')
-                          : (widget.isAmharic ? 'ምሳሌ፡ አዋሽ ፋብሪካ' : 'e.g. Awash Factory'),
-                      filled: true,
-                      fillColor: inputFillColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: inputBorderColor),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: inputBorderColor),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                  ],
 
                   // Date and Note
                   Row(
@@ -1063,22 +903,31 @@ class _StockTransactionDialogState extends State<StockTransactionDialog> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            TextFormField(
-                              controller: _dateController,
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: primaryTextColor),
-                              decoration: InputDecoration(
-                                hintText: 'YYYY-MM-DD',
-                                filled: true,
-                                fillColor: inputFillColor,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: inputBorderColor),
+                            InkWell(
+                              onTap: _pickEthiopianDate,
+                              borderRadius: BorderRadius.circular(8),
+                              child: InputDecorator(
+                                decoration: InputDecoration(
+                                  suffixIcon: const Icon(Icons.calendar_month, size: 18),
+                                  filled: true,
+                                  fillColor: inputFillColor,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: inputBorderColor),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 11,
+                                  ),
                                 ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: inputBorderColor),
+                                child: Text(
+                                  _dateController.text,
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryTextColor,
+                                  ),
                                 ),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
                               ),
                             ),
                           ],

@@ -127,18 +127,25 @@ class LanguageService {
     if (clean.isEmpty) return clean;
 
     if (isAmharic) {
-      // Look up English -> Amharic
       final lower = clean.toLowerCase();
       if (_enToAmProducts.containsKey(lower)) {
         return _enToAmProducts[lower]!;
       }
-      return clean;
+      return clean.replaceAllMapped(
+        RegExp(r"[A-Za-z]+"),
+        (match) => _enToAmProducts[match.group(0)!.toLowerCase()] ?? match.group(0)!,
+      );
     } else {
-      // Look up Amharic -> English
       if (_amToEnProducts.containsKey(clean)) {
         return _amToEnProducts[clean]!;
       }
-      return clean;
+      return clean.replaceAllMapped(
+        RegExp(r"[^\s]+"),
+        (match) {
+          final word = match.group(0)!;
+          return _amToEnProducts[word] ?? word;
+        },
+      );
     }
   }
 }

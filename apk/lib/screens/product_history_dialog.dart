@@ -181,12 +181,12 @@ class _ProductHistoryDialogState extends State<ProductHistoryDialog> {
                                       ),
                                       const SizedBox(height: 6),
 
-                                      // Row 2: Quantity breakdown (Cartons, Loose, Total Pieces)
+                                      // Row 2: Quantity and total pieces
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
-                                            '${isOut ? "-" : "+"}${m.cartons} ctns · ${m.loosePieces} loose (${m.quantity.toInt()} pcs)',
+                                            '${isOut ? "-" : "+"}${m.cartons} ctn · ${m.quantity.toInt()} pcs',
                                             style: TextStyle(
                                               fontSize: 12.5,
                                               fontWeight: FontWeight.w800,
@@ -256,4 +256,3 @@ class _ProductHistoryDialogState extends State<ProductHistoryDialog> {
     );
   }
 }
-

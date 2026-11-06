@@ -62,13 +62,6 @@ class InventoryProduct {
     return (currentQuantity / pcsPerCarton).floor();
   }
 
-  /// Loose pieces remainder: pieces left over after full cartons
-  int get loosePieces {
-    if (pcsPerCarton <= 0) return 0;
-    final rem = currentQuantity - (cartons * pcsPerCarton);
-    return rem > 0 ? rem.round() : 0;
-  }
-
   /// Total available pieces = Cartons × Pieces per Carton
   int get totalPieces {
     if (pcsPerCarton <= 0) return currentQuantity.toInt();

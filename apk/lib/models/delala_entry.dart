@@ -11,6 +11,8 @@ class DelalaEntry {
   final String? storeId;
   final String? createdAt;
   final String? updatedAt;
+  final String operationType;
+  final String? notes;
 
   const DelalaEntry({
     required this.id,
@@ -24,24 +26,36 @@ class DelalaEntry {
     this.storeId,
     this.createdAt,
     this.updatedAt,
+    this.operationType = 'item_cash',
+    this.notes,
   });
 
   factory DelalaEntry.fromMap(Map<String, dynamic> map) {
     final rawSign = map['sign'];
-    final int signVal = (rawSign is num ? rawSign.toInt() : int.tryParse(rawSign?.toString() ?? '1') ?? 1);
+    final int signVal = (rawSign is num
+        ? rawSign.toInt()
+        : int.tryParse(rawSign?.toString() ?? '1') ?? 1);
     final finalSign = signVal == -1 ? -1 : 1;
 
     final rawPrice = map['unit_price'];
-    final double priceVal = (rawPrice is num ? rawPrice.toDouble() : double.tryParse(rawPrice?.toString() ?? '0') ?? 0.0);
+    final double priceVal = (rawPrice is num
+        ? rawPrice.toDouble()
+        : double.tryParse(rawPrice?.toString() ?? '0') ?? 0.0);
 
     final rawPieces = map['pieces'];
-    final double piecesVal = (rawPieces is num ? rawPieces.toDouble() : double.tryParse(rawPieces?.toString() ?? '0') ?? 0.0);
+    final double piecesVal = (rawPieces is num
+        ? rawPieces.toDouble()
+        : double.tryParse(rawPieces?.toString() ?? '0') ?? 0.0);
 
     final rawTotal = map['total'];
-    double totalVal = (rawTotal is num ? rawTotal.toDouble() : double.tryParse(rawTotal?.toString() ?? '0') ?? 0.0);
+    double totalVal = (rawTotal is num
+        ? rawTotal.toDouble()
+        : double.tryParse(rawTotal?.toString() ?? '0') ?? 0.0);
     // If total in DB is 0 or uncalculated, calculate automatically
     if (totalVal == 0.0 && priceVal > 0 && piecesVal > 0) {
-      totalVal = double.parse((priceVal * piecesVal * finalSign).toStringAsFixed(2));
+      totalVal = double.parse(
+        (priceVal * piecesVal * finalSign).toStringAsFixed(2),
+      );
     }
 
     return DelalaEntry(
@@ -56,6 +70,8 @@ class DelalaEntry {
       storeId: map['store_id']?.toString(),
       createdAt: map['created_at']?.toString(),
       updatedAt: map['updated_at']?.toString(),
+      operationType: map['operation_type']?.toString() ?? 'item_cash',
+      notes: map['notes']?.toString(),
     );
   }
 
@@ -72,6 +88,8 @@ class DelalaEntry {
       'store_id': storeId,
       'created_at': createdAt,
       'updated_at': updatedAt,
+      'operation_type': operationType,
+      'notes': notes,
     };
   }
 
@@ -87,6 +105,8 @@ class DelalaEntry {
     String? storeId,
     String? createdAt,
     String? updatedAt,
+    String? operationType,
+    String? notes,
   }) {
     return DelalaEntry(
       id: id ?? this.id,
@@ -100,7 +120,8 @@ class DelalaEntry {
       storeId: storeId ?? this.storeId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      operationType: operationType ?? this.operationType,
+      notes: notes ?? this.notes,
     );
   }
 }
-
